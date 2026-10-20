@@ -1,19 +1,8 @@
-'use client';
-
-import { useRouter } from 'next/navigation';
-import { useEffect, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { Logo } from '@/components/Logo';
-import { useHydrated, useStore } from '@/lib/store';
 
+/** Signed-in visitors are sent to the dashboard by proxy.ts before this renders. */
 export default function AuthLayout({ children }: { children: ReactNode }) {
-  const hydrated = useHydrated();
-  const signedIn = useStore((s) => !!s.session);
-  const router = useRouter();
-
-  useEffect(() => {
-    if (hydrated && signedIn) router.replace('/');
-  }, [hydrated, signedIn, router]);
-
   return (
     <div className="auth">
       <div className="auth-brand">

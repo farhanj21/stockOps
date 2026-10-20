@@ -296,9 +296,9 @@ function Users() {
                       type="button"
                       className="btn btn-outline"
                       style={{ height: 40, padding: '0 14px' }}
-                      onClick={() => {
-                        const res = declineRequest(r.id);
-                        if (res) toast(`Request from ${res.request.name} declined.`, { label: 'Undo', fn: res.undo });
+                      onClick={async () => {
+                        const res = await declineRequest(r.id);
+                        if (res) toast(`Request from ${res.name} declined.`, { label: 'Undo', fn: res.undo });
                       }}
                     >
                       Decline
@@ -307,8 +307,8 @@ function Users() {
                       type="button"
                       className="btn btn-primary"
                       style={{ height: 40 }}
-                      onClick={() => {
-                        const done = approveRequest(r.id);
+                      onClick={async () => {
+                        const done = await approveRequest(r.id);
                         if (done) toast(`${done.name} approved as ${done.role}.`);
                       }}
                     >

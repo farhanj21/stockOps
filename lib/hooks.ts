@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useSyncExternalStore } from 'react';
 import { PERMS } from './roles';
 import { useStore } from './store';
+import type { Role, User } from './types';
 import { useUI, type UIState } from './ui';
 
 export type Tab = 'home' | 'stock' | 'plan' | 'orders' | 'setup';
@@ -21,13 +22,13 @@ export function tabOf(pathname: string): Tab {
   return (Object.keys(TAB_PATH) as Tab[]).find((t) => t === seg) ?? 'home';
 }
 
-/** Signed-in user, their active role and what that role may do. */
+/** Signed-in user, their active role and what that role may do (the server enforces the same rules). */
 export function useCurrentUser() {
-  const session = useStore((s) => s.session);
+  const me = useStore((s) => s.me);
   const users = useStore((s) => s.data.users);
-  const role = session?.role ?? 'Admin';
-  const user = users.find((u) => u.id === session?.userId) ?? users.find((u) => u.role === role) ?? users[0];
-  return { user, role, perms: PERMS[role] };
+  const role: Role = me?.role ?? 'Production';
+  const user: User = users.find((u) => u.id === me?.userId) ?? { id: me?.userId ?? '', name: '—', username: '', email: '', role };
+  return { user, role, baseRole: me?.baseRole ?? role, demo: me?.demo ?? false, perms: PERMS[role] };
 }
 
 /** Matches the desktop breakpoint in the stylesheets. */

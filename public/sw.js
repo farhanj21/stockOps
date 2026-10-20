@@ -1,8 +1,8 @@
-// StockOps service worker: makes the installed app open and work offline.
-// All app data lives in localStorage, so caching the pages and build assets is enough.
+// StockOps service worker: lets the installed app open instantly and show its shell offline.
+// Data always comes live from the server: /api and Server Action requests are never cached.
 
-const CACHE = 'stockops-v1';
-const PRECACHE = ['/', '/signin', '/stock', '/plan', '/orders', '/setup', '/manifest.webmanifest'];
+const CACHE = 'stockops-v2';
+const PRECACHE = ['/signin', '/manifest.webmanifest'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -27,7 +27,8 @@ async function networkFirst(request, isPage) {
   const cache = await caches.open(CACHE);
   try {
     const res = await fetch(request);
-    if (res.ok) cache.put(request, res.clone());
+    // A redirect (e.g. to /signin when signed out) must not be stored under the original URL.
+    if (res.ok && !res.redirected) cache.put(request, res.clone());
     return res;
   } catch {
     const cached = await cache.match(request, { ignoreSearch: isPage });
@@ -61,6 +62,7 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
 
   if (url.origin !== self.location.origin) return;
+  if (url.pathname.startsWith('/api/')) return;
 
   if (request.mode === 'navigate') return event.respondWith(networkFirst(request, true));
   // Client-side navigation payloads must match the deployed build, so prefer the network.

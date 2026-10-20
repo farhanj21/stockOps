@@ -2,9 +2,9 @@
 
 import Link from 'next/link';
 import { useState, type FormEvent } from 'react';
+import { requestPasswordReset } from '@/app/actions';
 import { Icon } from '@/components/Icon';
 import { EMAIL_RE } from '@/lib/format';
-import { toast } from '@/lib/ui';
 import { Field } from './Field';
 
 export function ForgotForm() {
@@ -12,7 +12,7 @@ export function ForgotForm() {
   const [err, setErr] = useState<string | null>(null);
   const [sentTo, setSentTo] = useState<string | null>(null);
 
-  function submit(e: FormEvent) {
+  async function submit(e: FormEvent) {
     e.preventDefault();
     const v = email.trim().toLowerCase();
     const problem = !v ? 'This field is required.' : !EMAIL_RE.test(v) ? 'Enter a valid email address.' : null;
@@ -20,6 +20,7 @@ export function ForgotForm() {
       setErr(problem);
       return;
     }
+    await requestPasswordReset(v).catch(() => null);
     setSentTo(v);
     setEmail('');
   }
@@ -30,19 +31,14 @@ export function ForgotForm() {
         <div className="done-ico mail">
           <Icon name="mail" size={26} />
         </div>
-        <h1 className="done-title">Check your email</h1>
+        {/* Email delivery isn't configured yet, so resets go through the plant admin. */}
+        <h1 className="done-title">Ask your plant admin</h1>
         <div className="done-text">
-          We sent a reset link to <strong>{sentTo}</strong>. It expires in 30 minutes.
+          Password resets by email aren&apos;t switched on yet. Your plant admin can set a new password for <strong>{sentTo}</strong>.
         </div>
         <Link href="/signin" className="btn btn-primary btn-lg" style={{ textDecoration: 'none' }}>
           Back to sign in
         </Link>
-        <div className="auth-switch">
-          Didn&apos;t get it?
-          <button type="button" className="btn-link" onClick={() => toast(`Reset link sent again to ${sentTo}.`)}>
-            Resend
-          </button>
-        </div>
       </div>
     );
   }

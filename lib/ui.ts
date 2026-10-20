@@ -1,7 +1,10 @@
 'use client';
 
 import { create } from 'zustand';
+import type { ImportRow } from './import-plan';
 import type { Num } from './types';
+
+export type { ImportRow } from './import-plan';
 
 export type SheetType = 'material' | 'product' | 'run' | 'import' | 'account';
 export type StockFilter = 'all' | 'low' | 'ingredient' | 'packaging';
@@ -16,16 +19,6 @@ export interface Toast {
   id: number;
   text: string;
   action: ToastAction | null;
-}
-
-/** One material row read from an uploaded spreadsheet. */
-export interface ImportRow {
-  name: string;
-  cost?: number;
-  pack?: number;
-  inHand?: number;
-  pipeline?: number;
-  par?: number;
 }
 
 export type ImportState =

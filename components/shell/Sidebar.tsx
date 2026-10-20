@@ -12,7 +12,7 @@ import { onNavigate, useNavItems } from './nav';
 
 export function Sidebar({ tab }: { tab: Tab }) {
   const items = useNavItems();
-  const { user, role } = useCurrentUser();
+  const { user, role, baseRole } = useCurrentUser();
   const signOut = useStore((s) => s.signOut);
   const openSheet = useUI((s) => s.openSheet);
   const router = useRouter();
@@ -51,15 +51,15 @@ export function Sidebar({ tab }: { tab: Tab }) {
         </span>
         <span className="row-main" style={{ gap: 0 }}>
           <span style={{ fontSize: 13, fontWeight: 700 }}>{user.name}</span>
-          <span style={{ fontSize: 11, color: 'var(--on-navy)' }}>{role} · switch role</span>
+          <span style={{ fontSize: 11, color: 'var(--on-navy)' }}>{role} · {baseRole === 'Admin' ? 'switch role' : 'account'}</span>
         </span>
         <Icon name="chevronRight" size={16} color="var(--on-navy-2)" />
       </button>
       <button
         type="button"
         className="side-signout"
-        onClick={() => {
-          signOut();
+        onClick={async () => {
+          await signOut();
           router.replace('/signin');
         }}
       >

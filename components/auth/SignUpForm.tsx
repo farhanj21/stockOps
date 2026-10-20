@@ -2,10 +2,10 @@
 
 import Link from 'next/link';
 import { useState, type FormEvent } from 'react';
+import { requestAccess } from '@/app/actions';
 import { Icon } from '@/components/Icon';
-import { EMAIL_RE, today } from '@/lib/format';
+import { EMAIL_RE } from '@/lib/format';
 import { ROLE_DESC } from '@/lib/roles';
-import { useStore } from '@/lib/store';
 import type { Role } from '@/lib/types';
 import { Field } from './Field';
 
@@ -15,10 +15,8 @@ const TEAMS: Role[] = ['Warehouse', 'Production', 'Admin'];
 const EMPTY = { name: '', email: '', role: 'Warehouse' as Role, pass: '', pass2: '', agree: false };
 
 export function SignUpForm() {
-  const users = useStore((s) => s.data.users);
-  const requests = useStore((s) => s.data.requests);
-  const addRequest = useStore((s) => s.addRequest);
   const [form, setForm] = useState(EMPTY);
+  const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<Errors>({});
   const [sentTo, setSentTo] = useState<string | null>(null);
 
@@ -31,15 +29,13 @@ export function SignUpForm() {
     });
   }
 
-  function submit(e: FormEvent) {
+  async function submit(e: FormEvent) {
     e.preventDefault();
     const email = form.email.trim().toLowerCase();
     const next: Errors = {};
     if (!form.name.trim()) next.name = 'This field is required.';
     if (!email) next.email = 'This field is required.';
     else if (!EMAIL_RE.test(email)) next.email = 'Enter a valid email address.';
-    else if (users.some((u) => u.email.toLowerCase() === email) || requests.some((r) => r.email === email))
-      next.email = 'An account or request already exists for this email.';
     if (!form.pass) next.pass = 'This field is required.';
     else if (form.pass.length < 8) next.pass = 'Use at least 8 characters.';
     else if (form.pass2 !== form.pass) next.pass2 = 'Passwords must match.';
@@ -48,9 +44,21 @@ export function SignUpForm() {
       setErr(next);
       return;
     }
-    addRequest({ name: form.name.trim(), email, role: form.role, date: today() });
-    setSentTo(email);
-    setForm(EMPTY);
+    setBusy(true);
+    try {
+      const res = await requestAccess({ name: form.name, email, role: form.role, password: form.pass });
+      if (!res.ok) {
+        const fe = res.fieldErrors ?? {};
+        setErr({ name: fe.name, email: fe.email ?? (fe.name || fe.password ? undefined : res.error), pass: fe.password });
+        return;
+      }
+      setSentTo(res.value.email);
+      setForm(EMPTY);
+    } catch {
+      setErr({ email: "Couldn't reach the server. Check your connection." });
+    } finally {
+      setBusy(false);
+    }
   }
 
   if (sentTo) {
@@ -176,8 +184,8 @@ export function SignUpForm() {
         </button>
         {err.agree && <div className="field-err" style={{ marginTop: 0 }}>{err.agree}</div>}
       </div>
-      <button type="submit" className="btn btn-primary btn-lg">
-        Send request
+      <button type="submit" className="btn btn-primary btn-lg" disabled={busy}>
+        {busy ? 'Sending…' : 'Send request'}
       </button>
       <div className="auth-switch">
         Already have an account?

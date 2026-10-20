@@ -1,210 +1,239 @@
 'use client';
 
-import { useSyncExternalStore } from 'react';
+/**
+ * Client copy of the server data.
+ *
+ * Every change is applied locally first so taps feel instant, then sent to the server as a
+ * Server Action. Each action returns a fresh snapshot; once no changes are in flight the
+ * latest snapshot replaces local state. If the server rejects a change, the user sees why
+ * and the store reloads from the server, undoing the optimistic edit.
+ */
 import { create } from 'zustand';
-import { createJSONStorage, persist } from 'zustand/middleware';
-import { num, round, today } from './format';
-import { ROLE_USER } from './roles';
-import { seed } from './seed';
-import type { AccessRequest, Data, Forecast, Ingredient, Num, Product, PurchaseOrder, Role, User } from './types';
+import * as api from '@/app/actions';
+import type { ActionResult, ImportUndo, Me, Snapshot } from './api';
+import { num, round } from './format';
+import type { ImportRow } from './import-plan';
+import type { Data, Ingredient, Num, Role } from './types';
+import { toast } from './ui';
 
-export interface Session {
-  userId: string;
-  role: Role;
-}
-
+type Status = 'loading' | 'ready' | 'signed-out' | 'offline';
 type Undo = () => void;
-
-const uid = (prefix: string) => prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+type StockField = 'inHand' | 'pipeline';
+type MasterField = 'cost' | 'pack' | 'par';
 
 interface StoreState {
   data: Data;
-  session: Session | null;
+  me: Me | null;
+  status: Status;
 
-  signIn: (user: User) => void;
-  signOut: () => void;
-  /** Demo role switch: jumps to that role's demo user. */
-  switchRole: (role: Role) => void;
+  load: () => Promise<void>;
+  /** Forget everything (sign-in/out), so the next screen loads fresh. */
+  clear: () => void;
+  signOut: () => Promise<void>;
+  /** Admins only: preview the app as another role. */
+  switchRole: (role: Role) => Promise<void>;
+  resetDemo: () => Promise<boolean>;
 
-  updateIngredient: (id: string, patch: Partial<Ingredient>) => void;
-  /** Add or remove one supplier pack from in-hand or pipeline. */
-  stepIngredient: (id: string, field: 'inHand' | 'pipeline', dir: 1 | -1) => void;
-  setIngredients: (next: Ingredient[]) => void;
-
-  addRequest: (r: Omit<AccessRequest, 'id'>) => void;
-  approveRequest: (id: string) => AccessRequest | null;
-  declineRequest: (id: string) => { request: AccessRequest; undo: Undo } | null;
-  setUserRole: (userId: string, role: Role) => void;
-
-  addForecast: (f: Omit<Forecast, 'id'>) => void;
-  removeForecast: (id: string) => Undo | null;
-  /** Deduct a production run from in-hand and from the plan it came from. */
-  logRun: (forecastId: string, batches: number) => void;
-
-  /** New PO goes on top and its quantities move into pipeline. */
-  createPO: (po: PurchaseOrder) => void;
-  /** Pipeline quantities move into in-hand. */
-  receivePO: (id: string) => void;
+  stepIngredient: (id: string, field: StockField, dir: 1 | -1) => void;
+  /** Typed edits to stock counts or cost / pack / par; saved after a short pause. */
+  updateIngredient: (id: string, patch: Partial<Record<StockField | MasterField, Num>>) => void;
+  importRows: (rows: ImportRow[], fileName: string) => Promise<{ updated: number; added: number; undo: Undo } | null>;
 
   setRecipeQty: (productId: string, ing: string, qty: Num) => void;
   setProductField: (productId: string, field: 'upb' | 'upc', v: Num) => void;
-  /** Changing batch weight scales every mix line so the % stay the same. */
   setBatchKg: (productId: string, v: Num) => void;
 
-  resetData: () => void;
+  approveRequest: (id: string) => Promise<{ name: string; role: Role } | null>;
+  declineRequest: (id: string) => Promise<{ name: string; undo: Undo } | null>;
+  setUserRole: (userId: string, role: Role) => void;
+
+  addForecast: (f: { productId: string; batches: number; date: string }) => Promise<boolean>;
+  removeForecast: (id: string) => Promise<Undo | null>;
+  logRun: (forecastId: string, batches: number) => Promise<{ product: string; units: number } | null>;
+
+  generatePO: (excluded: string[]) => Promise<{ id: string; lines: number } | null>;
+  receivePO: (id: string) => Promise<boolean>;
 }
 
-export const useStore = create<StoreState>()(
-  persist(
-    (set, get) => {
-      const edit = (fn: (d: Data) => Partial<Data>) => set((s) => ({ data: { ...s.data, ...fn(s.data) } }));
-      const mapIngs = (fn: (i: Ingredient) => Ingredient) => edit((d) => ({ ingredients: d.ingredients.map(fn) }));
-      const mapProduct = (id: string, fn: (p: Product) => Product) =>
-        edit((d) => ({ products: d.products.map((p) => (p.id === id ? fn(p) : p)) }));
+const EMPTY: Data = { ingredients: [], products: [], recipes: {}, forecasts: [], pos: [], users: [], requests: [] };
+const SAVE_DELAY_MS = 500;
 
-      return {
-        data: seed(),
-        session: null,
+export const useStore = create<StoreState>()((set, get) => {
+  // ── Sync engine ───────────────────────────────────────────────────────────
+  let inFlight = 0;
+  let latest: Snapshot | null = null;
+  let mustReload = false;
+  const timers = new Map<string, { timer: ReturnType<typeof setTimeout>; fire: () => void }>();
 
-        signIn: (user) => set({ session: { userId: user.id, role: user.role } }),
-        signOut: () => set({ session: null }),
-        switchRole: (role) =>
-          set((s) => ({ session: s.session && { userId: ROLE_USER[role] ?? s.session.userId, role } })),
+  const begin = () => void inFlight++;
+  const end = () => {
+    if (--inFlight > 0) return;
+    if (mustReload) {
+      mustReload = false;
+      latest = null;
+      void get().load();
+    } else if (latest) {
+      set({ data: latest.data, me: latest.me });
+      latest = null;
+    }
+  };
 
-        updateIngredient: (id, patch) => mapIngs((i) => (i.id === id ? { ...i, ...patch } : i)),
-        stepIngredient: (id, field, dir) =>
-          mapIngs((i) => (i.id === id ? { ...i, [field]: round(Math.max(0, num(i[field]) + dir * num(i.pack))) } : i)),
-        setIngredients: (next) => edit(() => ({ ingredients: next })),
+  /** Send one change; returns its value, or null if it failed (after telling the user). */
+  async function send<T>(call: () => Promise<ActionResult<T>>): Promise<T | null> {
+    begin();
+    try {
+      const res = await call();
+      if (res.ok) {
+        if (res.snapshot) latest = res.snapshot;
+        return res.value;
+      }
+      if (res.signedOut) set({ status: 'signed-out', me: null });
+      else {
+        toast(res.error);
+        mustReload = true;
+      }
+      return null;
+    } catch {
+      toast("Couldn't reach the server. Your last change wasn't saved.");
+      mustReload = true;
+      return null;
+    } finally {
+      end();
+    }
+  }
 
-        addRequest: (r) => edit((d) => ({ requests: [...d.requests, { ...r, id: uid('r') }] })),
-        approveRequest: (id) => {
-          const d = get().data;
-          const r = d.requests.find((x) => x.id === id);
-          if (!r) return null;
-          const base = r.email.split('@')[0].toLowerCase().replace(/[^a-z0-9.]/g, '') || 'user';
-          let username = base;
-          for (let n = 2; d.users.some((u) => u.username === username); n++) username = base + n;
-          edit((dd) => ({
-            requests: dd.requests.filter((x) => x.id !== id),
-            users: [...dd.users, { id: uid('u'), name: r.name, username, email: r.email, role: r.role }],
-          }));
-          return r;
-        },
-        declineRequest: (id) => {
-          const d = get().data;
-          const ix = d.requests.findIndex((x) => x.id === id);
-          if (ix < 0) return null;
-          const request = d.requests[ix];
-          edit((dd) => ({ requests: dd.requests.filter((x) => x.id !== id) }));
-          return {
-            request,
-            undo: () =>
-              edit((dd) => {
-                const requests = dd.requests.slice();
-                requests.splice(ix, 0, request);
-                return { requests };
-              }),
-          };
-        },
-        setUserRole: (userId, role) => edit((d) => ({ users: d.users.map((u) => (u.id === userId ? { ...u, role } : u)) })),
+  /** Save after typing pauses. Blank values aren't sent; the field keeps showing blank until edited. */
+  function sendLater<T>(key: string, value: Num, call: (v: number) => Promise<ActionResult<T>>) {
+    const pending = timers.get(key);
+    if (pending) clearTimeout(pending.timer);
+    else begin();
+    const fire = () => {
+      timers.delete(key);
+      if (value === '') end();
+      else void send(() => call(value)).finally(end);
+    };
+    timers.set(key, { timer: setTimeout(fire, SAVE_DELAY_MS), fire });
+  }
 
-        addForecast: (f) => edit((d) => ({ forecasts: [...d.forecasts, { ...f, id: uid('f') }] })),
-        removeForecast: (id) => {
-          const d = get().data;
-          const ix = d.forecasts.findIndex((f) => f.id === id);
-          if (ix < 0) return null;
-          const f = d.forecasts[ix];
-          edit((dd) => ({ forecasts: dd.forecasts.filter((x) => x.id !== id) }));
-          return () =>
-            edit((dd) => {
-              const forecasts = dd.forecasts.slice();
-              forecasts.splice(ix, 0, f);
-              return { forecasts };
-            });
-        },
-        logRun: (forecastId, batches) =>
-          edit((d) => {
-            const f = d.forecasts.find((x) => x.id === forecastId);
-            if (!f) return {};
-            const recipe = d.recipes[f.productId] || [];
-            return {
-              ingredients: d.ingredients.map((i) => {
-                const l = recipe.find((x) => x.ing === i.id);
-                return l ? { ...i, inHand: round(Math.max(0, num(i.inHand) - num(l.qty) * batches)) } : i;
-              }),
-              forecasts: d.forecasts
-                .map((x) => (x.id === forecastId ? { ...x, batches: num(x.batches) - batches } : x))
-                .filter((x) => num(x.batches) > 0),
-            };
-          }),
+  // Leaving or backgrounding the app: save pending edits now instead of waiting.
+  if (typeof window !== 'undefined') {
+    const flush = () => {
+      for (const { timer, fire } of [...timers.values()]) {
+        clearTimeout(timer);
+        fire();
+      }
+    };
+    window.addEventListener('pagehide', flush);
+    document.addEventListener('visibilitychange', () => document.visibilityState === 'hidden' && flush());
+  }
 
-        createPO: (po) =>
-          edit((d) => ({
-            pos: [po, ...d.pos],
-            ingredients: d.ingredients.map((i) => {
-              const l = po.lines.find((x) => x.ing === i.id);
-              return l ? { ...i, pipeline: round(num(i.pipeline) + l.qty) } : i;
-            }),
-          })),
-        receivePO: (id) =>
-          edit((d) => {
-            const po = d.pos.find((p) => p.id === id);
-            if (!po) return {};
-            return {
-              pos: d.pos.map((p) => (p.id === id ? { ...p, status: 'Received' as const, received: today() } : p)),
-              ingredients: d.ingredients.map((i) => {
-                const l = po.lines.find((x) => x.ing === i.id);
-                return l
-                  ? { ...i, inHand: round(num(i.inHand) + l.qty), pipeline: round(Math.max(0, num(i.pipeline) - l.qty)) }
-                  : i;
-              }),
-            };
-          }),
+  const edit = (fn: (d: Data) => Partial<Data>) => set((s) => ({ data: { ...s.data, ...fn(s.data) } }));
+  const mapIng = (id: string, fn: (i: Ingredient) => Ingredient) =>
+    edit((d) => ({ ingredients: d.ingredients.map((i) => (i.id === id ? fn(i) : i)) }));
 
-        setRecipeQty: (productId, ing, qty) =>
-          edit((d) => ({
-            recipes: { ...d.recipes, [productId]: (d.recipes[productId] || []).map((x) => (x.ing === ing ? { ...x, qty } : x)) },
-          })),
-        setProductField: (productId, field, v) => mapProduct(productId, (p) => ({ ...p, [field]: v })),
-        setBatchKg: (productId, v) =>
-          edit((d) => {
-            const old = num(d.products.find((p) => p.id === productId)?.batchKg);
-            const k = old > 0 && num(v) > 0 ? num(v) / old : 1;
-            const kindOf = (ing: string) => d.ingredients.find((i) => i.id === ing)?.kind;
-            return {
-              products: d.products.map((p) => (p.id === productId ? { ...p, batchKg: v } : p)),
-              recipes:
-                k === 1
-                  ? d.recipes
-                  : {
-                      ...d.recipes,
-                      [productId]: (d.recipes[productId] || []).map((x) => {
-                        const kind = kindOf(x.ing);
-                        return kind && kind !== 'packaging' ? { ...x, qty: round(num(x.qty) * k) } : x;
-                      }),
-                    },
-            };
-          }),
+  return {
+    data: EMPTY,
+    me: null,
+    status: 'loading',
 
-        resetData: () => set({ data: seed() }),
-      };
+    load: async () => {
+      try {
+        const res = await fetch('/api/snapshot', { cache: 'no-store' });
+        if (res.status === 401) return set({ status: 'signed-out', me: null, data: EMPTY });
+        if (!res.ok) throw new Error(String(res.status));
+        const snap = (await res.json()) as Snapshot;
+        // Don't clobber edits made while the request was out.
+        if (inFlight === 0) set({ data: snap.data, me: snap.me, status: 'ready' });
+        else latest = snap;
+      } catch {
+        if (get().status === 'loading') set({ status: 'offline' });
+      }
     },
-    {
-      name: 'stockops-v1',
-      version: 1,
-      storage: createJSONStorage(() => localStorage),
-      partialize: (s) => ({ data: s.data, session: s.session }),
-      // Rehydrated from <StoreHydrator /> after mount so server and first client render match.
-      skipHydration: true,
+    clear: () => set({ data: EMPTY, me: null, status: 'loading' }),
+    signOut: async () => {
+      await send(() => api.signOut());
+      set({ data: EMPTY, me: null, status: 'signed-out' });
     },
-  ),
-);
+    switchRole: async (role) => {
+      await send(() => api.switchRole(role));
+    },
+    resetDemo: async () => (await send(() => api.resetDemoData())) !== null,
 
-const subscribeHydration = (cb: () => void) => useStore.persist.onFinishHydration(cb);
+    stepIngredient: (id, field, dir) => {
+      mapIng(id, (i) => ({ ...i, [field]: round(Math.max(0, num(i[field]) + dir * num(i.pack))) }));
+      void send(() => api.stepStock(id, field, dir));
+    },
+    updateIngredient: (id, patch) => {
+      mapIng(id, (i) => ({ ...i, ...patch }));
+      for (const [field, value] of Object.entries(patch) as [StockField | MasterField, Num][]) {
+        sendLater(`ing|${id}|${field}`, value, (v) =>
+          field === 'inHand' || field === 'pipeline' ? api.setStock(id, field, v) : api.updateMaterial(id, { [field]: v }),
+        );
+      }
+    },
+    importRows: async (rows, fileName) => {
+      const res = await send(() => api.applyImport(rows, fileName));
+      if (!res) return null;
+      return { updated: res.updated, added: res.added, undo: () => void send(() => api.revertImport(res.undo as ImportUndo)) };
+    },
 
-/** False on the server and during hydration; true once localStorage has been read. */
-export function useHydrated() {
-  return useSyncExternalStore(subscribeHydration, () => useStore.persist.hasHydrated(), () => false);
-}
+    setRecipeQty: (productId, ing, qty) => {
+      edit((d) => ({ recipes: { ...d.recipes, [productId]: (d.recipes[productId] || []).map((x) => (x.ing === ing ? { ...x, qty } : x)) } }));
+      sendLater(`recipe|${productId}|${ing}`, qty, (v) => api.setRecipeQty(productId, ing, v));
+    },
+    setProductField: (productId, field, v) => {
+      edit((d) => ({ products: d.products.map((p) => (p.id === productId ? { ...p, [field]: v } : p)) }));
+      sendLater(`product|${productId}|${field}`, v, (n) => api.setProductCounts(productId, field, n));
+    },
+    setBatchKg: (productId, v) => {
+      // Preview the scaled recipe locally; the server rescales from the saved weight, so typing
+      // through intermediate values ("5", "50", "500") can't accumulate rounding error.
+      edit((d) => {
+        const old = num(d.products.find((p) => p.id === productId)?.batchKg);
+        const k = old > 0 && num(v) > 0 ? num(v) / old : 1;
+        const kindOf = (ing: string) => d.ingredients.find((i) => i.id === ing)?.kind;
+        return {
+          products: d.products.map((p) => (p.id === productId ? { ...p, batchKg: v } : p)),
+          recipes:
+            k === 1
+              ? d.recipes
+              : {
+                  ...d.recipes,
+                  [productId]: (d.recipes[productId] || []).map((x) => {
+                    const kind = kindOf(x.ing);
+                    return kind && kind !== 'packaging' ? { ...x, qty: round(num(x.qty) * k) } : x;
+                  }),
+                },
+        };
+      });
+      sendLater(`batch|${productId}`, num(v) > 0 ? v : '', (n) => api.setBatchKg(productId, n));
+    },
+
+    approveRequest: async (id) => {
+      edit((d) => ({ requests: d.requests.filter((r) => r.id !== id) }));
+      return send(() => api.approveRequest(id));
+    },
+    declineRequest: async (id) => {
+      edit((d) => ({ requests: d.requests.filter((r) => r.id !== id) }));
+      const res = await send(() => api.declineRequest(id));
+      return res && { name: res.name, undo: () => void send(() => api.reopenRequest(id)) };
+    },
+    setUserRole: (userId, role) => {
+      edit((d) => ({ users: d.users.map((u) => (u.id === userId ? { ...u, role } : u)) }));
+      void send(() => api.setUserRole(userId, role));
+    },
+
+    addForecast: async (f) => (await send(() => api.addForecast(f))) !== null,
+    removeForecast: async (id) => {
+      edit((d) => ({ forecasts: d.forecasts.filter((f) => f.id !== id) }));
+      const ok = await send(() => api.removeForecast(id));
+      return ok === null ? null : () => void send(() => api.restoreForecast(id));
+    },
+    logRun: (forecastId, batches) => send(() => api.logRun(forecastId, batches)),
+
+    generatePO: (excluded) => send(() => api.generatePO(excluded)),
+    receivePO: async (id) => (await send(() => api.receivePO(id))) !== null,
+  };
+});
 
 export const useData = () => useStore((s) => s.data);

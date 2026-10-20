@@ -1,8 +1,9 @@
 'use client';
 
+import { useState } from 'react';
 import { Icon } from '@/components/Icon';
 import { SHOW_COST } from '@/lib/config';
-import { fmt, fmtDate, money, plural, qu, today } from '@/lib/format';
+import { fmt, fmtDate, money, plural, qu } from '@/lib/format';
 import { useCurrentUser } from '@/lib/hooks';
 import { packTxt, useModel } from '@/lib/model';
 import { useStore } from '@/lib/store';
@@ -11,10 +12,11 @@ import { toast, useUI } from '@/lib/ui';
 
 export function Orders() {
   const m = useModel();
-  const { user, perms } = useCurrentUser();
+  const { perms } = useCurrentUser();
+  const [busy, setBusy] = useState<string | null>(null);
   const excluded = useUI((s) => s.poExcluded);
   const setUI = useUI((s) => s.set);
-  const createPO = useStore((s) => s.createPO);
+  const generatePO = useStore((s) => s.generatePO);
   const receivePO = useStore((s) => s.receivePO);
 
   const included = m.suggestions.filter((x) => !excluded[x.i.id]);
@@ -22,12 +24,23 @@ export function Orders() {
   const lineName = (l: PoLine) => m.byId[l.ing]?.name ?? l.ing;
   const lineQty = (l: PoLine) => (m.byId[l.ing] ? qu(l.qty, m.byId[l.ing].unit) : fmt(l.qty));
 
-  function generate() {
-    if (!included.length) return;
-    const id = m.nextPoId;
-    createPO({ id, date: today(), status: 'Open', by: user.name, lines: included.map((x) => ({ ing: x.i.id, packs: x.packs, qty: x.qty })) });
+  /** The server recomputes the order from live stock; unticked materials are left out. */
+  async function generate() {
+    if (!included.length || busy) return;
+    setBusy('generate');
+    const po = await generatePO(Object.keys(excluded).filter((id) => excluded[id]));
+    setBusy(null);
+    if (!po) return;
     setUI({ poExcluded: {} });
-    toast(`${id} generated · ${plural(included.length, 'line')} added to pipeline.`);
+    toast(`${po.id} generated · ${plural(po.lines, 'line')} added to pipeline.`);
+  }
+
+  async function receive(id: string) {
+    if (busy) return;
+    setBusy(id);
+    const ok = await receivePO(id);
+    setBusy(null);
+    if (ok) toast(`${id} received. Pipeline moved to in-hand.`);
   }
 
   return (
@@ -96,7 +109,7 @@ export function Orders() {
                 </span>
                 {SHOW_COST && <span style={{ color: 'var(--navy)' }}>{money(poCost)}</span>}
               </div>
-              <button type="button" className="btn btn-primary btn-lg" disabled={!included.length} onClick={generate}>
+              <button type="button" className="btn btn-primary btn-lg" disabled={!included.length || !!busy} onClick={generate}>
                 Generate {m.nextPoId}
               </button>
             </div>
@@ -143,10 +156,8 @@ export function Orders() {
                       type="button"
                       className="btn btn-outline"
                       style={{ width: '100%', height: 46, marginTop: 10 }}
-                      onClick={() => {
-                        receivePO(po.id);
-                        toast(`${po.id} received. Pipeline moved to in-hand.`);
-                      }}
+                      disabled={!!busy}
+                      onClick={() => receive(po.id)}
                     >
                       <Icon name="check" size={14} stroke={2.5} color="var(--ok)" />
                       Receive delivery

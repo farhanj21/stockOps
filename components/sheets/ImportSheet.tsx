@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { Icon } from '@/components/Icon';
 import { plural, today } from '@/lib/format';
 import { useCurrentUser } from '@/lib/hooks';
@@ -18,7 +18,8 @@ export function ImportSheet() {
   const imp = useUI((s) => s.imp);
   const setUI = useUI((s) => s.set);
   const ingredients = useStore((s) => s.data.ingredients);
-  const setIngredients = useStore((s) => s.setIngredients);
+  const importRows = useStore((s) => s.importRows);
+  const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const pickFile = () => {
@@ -46,15 +47,15 @@ export function ImportSheet() {
   const cols = IMPORT_COLS.filter((c) => c.key === 'name' || (fields as string[]).includes(c.key));
   const plan = imp.stage === 'preview' ? planImport(imp.rows, ingredients, perms.setup) : null;
 
-  function apply() {
-    if (imp.stage !== 'preview' || !plan?.changes) return;
-    const prev = ingredients;
-    setIngredients(plan.next);
+  /** The server re-matches the rows against live data and applies only what this role may change. */
+  async function apply() {
+    if (imp.stage !== 'preview' || !plan?.changes || busy) return;
+    setBusy(true);
+    const res = await importRows(imp.rows, imp.file);
+    setBusy(false);
+    if (!res) return;
     setUI({ sheetOpen: false, imp: { stage: 'pick' } });
-    toast(`Imported ${imp.file} · ${plural(plan.count.update, 'update')}${plan.count.add ? `, ${plan.count.add} new` : ''}.`, {
-      label: 'Undo',
-      fn: () => setIngredients(prev),
-    });
+    toast(`Imported ${imp.file} · ${plural(res.updated, 'update')}${res.added ? `, ${res.added} new` : ''}.`, { label: 'Undo', fn: res.undo });
   }
 
   return (
@@ -149,7 +150,7 @@ export function ImportSheet() {
                 </div>
               ))}
             </div>
-            <button type="button" className="btn btn-primary btn-lg" style={{ fontWeight: 700 }} disabled={!plan.changes} onClick={apply}>
+            <button type="button" className="btn btn-primary btn-lg" style={{ fontWeight: 700 }} disabled={!plan.changes || busy} onClick={apply}>
               {plan.changes ? `Apply ${plural(plan.changes, 'change')}` : 'Nothing to update'}
             </button>
           </>

@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { Icon } from '@/components/Icon';
 import { fmt, fmtDate, num, plural, qu } from '@/lib/format';
 import { useModel } from '@/lib/model';
@@ -14,6 +15,7 @@ export function RunSheet() {
   const runBatches = useUI((s) => s.runBatches);
   const setUI = useUI((s) => s.set);
   const logRun = useStore((s) => s.logRun);
+  const [busy, setBusy] = useState(false);
 
   const f = m.forecastsSorted.find((x) => x.id === runId) ?? m.forecastsSorted[0];
 
@@ -124,11 +126,14 @@ export function RunSheet() {
         <button
           type="button"
           className="btn btn-primary btn-lg"
-          disabled={blocked}
-          onClick={() => {
-            logRun(f.id, rb);
+          disabled={blocked || busy}
+          onClick={async () => {
+            setBusy(true);
+            const done = await logRun(f.id, rb);
+            setBusy(false);
+            if (!done) return;
             setUI({ sheetOpen: false });
-            toast(`Logged ${plural(rb, 'batch', 'batches')} of ${p?.name}. In-hand stock deducted.`);
+            toast(`Logged ${plural(rb, 'batch', 'batches')} of ${done.product}. In-hand stock deducted.`);
           }}
         >
           Log {plural(rb, 'batch', 'batches')} · {fmt(rb * num(p?.upb))} units

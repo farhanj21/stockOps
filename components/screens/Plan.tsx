@@ -1,17 +1,18 @@
 'use client';
 
+import { useState } from 'react';
 import { Icon } from '@/components/Icon';
 import { SHOW_COST } from '@/lib/config';
 import { daysFromToday, fmt, fmtDate, inputVal, money, num, plural, qu } from '@/lib/format';
-import { useCurrentUser, useGo } from '@/lib/hooks';
+import { useGo } from '@/lib/hooks';
 import { packTxt, useModel } from '@/lib/model';
 import { useStore } from '@/lib/store';
 import { toast, useUI } from '@/lib/ui';
 
 export function Plan() {
   const m = useModel();
-  const { user } = useCurrentUser();
   const go = useGo();
+  const [busy, setBusy] = useState(false);
   const ui = useUI();
   const addForecast = useStore((s) => s.addForecast);
   const removeForecast = useStore((s) => s.removeForecast);
@@ -31,9 +32,12 @@ export function Plan() {
         : 'Set batches to preview';
   const commitLabel = pb > 0 ? `Commit plan · ${plural(pb, 'batch', 'batches')}` : 'Commit plan';
 
-  function commit() {
-    if (pb < 1) return;
-    addForecast({ productId: pp.id, batches: pb, date: planDate, by: user.name });
+  async function commit() {
+    if (pb < 1 || busy) return;
+    setBusy(true);
+    const saved = await addForecast({ productId: pp.id, batches: pb, date: planDate });
+    setBusy(false);
+    if (!saved) return;
     ui.set({ planBatches: 0 });
     const what = `${pp.name} · ${plural(pb, 'batch', 'batches')} committed.`;
     if (impact.shortCount > 0)
@@ -47,7 +51,7 @@ export function Plan() {
         <span>{summary}</span>
         {SHOW_COST && <span className="subtle">Materials {money(impact.materialCost)}</span>}
       </div>
-      <button type="button" className="btn btn-primary btn-lg" disabled={pb < 1} onClick={commit}>
+      <button type="button" className="btn btn-primary btn-lg" disabled={pb < 1 || busy} onClick={commit}>
         {commitLabel}
       </button>
     </>
@@ -223,8 +227,8 @@ export function Plan() {
                   type="button"
                   className="icon-btn"
                   aria-label={`Remove plan for ${p?.name ?? 'product'}`}
-                  onClick={() => {
-                    const undo = removeForecast(f.id);
+                  onClick={async () => {
+                    const undo = await removeForecast(f.id);
                     if (undo) toast('Plan removed.', { label: 'Undo', fn: undo });
                   }}
                 >

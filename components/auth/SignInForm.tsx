@@ -2,45 +2,54 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState, type FormEvent } from 'react';
-import { DEMO_PASS } from '@/lib/roles';
+import { useEffect, useState, type FormEvent } from 'react';
+import { signIn } from '@/app/actions';
+import type { SessionInfo } from '@/lib/api';
 import { useStore } from '@/lib/store';
 import { toast, useUI } from '@/lib/ui';
-import type { User } from '@/lib/types';
 import { Field } from './Field';
 
 type Errors = { user?: string; pass?: string };
 
-const emailOf = (u: User) => String(u.email || u.username + '@plant1.co').toLowerCase();
-
 export function SignInForm() {
-  const users = useStore((s) => s.data.users);
-  const signIn = useStore((s) => s.signIn);
   const router = useRouter();
   const [user, setUser] = useState('');
   const [pass, setPass] = useState('');
   const [show, setShow] = useState(false);
   const [err, setErr] = useState<Errors>({});
+  const [busy, setBusy] = useState(false);
+  const [session, setSession] = useState<SessionInfo | null>(null);
 
-  const demoAccounts = ['u1', 'u2', 'u3'].map((id) => users.find((u) => u.id === id)).filter((u): u is User => !!u);
+  useEffect(() => {
+    fetch('/api/session', { cache: 'no-store' })
+      .then((r) => r.json() as Promise<SessionInfo>)
+      .then(setSession)
+      .catch(() => {});
+  }, []);
 
-  function submit(e: FormEvent) {
+  async function submit(e: FormEvent) {
     e.preventDefault();
-    const q = user.trim().toLowerCase();
     const next: Errors = {};
-    if (!q) next.user = 'This field is required.';
+    if (!user.trim()) next.user = 'This field is required.';
     if (!pass) next.pass = 'This field is required.';
-    const found = q ? users.find((x) => x.username.toLowerCase() === q || emailOf(x) === q) : undefined;
-    if (q && !found) next.user = 'No account found for that username or email.';
-    else if (found && pass && pass.length < 6) next.pass = 'Incorrect password. Try again.';
-    if (next.user || next.pass || !found) {
-      setErr(next);
-      return;
+    if (next.user || next.pass) return setErr(next);
+
+    setBusy(true);
+    try {
+      const res = await signIn(user, pass);
+      if (!res.ok) {
+        setErr(res.fieldErrors ?? { pass: res.error });
+        return;
+      }
+      useStore.getState().clear();
+      useUI.getState().set({ query: '', sheetOpen: false });
+      toast(`Signed in as ${res.value.name} · ${res.value.role}`);
+      router.replace('/');
+    } catch {
+      setErr({ pass: "Couldn't reach the server. Check your connection." });
+    } finally {
+      setBusy(false);
     }
-    signIn(found);
-    useUI.getState().set({ query: '', sheetOpen: false });
-    toast(`Signed in as ${found.name} · ${found.role}`);
-    router.replace('/');
   }
 
   return (
@@ -87,33 +96,41 @@ export function SignInForm() {
             {show ? 'Hide' : 'Show'}
           </button>
         </div>
-        {err.pass && <div className="field-err">{err.pass}</div>}
+        {err.pass && (
+          <div className="field-err" role="alert">
+            {err.pass}
+          </div>
+        )}
       </div>
-      <button type="submit" className="btn btn-primary btn-lg">
-        Sign in
+      <button type="submit" className="btn btn-primary btn-lg" disabled={busy}>
+        {busy ? 'Signing in…' : 'Sign in'}
       </button>
-      <div className="divider-label">
-        <span />
-        Demo accounts
-        <span />
-      </div>
-      <div className="demo-pills">
-        {demoAccounts.map((u) => (
-          <button
-            key={u.id}
-            type="button"
-            className="demo-pill"
-            onClick={() => {
-              setUser(u.username);
-              setPass(DEMO_PASS);
-              setShow(false);
-              setErr({});
-            }}
-          >
-            {u.role} · {u.name.split(' ')[0]}
-          </button>
-        ))}
-      </div>
+      {!!session?.demoAccounts.length && (
+        <>
+          <div className="divider-label">
+            <span />
+            Demo accounts
+            <span />
+          </div>
+          <div className="demo-pills">
+            {session.demoAccounts.map((a) => (
+              <button
+                key={a.username}
+                type="button"
+                className="demo-pill"
+                onClick={() => {
+                  setUser(a.username);
+                  setPass(session.demoPassword ?? '');
+                  setShow(false);
+                  setErr({});
+                }}
+              >
+                {a.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
       <div className="auth-switch">
         New to StockOps?
         <Link href="/signup" className="btn-link">
