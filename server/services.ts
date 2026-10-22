@@ -114,6 +114,22 @@ export async function renameOrganization(db: Db, actor: Actor, name: string) {
   await db.update(t.organizations).set({ name: name.trim() }).where(eq(t.organizations.id, actor.organizationId));
 }
 
+/** Largest logo accepted, as a data: URL. The browser resizes to 256 px first, so real logos are far smaller. */
+export const MAX_LOGO_CHARS = 400_000;
+const LOGO_RE = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+=*$/;
+
+/** Set the organization's logo (a data: URL), or remove it with null. */
+export async function setOrganizationLogo(db: Db, actor: Actor, logo: string | null) {
+  requirePerm(actor, 'setup');
+  if (logo !== null && (logo.length > MAX_LOGO_CHARS || !LOGO_RE.test(logo))) {
+    throw new AppError('Use a PNG, JPG or WebP image under 300 KB.', 'invalid');
+  }
+  await db
+    .update(t.organizations)
+    .set({ logo, logoUpdatedAt: logo ? new Date() : null })
+    .where(eq(t.organizations.id, actor.organizationId));
+}
+
 /** Demo mode only: swap the organization's materials, recipes, plans and POs for the sample plant. */
 export async function replaceWithSample(db: Db, actor: Actor) {
   if (!demoMode()) throw new AppError('Sample data is turned off on this server.', 'forbidden');

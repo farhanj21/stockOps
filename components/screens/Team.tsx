@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { useState, type ChangeEvent, type FormEvent } from 'react';
 import * as api from '@/app/actions';
 import { FormField } from '@/components/FormField';
 import { Icon } from '@/components/Icon';
+import { Logo } from '@/components/Logo';
 import { initialsOf } from '@/lib/format';
 import { useCurrentUser } from '@/lib/hooks';
 import { generatePassword } from '@/lib/password-gen';
@@ -451,7 +452,85 @@ function Organization() {
             Save
           </button>
         </div>
+        <OrgLogo />
       </form>
     </section>
+  );
+}
+
+/** Longest side of a stored logo, in pixels: plenty for the 36 px badge on high-density screens. */
+const LOGO_PX = 256;
+
+/** Shrink an image file to a small PNG (or WebP if the PNG is large) data: URL. */
+async function resizeLogo(file: File): Promise<string> {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = new Image();
+    img.src = url;
+    await img.decode();
+    // SVGs without a set size report 0×0: draw them at full size.
+    const w0 = img.naturalWidth || LOGO_PX;
+    const h0 = img.naturalHeight || LOGO_PX;
+    const scale = Math.min(1, LOGO_PX / Math.max(w0, h0));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(w0 * scale));
+    canvas.height = Math.max(1, Math.round(h0 * scale));
+    canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
+    const png = canvas.toDataURL('image/png');
+    return png.length > 250_000 ? canvas.toDataURL('image/webp', 0.9) : png;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+/** Upload or remove the logo shown in the sidebar and phone header instead of the StockOps mark. */
+function OrgLogo() {
+  const { org } = useCurrentUser();
+  const send = useStore((s) => s.send);
+  const [busy, setBusy] = useState(false);
+
+  async function upload(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) return toast('Pick an image file (PNG, JPG, WebP or SVG).');
+    setBusy(true);
+    try {
+      const logo = await resizeLogo(file);
+      if ((await send(() => api.setOrganizationLogo(logo))) !== null) toast('Logo updated.');
+    } catch {
+      toast("Couldn't read that image. Try a PNG or JPG.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove() {
+    const ok = await confirmDialog({ title: 'Remove the logo?', body: 'The StockOps logo will show instead.', confirmLabel: 'Remove logo' });
+    if (ok && (await send(() => api.setOrganizationLogo(null))) !== null) toast('Logo removed.');
+  }
+
+  return (
+    <div className="org-logo">
+      <Logo size="lg" src={org?.logoUrl} />
+      <div className="min0" style={{ flex: 1 }}>
+        <div className="field-label" style={{ marginBottom: 2 }}>
+          Logo
+        </div>
+        <div className="row-sub">Replaces the StockOps logo in the sidebar and on phones. Square images look best.</div>
+        <div className="org-logo-actions">
+          <label className={`btn btn-outline${busy ? ' is-busy' : ''}`}>
+            <Icon name="upload" size={15} />
+            {busy ? 'Uploading…' : org?.logoUrl ? 'Change logo' : 'Upload logo'}
+            <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" className="sr-only" disabled={busy} onChange={upload} />
+          </label>
+          {org?.logoUrl && (
+            <button type="button" className="btn-link danger" onClick={remove} disabled={busy}>
+              Remove
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }

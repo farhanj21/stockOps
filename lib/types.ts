@@ -75,4 +75,6 @@ export interface Data {
 export interface Organization {
   id: string;
   name: string;
+  /** Where the uploaded logo is served from, or null to show the StockOps mark. */
+  logoUrl: string | null;
 }

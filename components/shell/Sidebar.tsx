@@ -16,7 +16,7 @@ export function Sidebar({ tab }: { tab: Tab }) {
   return (
     <aside className="sidebar w-only">
       <div className="side-brand">
-        <Logo size="md" />
+        <Logo size="md" src={org?.logoUrl} />
         <div className="min0 side-text" style={{ flex: 1 }}>
           <div className="side-name">StockOps</div>
           <div className="side-plant ellipsis">{org?.name}</div>

@@ -12,7 +12,7 @@ export function MobileHeader() {
   return (
     <header className="m-header n-only">
       <div className="m-header-row">
-        <Logo size="sm" />
+        <Logo size="sm" src={org?.logoUrl} />
         <div className="row-main" style={{ gap: 0 }}>
           <span className="m-header-name">StockOps</span>
           <span className="side-plant ellipsis">{org?.name}</span>

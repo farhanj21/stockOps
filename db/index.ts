@@ -7,7 +7,7 @@
  * Migrations in /drizzle run automatically on first use. A new database starts empty: the first
  * visitor creates an organization (see `npm run db:seed-demo` for a ready-made demo one).
  */
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { PGlite } from '@electric-sql/pglite';
 import type { PgDatabase, PgQueryResultHKT } from 'drizzle-orm/pg-core';
@@ -45,13 +45,42 @@ async function init(): Promise<Db> {
 }
 
 // One connection per server process, surviving dev hot reloads.
-const globalForDb = globalThis as unknown as { __stockopsDb?: Promise<Db> };
+const globalForDb = globalThis as unknown as { __stockopsDb?: Promise<Db>; __stockopsJournal?: number };
+
+const journalStamp = () => {
+  try {
+    return statSync(path.join(migrationsFolder, 'meta', '_journal.json')).mtimeMs;
+  } catch {
+    return 0;
+  }
+};
+
+/** Development: apply migrations added while `next dev` is running, on the open connection. */
+async function migrateOpenDb(db: Db) {
+  try {
+    if (process.env.DATABASE_URL) await migratePostgres(db as never, { migrationsFolder });
+    else await migratePglite(db as never, { migrationsFolder });
+    console.log('[stockops] applied new database migrations');
+  } catch (e) {
+    console.error('[stockops] migration failed', e);
+  }
+  return db;
+}
 
 export function getDb(): Promise<Db> {
-  globalForDb.__stockopsDb ??= init().catch((err) => {
-    globalForDb.__stockopsDb = undefined;
-    throw err;
-  });
+  if (!globalForDb.__stockopsDb) {
+    globalForDb.__stockopsJournal = journalStamp();
+    globalForDb.__stockopsDb = init().catch((err) => {
+      globalForDb.__stockopsDb = undefined;
+      throw err;
+    });
+  } else if (process.env.NODE_ENV !== 'production') {
+    const stamp = journalStamp();
+    if (stamp !== globalForDb.__stockopsJournal) {
+      globalForDb.__stockopsJournal = stamp;
+      globalForDb.__stockopsDb = globalForDb.__stockopsDb.then(migrateOpenDb);
+    }
+  }
   return globalForDb.__stockopsDb;
 }
 

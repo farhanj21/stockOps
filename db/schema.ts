@@ -39,6 +39,10 @@ const orgId = () =>
 export const organizations = pgTable('organizations', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
+  /** Uploaded logo as a data: URL (PNG/JPEG/WebP, resized in the browser), shown instead of the StockOps mark. */
+  logo: text('logo'),
+  /** Changes with every upload, so the logo URL can be cached. */
+  logoUpdatedAt: timestamp('logo_updated_at', { withTimezone: true }),
   createdAt: createdAt(),
 });
 

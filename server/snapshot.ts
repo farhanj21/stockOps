@@ -79,10 +79,15 @@ export async function loadData(db: Db, organizationId: string, people: { all: bo
 export async function loadSnapshot(db: Db, actor: Actor): Promise<Snapshot> {
   const [data, [org]] = await Promise.all([
     loadData(db, actor.organizationId, { all: can(actor, 'setup'), selfId: actor.userId }),
-    db.select({ id: t.organizations.id, name: t.organizations.name }).from(t.organizations).where(eq(t.organizations.id, actor.organizationId)),
+    db
+      .select({ id: t.organizations.id, name: t.organizations.name, logoUpdatedAt: t.organizations.logoUpdatedAt })
+      .from(t.organizations)
+      .where(eq(t.organizations.id, actor.organizationId)),
   ]);
+  // The logo itself is fetched separately (it can be tens of KB); the version keeps caches fresh.
+  const logoUrl = org.logoUpdatedAt ? `/api/org-logo?v=${org.logoUpdatedAt.getTime()}` : null;
   return {
     data,
-    me: { userId: actor.userId, org, isOwner: actor.isOwner, role: actor.role, baseRole: actor.baseRole, demo: demoMode(), assistant: !!process.env.GEMINI_API_KEY },
+    me: { userId: actor.userId, org: { id: org.id, name: org.name, logoUrl }, isOwner: actor.isOwner, role: actor.role, baseRole: actor.baseRole, demo: demoMode(), assistant: !!process.env.GEMINI_API_KEY },
   };
 }

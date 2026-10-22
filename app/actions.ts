@@ -164,6 +164,11 @@ export async function renameOrganization(name: string) {
   return act((db, actor) => svc.renameOrganization(db, actor, Name.parse(name)));
 }
 
+/** Upload (a resized data: URL) or remove (null) the organization's logo. */
+export async function setOrganizationLogo(logo: string | null) {
+  return act((db, actor) => svc.setOrganizationLogo(db, actor, z.string().max(svc.MAX_LOGO_CHARS).nullable().parse(logo)));
+}
+
 /** Current state for the signed-in user (used after errors to resync). */
 export async function getSnapshot(): Promise<ActionResult<Snapshot>> {
   return act(async (db, actor) => loadSnapshot(db, actor));

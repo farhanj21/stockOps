@@ -15,6 +15,13 @@
       "when": 1792680018503,
       "tag": "0001_remove_role_preview",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792695483196,
+      "tag": "0002_org_logo",
+      "breakpoints": true
     }
   ]
 }

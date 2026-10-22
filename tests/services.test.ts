@@ -80,6 +80,17 @@ describe('organizations', () => {
   it('admins rename the organization', async () => {
     await svc.renameOrganization(db, admin, 'Plant 2');
     expect((await loadSnapshot(db, warehouse)).me.org.name).toBe('Plant 2');
+  });
+
+  it('admins upload and remove the organization logo', async () => {
+    const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAwS2OUAAAAABJRU5ErkJggg==';
+    expect((await loadSnapshot(db, admin)).me.org.logoUrl).toBeNull();
+    await svc.setOrganizationLogo(db, admin, png);
+    expect((await loadSnapshot(db, warehouse)).me.org.logoUrl).toMatch(/^\/api\/org-logo\?v=\d+$/);
+    await expect(svc.setOrganizationLogo(db, admin, 'data:image/svg+xml;base64,PHN2Zz4=')).rejects.toMatchObject({ code: 'invalid' });
+    await forbidden(svc.setOrganizationLogo(db, warehouse, png));
+    await svc.setOrganizationLogo(db, admin, null);
+    expect((await loadSnapshot(db, admin)).me.org.logoUrl).toBeNull();
     await forbidden(svc.renameOrganization(db, warehouse, 'Nope'));
   });
 });
