@@ -3,14 +3,12 @@
 import Link from 'next/link';
 import { Icon } from '@/components/Icon';
 import { Logo } from '@/components/Logo';
-import { initialsOf } from '@/lib/format';
 import { TAB_PATH, useCurrentUser, type Tab } from '@/lib/hooks';
-import { useUI } from '@/lib/ui';
+import { AccountMenu } from './AccountMenu';
 import { onNavigate, useNavItems } from './nav';
 
 export function MobileHeader() {
-  const { user, role, org } = useCurrentUser();
-  const openSheet = useUI((s) => s.openSheet);
+  const { org } = useCurrentUser();
   return (
     <header className="m-header n-only">
       <div className="m-header-row">
@@ -19,10 +17,7 @@ export function MobileHeader() {
           <span className="m-header-name">StockOps</span>
           <span className="side-plant ellipsis">{org?.name}</span>
         </div>
-        <button type="button" className="m-account" aria-label="Account and role" onClick={() => openSheet('account')}>
-          <span style={{ fontSize: 12, fontWeight: 600 }}>{role}</span>
-          <span className="avatar">{initialsOf(user.name)}</span>
-        </button>
+        <AccountMenu variant="header" />
       </div>
     </header>
   );

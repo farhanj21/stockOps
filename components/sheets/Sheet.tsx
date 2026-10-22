@@ -3,7 +3,6 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { Icon } from '@/components/Icon';
 import { useUI } from '@/lib/ui';
-import { AccountSheet } from './AccountSheet';
 import { ImportSheet } from './ImportSheet';
 import { MaterialSheet } from './MaterialSheet';
 import { ProductSheet } from './ProductSheet';
@@ -33,7 +32,6 @@ export function Sheet() {
   else if (sheet?.type === 'product' && sheet.id) body = <ProductSheet id={sheet.id} />;
   else if (sheet?.type === 'run') body = <RunSheet />;
   else if (sheet?.type === 'import') body = <ImportSheet />;
-  else if (sheet?.type === 'account') body = <AccountSheet />;
 
   return (
     <>

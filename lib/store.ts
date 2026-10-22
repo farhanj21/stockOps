@@ -30,8 +30,6 @@ interface StoreState {
   /** Forget everything (sign-in/out), so the next screen loads fresh. */
   clear: () => void;
   signOut: () => Promise<void>;
-  /** Admins only: preview the app as another role. */
-  switchRole: (role: Role) => Promise<void>;
   /** Owner, demo mode: swap all materials, recipes, plans and POs for the sample plant. */
   replaceWithSample: () => Promise<boolean>;
   /** Run any action; on error show it in a toast and resync. Returns the action's value or null. */
@@ -42,6 +40,8 @@ interface StoreState {
   stepIngredient: (id: string, field: StockField, dir: 1 | -1) => void;
   /** Typed edits to stock counts or cost / pack / par; saved after a short pause. */
   updateIngredient: (id: string, patch: Partial<Record<StockField | MasterField, Num>>) => void;
+  /** Typed edits to a material's name, type, unit or pack type; saved after a short pause. */
+  updateMaterialText: (id: string, field: 'name' | 'kind' | 'unit' | 'packName', value: string) => void;
   importRows: (rows: ImportRow[], fileName: string) => Promise<{ updated: number; added: number; undo: Undo } | null>;
 
   setRecipeQty: (productId: string, ing: string, qty: Num) => void;
@@ -106,14 +106,14 @@ export const useStore = create<StoreState>()((set, get) => {
   }
 
   /** Save after typing pauses. Blank values aren't sent; the field keeps showing blank until edited. */
-  function sendLater<T>(key: string, value: Num, call: (v: number) => Promise<ActionResult<T>>) {
+  function sendLater<T, V extends number | string>(key: string, value: V | '', call: (v: V) => Promise<ActionResult<T>>) {
     const pending = timers.get(key);
     if (pending) clearTimeout(pending.timer);
     else begin();
     const fire = () => {
       timers.delete(key);
-      if (value === '') end();
-      else void send(() => call(value)).finally(end);
+      if (value === '' || (typeof value === 'string' && !value.trim())) end();
+      else void send(() => call(value as V)).finally(end);
     };
     timers.set(key, { timer: setTimeout(fire, SAVE_DELAY_MS), fire });
   }
@@ -157,9 +157,6 @@ export const useStore = create<StoreState>()((set, get) => {
       await send(() => api.signOut());
       set({ data: EMPTY, me: null, status: 'signed-out' });
     },
-    switchRole: async (role) => {
-      await send(() => api.switchRole(role));
-    },
     replaceWithSample: async () => (await send(() => api.replaceWithSample())) !== null,
     send,
     submit: async (call) => {
@@ -187,6 +184,10 @@ export const useStore = create<StoreState>()((set, get) => {
           field === 'inHand' || field === 'pipeline' ? api.setStock(id, field, v) : api.updateMaterial(id, { [field]: v }),
         );
       }
+    },
+    updateMaterialText: (id, field, value) => {
+      mapIng(id, (i) => ({ ...i, [field]: value }));
+      sendLater(`ing|${id}|${field}`, value, (v: string) => api.updateMaterial(id, { [field]: v }));
     },
     importRows: async (rows, fileName) => {
       const res = await send(() => api.applyImport(rows, fileName));

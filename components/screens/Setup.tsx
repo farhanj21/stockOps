@@ -1,14 +1,14 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { useState, type FormEvent, type KeyboardEvent } from 'react';
 import * as api from '@/app/actions';
 import { FormField } from '@/components/FormField';
 import { Icon } from '@/components/Icon';
-import { cap1, fmt, inputVal, money, num, qu, round } from '@/lib/format';
+import { fmt, inputVal, money, num, qu, round } from '@/lib/format';
 import { useModel } from '@/lib/model';
 import { useStore } from '@/lib/store';
 import type { MaterialKind } from '@/lib/types';
-import { toast, useUI, type SetupTab } from '@/lib/ui';
+import { confirmDialog, toast, useUI, type SetupTab } from '@/lib/ui';
 
 const TABS: [SetupTab, string][] = [
   ['recipes', 'Products & recipes'],
@@ -150,7 +150,13 @@ function ProductCard({ id }: { id: string }) {
         className="btn-link danger"
         style={{ marginTop: 12, fontSize: 12 }}
         onClick={async () => {
-          if (!confirm(`Delete ${sp.name}? Its recipe, plans and production history are deleted too.`)) return;
+          const ok = await confirmDialog({
+            title: `Delete ${sp.name}?`,
+            body: 'Its recipe, committed plans and production history are deleted too. This can\'t be undone.',
+            confirmLabel: 'Delete product',
+            danger: true,
+          });
+          if (!ok) return;
           const res = await send(() => api.deleteProduct(sp.id));
           if (res) {
             setUI({ setupProduct: '' });
@@ -304,7 +310,7 @@ function NewProduct({ onCancel, onCreated }: { onCancel?: () => void; onCreated:
     <form className="card pad col" style={{ gap: 12 }} onSubmit={save} noValidate>
       <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--navy)' }}>New product</div>
       <FormField id="np-name" label="Product name" error={err.name}>
-        <input id="np-name" className="input" placeholder="e.g. Chocolate Coating" value={f.name} aria-invalid={!!err.name} onChange={(e) => set('name', e.target.value)} />
+        <input id="np-name" className="input" placeholder="Product name" value={f.name} aria-invalid={!!err.name} onChange={(e) => set('name', e.target.value)} />
       </FormField>
       <div className="grid3">
         <FormField id="np-kg" label="Batch size (kg)" error={err.batchKg}>
@@ -333,134 +339,189 @@ function NewProduct({ onCancel, onCreated }: { onCancel?: () => void; onCreated:
 
 // ── Materials ───────────────────────────────────────────────────────────────
 
+const KINDS: [MaterialKind, string, string, string][] = [
+  ['ingredient', 'Ingredient', 'kg', 'bag'],
+  ['packaging', 'Packaging', 'pcs', 'bundle'],
+  ['utility', 'Utility', 'kg', 'unit'],
+];
+
+const NUM_LABEL = { pack: 'pack size', cost: 'cost per unit', par: 'par level' } as const;
+
+/** Every material in one editable table; the last row adds a new one. */
 function Materials() {
   const m = useModel();
   const update = useStore((s) => s.updateIngredient);
+  const updateText = useStore((s) => s.updateMaterialText);
   const send = useStore((s) => s.send);
   const setUI = useUI((s) => s.set);
   const openSheet = useUI((s) => s.openSheet);
-  const [adding, setAdding] = useState(false);
+  const materials = m.data.ingredients;
 
   return (
     <>
       <div className="import-banner">
         <div className="min0" style={{ flex: '1 1 220px' }}>
-          <div style={{ fontSize: 14, fontWeight: 700 }}>{m.ings.length ? 'Update from your spreadsheet' : 'Start from your spreadsheet'}</div>
+          <div style={{ fontSize: 14, fontWeight: 700 }}>{materials.length ? 'Update from your spreadsheet' : 'Start from your spreadsheet'}</div>
           <div className="muted" style={{ marginTop: 2, fontSize: 12, lineHeight: 1.5 }}>
-            Costs, pack sizes, par levels and stock in one upload. New rows are added as materials.
+            Costs, pack sizes, par levels and stock in one upload. New rows are added as materials. Or type them straight into the table.
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button type="button" className="btn btn-outline" onClick={() => setAdding(true)}>
-            <Icon name="plus" size={16} stroke={2.2} />
-            Add material
-          </button>
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={() => {
-              setUI({ imp: { stage: 'pick' } });
-              openSheet('import');
-            }}
-          >
-            <Icon name="upload" size={16} />
-            Import Excel
-          </button>
-        </div>
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={() => {
+            setUI({ imp: { stage: 'pick' } });
+            openSheet('import');
+          }}
+        >
+          <Icon name="upload" size={16} />
+          Import Excel
+        </button>
       </div>
-      {(adding || !m.ings.length) && <NewMaterial onDone={() => setAdding(false)} canCancel={m.ings.length > 0} />}
-      <div className="mat-grid" style={{ marginTop: adding || !m.ings.length ? 12 : 0 }}>
-        {m.ings.map((i) => {
-          const fields = [
-            ['cost', `Rs / ${i.unit}`, 'Cost per unit'],
-            ['pack', `${cap1(i.packName)} (${i.unit})`, 'Pack size'],
-            ['par', `Par (${i.unit})`, 'Par level'],
-          ] as const;
-          return (
-            <div key={i.id} className="card flat" style={{ padding: '14px 16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                <span className="row-title min0 ellipsis">{i.name}</span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <span className="subtle" style={{ fontSize: 11 }}>
-                    {i.kind === 'packaging' ? 'Packaging' : 'Ingredient'}
-                  </span>
+
+      <div className="card clip mat-table-wrap">
+        <table className="mat-table">
+          <thead>
+            <tr>
+              <th scope="col">Material</th>
+              <th scope="col">Type</th>
+              <th scope="col">Unit</th>
+              <th scope="col">Pack type</th>
+              <th scope="col" className="num">
+                Pack size
+              </th>
+              <th scope="col" className="num">
+                Cost (Rs / unit)
+              </th>
+              <th scope="col" className="num">
+                Par level
+              </th>
+              <th scope="col" className="num">
+                In stock
+              </th>
+              <th scope="col">
+                <span className="sr-only">Delete</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {materials.map((i) => (
+              <tr key={i.id}>
+                <th scope="row">
+                  <input className="cell-input name" value={i.name} onChange={(e) => updateText(i.id, 'name', e.target.value)} aria-label="Material name" />
+                </th>
+                <td>
+                  <select className="cell-input" value={i.kind} onChange={(e) => updateText(i.id, 'kind', e.target.value)} aria-label={`${i.name} type`}>
+                    {KINDS.map(([v, label]) => (
+                      <option key={v} value={v}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </td>
+                <td>
+                  <input className="cell-input" value={i.unit} onChange={(e) => updateText(i.id, 'unit', e.target.value)} aria-label={`${i.name} unit`} />
+                </td>
+                <td>
+                  <input className="cell-input" value={i.packName} onChange={(e) => updateText(i.id, 'packName', e.target.value)} aria-label={`${i.name} pack type`} />
+                </td>
+                {(['pack', 'cost', 'par'] as const).map((key) => (
+                  <td key={key} className="num">
+                    <input
+                      className="cell-input num"
+                      type="number"
+                      inputMode="decimal"
+                      value={i[key]}
+                      onChange={(e) => update(i.id, { [key]: inputVal(e.target.value) })}
+                      aria-label={`${i.name} ${NUM_LABEL[key]}`}
+                    />
+                  </td>
+                ))}
+                <td className="num tnum muted">{i.kind === 'utility' ? '—' : qu(m.total(i), i.unit)}</td>
+                <td>
                   <button
                     type="button"
                     className="row-remove"
                     aria-label={`Delete ${i.name}`}
                     onClick={async () => {
-                      if (!confirm(`Delete ${i.name}?`)) return;
-                      if ((await send(() => api.deleteMaterial(i.id))) !== null) toast(`${i.name} deleted.`);
+                      const ok = await confirmDialog({
+                        title: `Delete ${i.name}?`,
+                        body: 'This removes the material for good. Materials used in a recipe or on a purchase order are kept.',
+                        confirmLabel: 'Delete material',
+                        danger: true,
+                      });
+                      if (ok && (await send(() => api.deleteMaterial(i.id))) !== null) toast(`${i.name} deleted.`);
                     }}
                   >
                     <Icon name="trash" size={14} />
                   </button>
-                </span>
-              </div>
-              <div className="mat-fields">
-                {fields.map(([key, label, aria]) => (
-                  <label key={key}>
-                    <div style={{ marginBottom: 4, fontSize: 11, fontWeight: 600 }}>{label}</div>
-                    <input
-                      type="number"
-                      inputMode="decimal"
-                      className="input h44"
-                      value={i[key]}
-                      onChange={(e) => update(i.id, { [key]: inputVal(e.target.value) })}
-                      aria-label={`${i.name} ${aria}`}
-                    />
-                  </label>
-                ))}
-              </div>
-            </div>
-          );
-        })}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <NewMaterialRow first={!materials.length} />
+          </tfoot>
+        </table>
       </div>
+      {!materials.length && (
+        <div className="muted" style={{ marginTop: 10, fontSize: 12 }}>
+          Type your first material into the row above, then press Add or Enter.
+        </div>
+      )}
     </>
   );
 }
 
-const KINDS: [MaterialKind, string, string, string][] = [
-  ['ingredient', 'Ingredient', 'kg', 'bag'],
-  ['packaging', 'Packaging', 'pcs', 'bundle'],
-  ['utility', 'Utility (not stocked)', 'kg', 'unit'],
-];
+const BLANK = { name: '', kind: 'ingredient' as MaterialKind, unit: 'kg', packName: 'bag', pack: '', cost: '', par: '' };
 
-function NewMaterial({ onDone, canCancel }: { onDone: () => void; canCancel: boolean }) {
+/** The table's last row: fill it in and press Add (or Enter) to create a material. */
+function NewMaterialRow({ first }: { first: boolean }) {
   const submit = useStore((s) => s.submit);
-  const [f, setF] = useState({ name: '', kind: 'ingredient' as MaterialKind, unit: 'kg', packName: 'bag', pack: '', cost: '', par: '' });
-  const [err, setErr] = useState<Record<string, string>>({});
+  const [f, setF] = useState(BLANK);
+  const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const set = (k: keyof typeof f, v: string) => {
+  const set = (k: keyof typeof BLANK, v: string) => {
     setF((x) => ({ ...x, [k]: v }));
-    setErr((e) => ({ ...e, [k]: '' }));
+    setErr(null);
   };
 
-  async function save(e: FormEvent) {
-    e.preventDefault();
-    if (!f.name.trim()) return setErr({ name: 'Required.' });
-    if (num(f.pack) <= 0) return setErr({ pack: 'Must be more than 0.' });
+  async function save() {
+    if (!f.name.trim()) return setErr('Give the material a name.');
+    if (num(f.pack) <= 0) return setErr('Pack size must be more than 0.');
     setBusy(true);
     const res = await submit(() => api.addMaterial({ ...f, pack: num(f.pack), cost: num(f.cost), par: num(f.par) }));
     setBusy(false);
-    if (!res.ok) return setErr(res.fieldErrors ?? { name: res.error });
+    if (!res.ok) return setErr(res.fieldErrors ? Object.values(res.fieldErrors)[0] : res.error);
     toast(`${f.name.trim()} added.`);
-    setF({ name: '', kind: f.kind, unit: f.unit, packName: f.packName, pack: '', cost: '', par: '' });
-    if (canCancel) onDone();
+    setF({ ...BLANK, kind: f.kind, unit: f.unit, packName: f.packName });
+    document.getElementById('new-mat-name')?.focus();
   }
 
+  const onEnter = (e: KeyboardEvent) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    void save();
+  };
+
   return (
-    <form className="card pad col" style={{ gap: 12 }} onSubmit={save} noValidate>
-      <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--navy)' }}>New material</div>
-      <div className="grid2" style={{ gap: 10 }}>
-        <FormField id="nm-name" label="Name" error={err.name}>
-          <input id="nm-name" className="input" placeholder="e.g. Sugar (Powdered)" value={f.name} aria-invalid={!!err.name} onChange={(e) => set('name', e.target.value)} />
-        </FormField>
-        <FormField id="nm-kind" label="Type">
+    <>
+      <tr className="new-row" onKeyDown={onEnter}>
+        <th scope="row">
+          <input
+            id="new-mat-name"
+            className="cell-input name"
+            placeholder={first ? 'Material name' : '+ New material'}
+            value={f.name}
+            onChange={(e) => set('name', e.target.value)}
+            aria-label="New material name"
+          />
+        </th>
+        <td>
           <select
-            id="nm-kind"
-            className="input"
+            className="cell-input"
             value={f.kind}
+            aria-label="New material type"
             onChange={(e) => {
               const k = KINDS.find(([v]) => v === e.target.value)!;
               setF((x) => ({ ...x, kind: k[0], unit: k[2], packName: k[3] }));
@@ -472,35 +533,40 @@ function NewMaterial({ onDone, canCancel }: { onDone: () => void; canCancel: boo
               </option>
             ))}
           </select>
-        </FormField>
-      </div>
-      <div className="grid3">
-        <FormField id="nm-unit" label="Unit" error={err.unit}>
-          <input id="nm-unit" className="input" placeholder="kg" value={f.unit} onChange={(e) => set('unit', e.target.value)} />
-        </FormField>
-        <FormField id="nm-packname" label="Pack type" error={err.packName}>
-          <input id="nm-packname" className="input" placeholder="bag, drum…" value={f.packName} onChange={(e) => set('packName', e.target.value)} />
-        </FormField>
-        <FormField id="nm-pack" label={`Pack size (${f.unit || 'unit'})`} error={err.pack}>
-          <input id="nm-pack" className="input" type="number" inputMode="decimal" placeholder="25" value={f.pack} aria-invalid={!!err.pack} onChange={(e) => set('pack', e.target.value)} />
-        </FormField>
-        <FormField id="nm-cost" label={`Cost (Rs / ${f.unit || 'unit'})`} error={err.cost}>
-          <input id="nm-cost" className="input" type="number" inputMode="decimal" value={f.cost} onChange={(e) => set('cost', e.target.value)} />
-        </FormField>
-        <FormField id="nm-par" label={`Par level (${f.unit || 'unit'})`} error={err.par}>
-          <input id="nm-par" className="input" type="number" inputMode="decimal" value={f.par} onChange={(e) => set('par', e.target.value)} />
-        </FormField>
-      </div>
-      <div style={{ display: 'flex', gap: 8 }}>
-        <button type="submit" className="btn btn-primary" style={{ flex: 1, height: 48, fontSize: 14 }} disabled={busy}>
-          {busy ? 'Adding…' : 'Add material'}
-        </button>
-        {canCancel && (
-          <button type="button" className="btn btn-outline" style={{ height: 48 }} onClick={onDone}>
-            Cancel
+        </td>
+        <td>
+          <input className="cell-input" value={f.unit} onChange={(e) => set('unit', e.target.value)} aria-label="New material unit" />
+        </td>
+        <td>
+          <input className="cell-input" value={f.packName} onChange={(e) => set('packName', e.target.value)} aria-label="New material pack type" />
+        </td>
+        {(['pack', 'cost', 'par'] as const).map((key) => (
+          <td key={key} className="num">
+            <input
+              className="cell-input num"
+              type="number"
+              inputMode="decimal"
+              placeholder={key === 'pack' ? 'Size' : '0'}
+              value={f[key]}
+              onChange={(e) => set(key, e.target.value)}
+              aria-label={`New material ${NUM_LABEL[key]}`}
+            />
+          </td>
+        ))}
+        <td colSpan={2} className="num">
+          <button type="button" className="btn btn-primary add-btn" disabled={busy || !f.name.trim()} onClick={() => void save()}>
+            <Icon name="plus" size={14} stroke={2.4} />
+            Add
           </button>
-        )}
-      </div>
-    </form>
+        </td>
+      </tr>
+      {err && (
+        <tr className="new-row-err">
+          <td colSpan={9} role="alert">
+            {err}
+          </td>
+        </tr>
+      )}
+    </>
   );
 }

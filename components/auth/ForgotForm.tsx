@@ -59,7 +59,7 @@ export function ForgotForm() {
         type="email"
         autoComplete="email"
         autoCapitalize="none"
-        placeholder="name@plant1.co"
+        placeholder="you@company.com"
         value={email}
         error={err}
         onChange={(e) => {

@@ -188,9 +188,8 @@ export async function setMemberRole(db: Db, actor: Actor, userId: string, role: 
     const u = await ownMember(tx, actor, userId);
     if (u.isOwner && role !== 'Admin') throw new AppError('The organization owner is always an Admin.', 'conflict');
     if (u.id === actor.userId && role !== 'Admin') throw new AppError("You can't take Admin away from yourself. Ask another Admin.", 'conflict');
+    // Their open sessions pick the new role up on their next request.
     await tx.update(t.users).set({ role }).where(eq(t.users.id, userId));
-    // Their open sessions pick the new role up on the next request; drop any role preview.
-    await tx.update(t.sessions).set({ viewRole: null }).where(eq(t.sessions.userId, userId));
   });
 }
 
@@ -265,15 +264,23 @@ export async function addMaterial(db: Db, actor: Actor, input: MaterialInput) {
   return { id };
 }
 
-export async function updateMaterial(db: Db, actor: Actor, id: string, patch: { cost?: number; pack?: number; par?: number }) {
+export type MaterialPatch = Partial<MaterialInput>;
+
+export async function updateMaterial(db: Db, actor: Actor, id: string, patch: MaterialPatch) {
   requirePerm(actor, 'setup');
   if (patch.pack != null && patch.pack <= 0) throw new AppError('Pack size must be more than 0.');
-  const res = await db
-    .update(t.ingredients)
-    .set({ ...patch, updatedAt: new Date() })
-    .where(and(eq(t.ingredients.id, id), eq(t.ingredients.organizationId, actor.organizationId)))
-    .returning({ id: t.ingredients.id });
-  if (!res.length) throw new AppError('That material no longer exists.', 'not_found');
+  const clean = { ...patch, ...(patch.name != null ? { name: patch.name.trim() } : {}) };
+  try {
+    const res = await db
+      .update(t.ingredients)
+      .set({ ...clean, updatedAt: new Date() })
+      .where(and(eq(t.ingredients.id, id), eq(t.ingredients.organizationId, actor.organizationId)))
+      .returning({ id: t.ingredients.id });
+    if (!res.length) throw new AppError('That material no longer exists.', 'not_found');
+  } catch (e) {
+    if (isUniqueViolation(e)) throw new AppError(`A material called "${clean.name}" already exists.`, 'conflict');
+    throw e;
+  }
 }
 
 /** Only materials that no recipe or purchase order uses can be deleted. */

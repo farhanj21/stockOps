@@ -82,6 +82,12 @@ export function Stock() {
         )}
       </div>
 
+      {perms.stock && (
+        <div className="stock-hint">
+          <strong>− / +</strong> buttons count in whole supplier packs (one bag, drum or box at a time). Tap the number to type an exact count.
+        </div>
+      )}
+
       {!perms.stock && (
         <div className="readonly-note">
           <Icon name="lock" size={14} />
@@ -97,7 +103,7 @@ export function Stock() {
               <button type="button" className="stock-name" onClick={() => openMat(i.id)}>
                 <span className="row-title">{i.name}</span>
                 <span className="subtle" style={{ fontSize: 12 }}>
-                  {cap1(i.packName)} of {qu(num(i.pack), i.unit)} · ± adds one {i.packName}
+                  − / + adds or removes one {qu(num(i.pack), i.unit)} {i.packName}
                 </span>
               </button>
               {low ? <span className="pill danger">−{qu(m.shortOf(i), i.unit)}</span> : <span className="pill ok">At par</span>}
@@ -165,7 +171,7 @@ export function Stock() {
 
       {/* Desktop: one table */}
       {rows.length > 0 && (
-        <div className="card w-only" style={{ overflowX: 'auto' }}>
+        <div className="card w-only" style={{ position: 'relative', overflowX: 'auto' }}>
           <div style={{ minWidth: 860 }} role="table" aria-label="Stock levels">
             <div className="st-row st-head" role="row">
               <span role="columnheader">Material</span>

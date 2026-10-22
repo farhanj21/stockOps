@@ -731,7 +731,7 @@
   }
 }
 select.input {
-  appearance: auto;
+  appearance: none;
 }
 .chip-add {
   display: inline-flex;
@@ -896,4 +896,170 @@ select.input {
 }
 .step-row[data-done='true'] .step-num {
   background: var(--ok);
+}
+
+/* ── Wide screens: use the extra width for more columns ─────────────── */
+
+@media (min-width: 1400px) {
+  .mat-grid,
+  .plans-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .plan-grid {
+    grid-template-columns: minmax(0, 420px) minmax(0, 1fr);
+  }
+  .recipe-grid {
+    grid-template-columns: minmax(0, 380px) minmax(0, 1fr);
+  }
+}
+@media (min-width: 1800px) {
+  .mat-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+/* ── Materials table ─────────────────────────────────────────────────── */
+
+.mat-table-wrap {
+  /* Positioned so the sticky name column's overflow stays inside the table's own scroll area. */
+  position: relative;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.mat-table {
+  width: 100%;
+  min-width: 980px;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 14px;
+}
+.mat-table th,
+.mat-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line-soft);
+  text-align: left;
+  vertical-align: middle;
+  background: #fff;
+}
+.mat-table thead th {
+  padding: 12px 8px;
+  background: var(--hover);
+  border-bottom: 1px solid var(--line);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--subtle);
+  white-space: nowrap;
+}
+.mat-table th:first-child,
+.mat-table td:first-child {
+  padding-left: 16px;
+}
+.mat-table th:last-child,
+.mat-table td:last-child {
+  width: 48px;
+  padding-right: 12px;
+}
+.mat-table .num {
+  text-align: right;
+}
+.mat-table thead th:nth-child(2) { width: 130px; }
+.mat-table thead th:nth-child(3) { width: 80px; }
+.mat-table thead th:nth-child(4) { width: 110px; }
+.mat-table thead th:nth-child(5),
+.mat-table thead th:nth-child(7) { width: 110px; }
+.mat-table thead th:nth-child(6) { width: 130px; }
+.mat-table thead th:nth-child(8) { width: 120px; }
+.mat-table tbody tr:hover > * {
+  background: var(--hover);
+}
+/* Keep the material name in view while scrolling sideways on a phone. */
+.mat-table tbody th,
+.mat-table tfoot th,
+.mat-table thead th:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  min-width: 200px;
+}
+.cell-input {
+  width: 100%;
+  min-width: 0;
+  height: 38px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  font: inherit;
+  font-size: 14px;
+  color: var(--ink);
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease,
+    box-shadow 140ms ease;
+}
+.cell-input.name {
+  font-weight: 600;
+}
+.cell-input.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.mat-table tr:hover .cell-input,
+.cell-input:hover {
+  border-color: var(--line);
+  background: #fff;
+}
+.cell-input:focus {
+  border-color: var(--gold);
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(191, 160, 90, 0.18);
+}
+select.cell-input {
+  appearance: none;
+  background-position: right 8px center !important;
+  padding-right: 30px !important;
+}
+.mat-table tfoot th,
+.mat-table tfoot td {
+  background: var(--hover);
+  border-top: 1px solid var(--line);
+  border-bottom: 0;
+}
+.mat-table tfoot .cell-input {
+  border-color: var(--line-2);
+  background: #fff;
+}
+.mat-table .add-btn {
+  height: 38px;
+  padding: 0 14px;
+}
+.new-row-err td {
+  padding: 8px 16px 12px;
+  border-top: 0;
+  background: var(--hover);
+  color: var(--danger);
+  font-size: 12px;
+  font-weight: 600;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.stock-hint {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--gold-bg);
+  color: var(--gold-ink);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.stock-hint strong {
+  color: var(--navy);
 }

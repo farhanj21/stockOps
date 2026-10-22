@@ -40,7 +40,7 @@
 
 /* Each route's content rises in; direct children follow one another. */
 .page-wrap > * {
-  animation: rise var(--t-slow) var(--ease-out) both;
+  animation: rise var(--t-slow) var(--ease-out) backwards;
 }
 .page-wrap > *:nth-child(2) {
   animation-delay: 40ms;
@@ -49,7 +49,7 @@
   animation-delay: 80ms;
 }
 .page-wrap > .col > * {
-  animation: rise var(--t-slow) var(--ease-out) both;
+  animation: rise var(--t-slow) var(--ease-out) backwards;
 }
 .page-wrap > .col > *:nth-child(2) {
   animation-delay: 50ms;
@@ -63,7 +63,7 @@
 
 /* Lists cascade in on first render (capped so long lists don't wait). */
 .list > * {
-  animation: fade var(--t-med) var(--ease-out) both;
+  animation: fade var(--t-med) var(--ease-out) backwards;
 }
 .list > *:nth-child(2) { animation-delay: 30ms; }
 .list > *:nth-child(3) { animation-delay: 60ms; }
@@ -76,7 +76,7 @@
 .stock-card,
 .plan-card,
 .mat-grid > .card {
-  animation: rise var(--t-slow) var(--ease-out) both;
+  animation: rise var(--t-slow) var(--ease-out) backwards;
 }
 .kpis > :nth-child(2),
 .actions > :nth-child(2) { animation-delay: 40ms; }
@@ -92,23 +92,23 @@
 .ios-steps,
 .install-banner,
 form.card {
-  animation: slide-down var(--t-med) var(--ease-out) both;
+  animation: slide-down var(--t-med) var(--ease-out) backwards;
 }
 
 /* Auth screens. */
 .auth-card {
-  animation: rise 480ms var(--ease-out) both;
+  animation: rise 480ms var(--ease-out) backwards;
 }
 .auth-hero {
-  animation: fade 700ms var(--ease-out) 120ms both;
+  animation: fade 700ms var(--ease-out) 120ms backwards;
 }
 .auth-done .done-ico {
-  animation: pop 420ms var(--ease-spring) both;
+  animation: pop 420ms var(--ease-spring) backwards;
 }
 
 /* Empty states and the offline screen. */
 .empty {
-  animation: fade var(--t-slow) var(--ease-out) both;
+  animation: fade var(--t-slow) var(--ease-out) backwards;
 }
 
 /* ── Feedback on touch & hover ───────────────────────────────────────── */
@@ -198,7 +198,7 @@ button.row {
   transform: scale(1.06);
 }
 .check-box svg {
-  animation: pop var(--t-med) var(--ease-spring) both;
+  animation: pop var(--t-med) var(--ease-spring) backwards;
 }
 
 /* Tabs: the gold underline slides in. */
@@ -232,7 +232,7 @@ button.row {
 .bn-badge,
 .side-count,
 .pill {
-  animation: pop var(--t-med) var(--ease-spring) both;
+  animation: pop var(--t-med) var(--ease-spring) backwards;
 }
 
 /* ── Values that change ──────────────────────────────────────────────── */
@@ -248,7 +248,7 @@ button.row {
 
 /* Search dropdown. */
 .search-pop {
-  animation: slide-down var(--t-med) var(--ease-out) both;
+  animation: slide-down var(--t-med) var(--ease-out) backwards;
   transform-origin: top center;
 }
 
@@ -272,3 +272,8 @@ button.row {
     transition-duration: 1ms !important;
   }
 }
+
+/*
+ * Entrance animations use fill-mode `backwards` (not `both`): once finished they leave no
+ * transform behind, so a finished card can't make the page wider than the screen.
+ */

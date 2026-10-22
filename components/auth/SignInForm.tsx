@@ -64,7 +64,7 @@ export function SignInForm() {
         type="text"
         autoComplete="username"
         autoCapitalize="none"
-        placeholder="e.g. areyes"
+        placeholder="Your username or email"
         value={user}
         error={err.user}
         onChange={(e) => {

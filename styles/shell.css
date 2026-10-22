@@ -21,16 +21,22 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  /* Only tables scroll sideways; the page itself never does. */
+  overflow-x: hidden;
   overscroll-behavior: contain;
 }
 .page-wrap {
-  margin: 0 auto;
   padding: 20px 16px 28px;
 }
+/* Desktop: content fills the space beside the sidebar instead of sitting in a centred column. */
 @media (min-width: 960px) {
   .page-wrap {
-    max-width: 1240px;
     padding: 28px 32px 48px;
+  }
+}
+@media (min-width: 1600px) {
+  .page-wrap {
+    padding: 32px 40px 56px;
   }
 }
 
@@ -530,4 +536,98 @@
   .auth-stack {
     max-width: 440px;
   }
+}
+
+/* ── Account menu ────────────────────────────────────────────────────── */
+
+.acct {
+  position: relative;
+}
+.acct-sidebar .side-account {
+  width: 100%;
+}
+.acct-chev {
+  transition: transform 200ms var(--ease-out, ease);
+}
+.side-account[aria-expanded='true'] .acct-chev {
+  transform: rotate(-90deg);
+}
+.acct-menu {
+  position: absolute;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.22);
+  color: var(--ink);
+}
+/* Desktop: opens upward from the name at the bottom of the sidebar. */
+.acct-sidebar .acct-menu {
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 8px);
+  transform-origin: bottom center;
+  animation: acct-up 200ms var(--ease-out, ease) backwards;
+}
+/* Phone: drops down from the avatar in the header. */
+.acct-header .acct-menu {
+  right: 0;
+  top: calc(100% + 8px);
+  width: min(290px, calc(100vw - 24px));
+  transform-origin: top right;
+  animation: acct-down 200ms var(--ease-out, ease) backwards;
+}
+@keyframes acct-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.97);
+  }
+}
+@keyframes acct-down {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.97);
+  }
+}
+.acct-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+  padding: 10px 10px 12px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.acct-item {
+  width: 100%;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 140ms ease;
+}
+.acct-item svg {
+  color: var(--muted);
+}
+.acct-item:hover,
+.acct-item:focus-visible {
+  background: var(--bg);
+}
+.acct-item.danger,
+.acct-item.danger svg {
+  color: var(--danger);
+}
+.acct-item.danger:hover {
+  background: var(--danger-bg);
 }

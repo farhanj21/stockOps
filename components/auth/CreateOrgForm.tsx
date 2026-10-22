@@ -63,7 +63,7 @@ export function CreateOrgForm() {
         <h1 className="auth-title">Create your organization</h1>
         <p className="auth-sub">You&apos;ll be its owner. Once you&apos;re in, add your warehouse and production team from the Team menu.</p>
       </div>
-      <Field id="co-org" label="Organization or plant name" placeholder="e.g. Karachi Foods — Plant 1" value={f.orgName} error={err.orgName} onChange={(e) => set('orgName', e.target.value)} />
+      <Field id="co-org" label="Organization or plant name" placeholder="Your company or plant name" value={f.orgName} error={err.orgName} onChange={(e) => set('orgName', e.target.value)} />
 
       <div className="form-section">Your account</div>
       <Field

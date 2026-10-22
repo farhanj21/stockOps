@@ -70,8 +70,6 @@ export const sessions = pgTable(
     userId: text('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
-    /** Admins may preview the app as another role. Never grants more than the user's own role. */
-    viewRole: roleEnum('view_role'),
     createdAt: createdAt(),
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   },

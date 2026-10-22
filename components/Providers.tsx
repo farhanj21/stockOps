@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import '@/lib/install'; // start listening for the browser's install prompt as early as possible
+import { ConfirmDialog } from './ConfirmDialog';
 import { Toast } from './Toast';
 
 /** App-wide client bits: register the service worker, show toasts. */
@@ -11,5 +12,10 @@ export function Providers() {
     navigator.serviceWorker.register('/sw.js', { scope: '/', updateViaCache: 'none' }).catch(() => {});
   }, []);
 
-  return <Toast />;
+  return (
+    <>
+      <Toast />
+      <ConfirmDialog />
+    </>
+  );
 }

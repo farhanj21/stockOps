@@ -16,7 +16,7 @@ There's no database to install. Without `DATABASE_URL`, the app uses a built-in 
 
 1. Open the app and choose **Create an organization**. You become its **owner** (an Admin who can't be removed). Tick *Start with sample data* to get a ready-made chocolate plant to try things with.
 2. Add materials (or import your stock spreadsheet) and build products and recipes under **Setup**. The dashboard shows a checklist until this is done.
-3. Open **Team** and create accounts for your Warehouse, Production and other Admin people. You choose their username and a temporary password (one is suggested) and hand those over. People can change their own password from the account menu.
+3. Open **Team** and create accounts for your Warehouse, Production and other Admin people. You choose their username and a temporary password (one is suggested) and hand those over. People change their own password from the account menu (click your name: bottom of the sidebar on desktop, top right on a phone).
 
 There's no public sign-up: only an organization's owner or Admins can create accounts. Admins can also change roles, reset passwords and remove people.
 
@@ -31,7 +31,7 @@ StockOps is an installable app (PWA). It opens full screen from the home screen 
 - **Android (Chrome):** an **Install StockOps** banner appears on the dashboard and sign-in screen. Tap **Install**.
 - **iPhone / iPad (Safari):** tap **How to install** in the banner. Then use Share → **Add to Home Screen**.
 - **Desktop (Chrome / Edge):** the same banner, or the install icon in the address bar.
-- **From the app:** the account menu also has **Install the app**.
+- **From the app:** the account menu (your name) also has **Install app**.
 
 Phones can only install it when the site is served over **HTTPS**, so deploy it first (next section). On your own computer, `localhost` counts as secure, so you can try installing there.
 
@@ -59,7 +59,6 @@ The server enforces every rule below on every request, and keeps each organizati
 
 - **Owner:** always an Admin and can't be demoted or removed.
 - **Admins:** can't remove themselves or take Admin away from themselves.
-- **Previewing roles:** Admins can preview the app as another role from the account menu. It never grants more access than the account has.
 
 ## How the numbers work (`lib/mrp.ts`)
 

@@ -15,7 +15,7 @@ import type { Actor } from '@/server/actor';
 import { AppError } from '@/server/errors';
 import * as svc from '@/server/services';
 import { USERNAME_RE } from '@/server/services';
-import { createSession, destroySession, getActor, setViewRole } from '@/server/session';
+import { createSession, destroySession, getActor } from '@/server/session';
 import { loadSnapshot } from '@/server/snapshot';
 
 // ── Input schemas ───────────────────────────────────────────────────────────
@@ -153,10 +153,6 @@ export async function changePassword(current: string, next: string): Promise<Act
   });
 }
 
-export async function switchRole(role: string) {
-  return act((db, actor) => setViewRole(db, actor, RoleZ.parse(role)));
-}
-
 export async function replaceWithSample() {
   return act(async (db, actor) => {
     await svc.replaceWithSample(db, actor);
@@ -183,10 +179,19 @@ export async function setStock(id: string, field: string, value: number) {
   return act((db, actor) => svc.setStock(db, actor, Id.parse(id), Field.parse(field), Qty.parse(value)));
 }
 
-export async function updateMaterial(id: string, patch: { cost?: number; pack?: number; par?: number }) {
-  return act((db, actor) =>
-    svc.updateMaterial(db, actor, Id.parse(id), z.object({ cost: Qty.optional(), pack: Qty.optional(), par: Qty.optional() }).strict().parse(patch)),
-  );
+export async function updateMaterial(id: string, patch: svc.MaterialPatch) {
+  const Patch = z
+    .object({
+      name: Name.optional(),
+      kind: z.enum(MATERIAL_KINDS).optional(),
+      unit: z.string().trim().min(1).max(12).optional(),
+      packName: z.string().trim().min(1).max(24).optional(),
+      cost: Qty.optional(),
+      pack: Qty.optional(),
+      par: Qty.optional(),
+    })
+    .strict();
+  return act((db, actor) => svc.updateMaterial(db, actor, Id.parse(id), Patch.parse(patch)));
 }
 
 export async function addMaterial(form: { name: string; kind: string; unit: string; packName: string; pack: number; cost: number; par: number }) {

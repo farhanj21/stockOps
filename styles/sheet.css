@@ -201,3 +201,98 @@
   gap: 10px;
   padding: 10px 14px;
 }
+
+/* ── Confirm dialog (replaces the browser's confirm box) ─────────────── */
+
+.confirm-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.confirm-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 32, 56, 0.5);
+  animation: fade 180ms ease backwards;
+}
+.confirm {
+  position: relative;
+  width: min(400px, 100%);
+  padding: 24px 22px 20px;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.28);
+  text-align: center;
+  animation: pop 240ms cubic-bezier(0.34, 1.4, 0.64, 1) backwards;
+}
+.confirm-layer[data-leaving='true'] .confirm-backdrop {
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+.confirm-layer[data-leaving='true'] .confirm {
+  opacity: 0;
+  transform: scale(0.96);
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease;
+}
+.confirm-ico {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--gold-bg);
+  color: var(--gold-ink);
+}
+.confirm-ico.danger {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+.confirm-title {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 22px;
+  font-weight: 400;
+  line-height: 1.25;
+  color: var(--navy);
+}
+.confirm-body {
+  margin: 8px 0 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+.confirm-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 20px;
+}
+.confirm-actions .btn {
+  height: 48px;
+  font-size: 14px;
+}
+.btn-danger {
+  background: var(--danger);
+  color: #fff;
+}
+.btn-danger:not(:disabled):hover {
+  background: #8f3029;
+}
+/* Phones: dialog sits at the bottom, within thumb reach. */
+@media (max-width: 520px) {
+  .confirm-layer {
+    align-items: flex-end;
+    padding: 12px 12px calc(12px + env(safe-area-inset-bottom));
+  }
+  .confirm {
+    width: 100%;
+  }
+}

@@ -6,7 +6,7 @@ import type { Num } from './types';
 
 export type { ImportRow } from './import-plan';
 
-export type SheetType = 'material' | 'product' | 'run' | 'import' | 'account';
+export type SheetType = 'material' | 'product' | 'run' | 'import';
 export type StockFilter = 'all' | 'low' | 'ingredient' | 'packaging';
 export type SetupTab = 'recipes' | 'materials';
 
@@ -86,3 +86,24 @@ export const useUI = create<UIState>()((set) => ({
 }));
 
 export const toast = (text: string, action?: ToastAction | null) => useUI.getState().showToast(text, action);
+
+export interface ConfirmOptions {
+  title: string;
+  body?: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  /** Red confirm button for destructive actions. */
+  danger?: boolean;
+}
+
+interface ConfirmState {
+  open: ConfirmOptions & { resolve: (ok: boolean) => void } | null;
+}
+
+export const useConfirm = create<ConfirmState>()(() => ({ open: null }));
+
+/** In-app replacement for window.confirm(): resolves true when the person confirms. */
+export function confirmDialog(opts: ConfirmOptions): Promise<boolean> {
+  useConfirm.getState().open?.resolve(false);
+  return new Promise((resolve) => useConfirm.setState({ open: { ...opts, resolve } }));
+}

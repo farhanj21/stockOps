@@ -10,7 +10,7 @@ import { generatePassword } from '@/lib/password-gen';
 import { ROLE_DESC, ROLES } from '@/lib/roles';
 import { useStore } from '@/lib/store';
 import type { Role, User } from '@/lib/types';
-import { toast } from '@/lib/ui';
+import { confirmDialog, toast } from '@/lib/ui';
 
 const MATRIX: [string, boolean, boolean, boolean][] = [
   ['Team accounts & organization', true, false, false],
@@ -319,7 +319,13 @@ function Member({ u }: { u: User }) {
               type="button"
               className="btn-link danger"
               onClick={async () => {
-                if (!confirm(`Remove ${u.name}? They won't be able to sign in any more. Their past work stays on record.`)) return;
+                const ok = await confirmDialog({
+                  title: `Remove ${u.name}?`,
+                  body: "They won't be able to sign in any more. Their past work stays on record, and you can add them again later.",
+                  confirmLabel: 'Remove from team',
+                  danger: true,
+                });
+                if (!ok) return;
                 const res = await send(() => api.removeMember(u.id));
                 if (res) toast(`${res.name} removed from the team.`);
               }}
