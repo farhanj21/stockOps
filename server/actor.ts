@@ -5,7 +5,9 @@ import { AppError } from './errors';
 /** The signed-in person a request acts for. */
 export interface Actor {
   userId: string;
+  organizationId: string;
   name: string;
+  isOwner: boolean;
   /** Effective role: the account's role, or the role an Admin is previewing. */
   role: Role;
   baseRole: Role;

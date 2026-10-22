@@ -54,9 +54,9 @@ export function SignInForm() {
 
   return (
     <form onSubmit={submit} noValidate className="auth-form">
-      <div>
+      <div className="auth-head">
         <h1 className="auth-title">Sign in</h1>
-        <div className="auth-sub">Welcome back. Use your plant account.</div>
+        <p className="auth-sub">Welcome back. Use the account your admin set up for you.</p>
       </div>
       <Field
         id="si-user"
@@ -132,9 +132,9 @@ export function SignInForm() {
         </>
       )}
       <div className="auth-switch">
-        New to StockOps?
-        <Link href="/signup" className="btn-link">
-          Request access
+        Setting up StockOps for your plant?
+        <Link href="/create-org" className="btn-link">
+          Create an organization
         </Link>
       </div>
     </form>

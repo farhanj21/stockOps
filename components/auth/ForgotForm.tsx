@@ -32,9 +32,9 @@ export function ForgotForm() {
           <Icon name="mail" size={26} />
         </div>
         {/* Email delivery isn't configured yet, so resets go through the plant admin. */}
-        <h1 className="done-title">Ask your plant admin</h1>
+        <h1 className="done-title">Ask your admin</h1>
         <div className="done-text">
-          Password resets by email aren&apos;t switched on yet. Your plant admin can set a new password for <strong>{sentTo}</strong>.
+          Password resets by email aren&apos;t switched on yet. An Admin in your organization can set a new password for <strong>{sentTo}</strong> from the Team menu.
         </div>
         <Link href="/signin" className="btn btn-primary btn-lg" style={{ textDecoration: 'none' }}>
           Back to sign in
@@ -49,9 +49,9 @@ export function ForgotForm() {
         <Icon name="chevronLeft" size={16} />
         Back to sign in
       </Link>
-      <div>
+      <div className="auth-head">
         <h1 className="auth-title">Reset password</h1>
-        <div className="auth-sub">Enter your work email and we&apos;ll send you a reset link.</div>
+        <p className="auth-sub">Enter the email on your account.</p>
       </div>
       <Field
         id="fp-email"

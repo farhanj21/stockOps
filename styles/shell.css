@@ -466,3 +466,68 @@
     animation: none;
   }
 }
+
+/* ── Install the app ─────────────────────────────────────────────────── */
+
+.install-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+  padding: 12px 8px 12px 14px;
+  border: 1px solid var(--navy-3);
+  border-radius: 16px;
+  background: var(--navy);
+  color: var(--bg);
+}
+.install-banner .row-sub {
+  color: var(--on-navy);
+}
+.install-banner .icon-btn {
+  color: var(--on-navy);
+}
+.install-banner .icon-btn:hover {
+  background: var(--navy-2);
+}
+.install-banner .btn-primary {
+  background: var(--gold);
+  color: var(--navy);
+}
+.install-banner .btn-primary:not(:disabled):hover {
+  background: #cdb06c;
+}
+.install-banner .btn-outline {
+  background: transparent;
+  border-color: var(--navy-3);
+  color: var(--bg);
+}
+.ios-steps {
+  flex-basis: 100%;
+  margin: 0;
+  padding: 12px 14px 12px 34px;
+  border-radius: 12px;
+  background: var(--bg);
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.7;
+}
+.install-banner .ios-steps {
+  background: var(--navy-2);
+  color: var(--bg);
+}
+.auth-stack {
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.auth-stack .install-banner {
+  margin: 0;
+}
+@media (min-width: 960px) {
+  .auth-stack {
+    max-width: 440px;
+  }
+}

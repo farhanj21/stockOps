@@ -1,10 +1,9 @@
 import 'server-only';
 import { createHash, randomBytes } from 'node:crypto';
 import { and, eq, gt, lt } from 'drizzle-orm';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import type { Db } from '@/db';
 import * as t from '@/db/schema';
-import { isProduction } from '@/db/seed';
 import type { Role } from '@/lib/types';
 import type { Actor } from './actor';
 import { AppError } from './errors';
@@ -20,7 +19,10 @@ export async function createSession(db: Db, userId: string) {
   const now = new Date();
   await db.delete(t.sessions).where(lt(t.sessions.expiresAt, now));
   await db.insert(t.sessions).values({ id: hashToken(token), userId, expiresAt: new Date(now.getTime() + MAX_AGE_S * 1000) });
-  (await cookies()).set(SESSION_COOKIE, token, { httpOnly: true, sameSite: 'lax', secure: isProduction(), path: '/', maxAge: MAX_AGE_S });
+  // Secure cookies only over HTTPS, so the app still works on a local network over plain http.
+  const h = await headers();
+  const https = h.get('x-forwarded-proto')?.split(',')[0].trim() === 'https' || process.env.SECURE_COOKIES === 'true';
+  (await cookies()).set(SESSION_COOKIE, token, { httpOnly: true, sameSite: 'lax', secure: https, path: '/', maxAge: MAX_AGE_S });
 }
 
 /** The signed-in user for this request, or null. Reads the role fresh from the database every time. */
@@ -29,13 +31,13 @@ export async function getActor(db: Db): Promise<Actor | null> {
   if (!token) return null;
   const sessionId = hashToken(token);
   const [row] = await db
-    .select({ userId: t.users.id, name: t.users.name, role: t.users.role, viewRole: t.sessions.viewRole })
+    .select({ userId: t.users.id, organizationId: t.users.organizationId, name: t.users.name, role: t.users.role, isOwner: t.users.isOwner, viewRole: t.sessions.viewRole })
     .from(t.sessions)
     .innerJoin(t.users, eq(t.sessions.userId, t.users.id))
     .where(and(eq(t.sessions.id, sessionId), gt(t.sessions.expiresAt, new Date()), eq(t.users.active, true)));
   if (!row) return null;
   const role = row.role === 'Admin' && row.viewRole ? row.viewRole : row.role;
-  return { userId: row.userId, name: row.name, role, baseRole: row.role, sessionId };
+  return { userId: row.userId, organizationId: row.organizationId, name: row.name, isOwner: row.isOwner, role, baseRole: row.role, sessionId };
 }
 
 export async function destroySession(db: Db) {

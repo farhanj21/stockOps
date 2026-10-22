@@ -2,7 +2,8 @@
 export type Num = number | '';
 
 export type Role = 'Admin' | 'Warehouse' | 'Production';
-export type MaterialKind = 'ingredient' | 'packaging' | 'utility';
+export const MATERIAL_KINDS = ['ingredient', 'packaging', 'utility'] as const;
+export type MaterialKind = (typeof MATERIAL_KINDS)[number];
 
 export interface Ingredient {
   id: string;
@@ -59,14 +60,7 @@ export interface User {
   username: string;
   email: string;
   role: Role;
-}
-
-export interface AccessRequest {
-  id: string;
-  name: string;
-  email: string;
-  role: Role;
-  date: string;
+  isOwner: boolean;
 }
 
 export interface Data {
@@ -76,5 +70,9 @@ export interface Data {
   forecasts: Forecast[];
   pos: PurchaseOrder[];
   users: User[];
-  requests: AccessRequest[];
+}
+
+export interface Organization {
+  id: string;
+  name: string;
 }

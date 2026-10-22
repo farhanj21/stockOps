@@ -7,13 +7,14 @@
  */
 import { z } from 'zod';
 import { getDb, type Db } from '@/db';
-import { demoMode, resetContent } from '@/db/seed';
 import type { ActionResult, ImportUndo, Snapshot } from '@/lib/api';
 import { EMAIL_RE } from '@/lib/format';
+import { MATERIAL_KINDS } from '@/lib/types';
 import { ROLES } from '@/lib/roles';
 import type { Actor } from '@/server/actor';
 import { AppError } from '@/server/errors';
 import * as svc from '@/server/services';
+import { USERNAME_RE } from '@/server/services';
 import { createSession, destroySession, getActor, setViewRole } from '@/server/session';
 import { loadSnapshot } from '@/server/snapshot';
 
@@ -24,6 +25,14 @@ const Qty = z.number().finite().min(0).max(1e9);
 const Count = z.number().int().min(0).max(1e6);
 const Field = z.enum(['inHand', 'pipeline']);
 const RoleZ = z.enum(ROLES as [string, ...string[]]).transform((r) => r as (typeof ROLES)[number]);
+const Name = z.string().trim().min(1, 'This field is required.').max(120);
+const Email = z.string().trim().toLowerCase().regex(EMAIL_RE, 'Enter a valid email address.').max(200);
+const Username = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .regex(USERNAME_RE, '3–32 characters: letters, numbers, dot, dash or underscore.');
+const Password = z.string().min(8, 'Use at least 8 characters.').max(200);
 const IsoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Pick a date.');
 const ImportRows = z
   .array(
@@ -100,47 +109,63 @@ export async function signOut(): Promise<ActionResult> {
   }
 }
 
-export async function requestAccess(form: { name: string; email: string; role: string; password: string }): Promise<ActionResult<{ email: string }>> {
-  const parsed = z
-    .object({
-      name: z.string().trim().min(1, 'This field is required.').max(100),
-      email: z.string().trim().toLowerCase().regex(EMAIL_RE, 'Enter a valid email address.').max(200),
-      role: RoleZ,
-      password: z.string().min(8, 'Use at least 8 characters.').max(200),
-    })
-    .safeParse(form);
-  if (!parsed.success) {
-    const fieldErrors = Object.fromEntries(parsed.error.issues.map((i) => [String(i.path[0]), i.message]));
-    return { ok: false, error: 'Check the highlighted fields.', fieldErrors };
-  }
-  try {
-    const value = await svc.requestAccess(await getDb(), parsed.data);
-    return { ok: true, value, snapshot: null };
-  } catch (e) {
-    return fail(e);
-  }
-}
-
 /**
  * Password reset by email needs a mail provider, which isn't configured yet.
- * The response never reveals whether an account exists; an Admin can reset a password with `npm run user:password`.
+ * The response never reveals whether an account exists; an Admin resets passwords from the Team screen.
  */
 export async function requestPasswordReset(email: string): Promise<ActionResult> {
   if (!EMAIL_RE.test(String(email ?? '').trim())) return { ok: false, error: 'Enter a valid email address.' };
   return { ok: true, value: null, snapshot: null };
 }
 
+/** Validation errors keyed by field, for forms. */
+function fieldFail(error: z.ZodError): ActionResult<never> {
+  return { ok: false, error: 'Check the highlighted fields.', fieldErrors: Object.fromEntries(error.issues.map((i) => [String(i.path[0]), i.message])) };
+}
+
+/** Start a new organization; the creator becomes its owner and is signed in. */
+export async function createOrganization(form: {
+  orgName: string;
+  name: string;
+  email: string;
+  username: string;
+  password: string;
+  sample: boolean;
+}): Promise<ActionResult<{ name: string }>> {
+  const parsed = z.object({ orgName: Name, name: Name, email: Email, username: Username, password: Password, sample: z.boolean() }).safeParse(form);
+  if (!parsed.success) return fieldFail(parsed.error);
+  try {
+    const db = await getDb();
+    const owner = await svc.createOrganization(db, parsed.data);
+    await createSession(db, owner.userId);
+    return { ok: true, value: { name: owner.name }, snapshot: null };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function changePassword(current: string, next: string): Promise<ActionResult> {
+  const parsed = z.object({ current: z.string().min(1, 'Enter your current password.').max(200), next: Password }).safeParse({ current, next });
+  if (!parsed.success) return fieldFail(parsed.error);
+  return act(async (db, actor) => {
+    await svc.changeOwnPassword(db, actor, parsed.data.current, parsed.data.next);
+    return null;
+  });
+}
+
 export async function switchRole(role: string) {
   return act((db, actor) => setViewRole(db, actor, RoleZ.parse(role)));
 }
 
-export async function resetDemoData() {
+export async function replaceWithSample() {
   return act(async (db, actor) => {
-    if (!demoMode()) throw new AppError('Demo reset is turned off on this server.', 'forbidden');
-    if (actor.baseRole !== 'Admin') throw new AppError('Only Admins can reset the demo data.', 'forbidden');
-    await resetContent(db);
+    await svc.replaceWithSample(db, actor);
     return null;
   });
+}
+
+export async function renameOrganization(name: string) {
+  return act((db, actor) => svc.renameOrganization(db, actor, Name.parse(name)));
 }
 
 /** Current state for the signed-in user (used after errors to resync). */
@@ -164,6 +189,26 @@ export async function updateMaterial(id: string, patch: { cost?: number; pack?: 
   );
 }
 
+export async function addMaterial(form: { name: string; kind: string; unit: string; packName: string; pack: number; cost: number; par: number }) {
+  const parsed = z
+    .object({
+      name: Name,
+      kind: z.enum(MATERIAL_KINDS),
+      unit: z.string().trim().min(1, 'Required.').max(12),
+      packName: z.string().trim().min(1, 'Required.').max(24),
+      pack: Qty,
+      cost: Qty,
+      par: Qty,
+    })
+    .safeParse(form);
+  if (!parsed.success) return fieldFail(parsed.error);
+  return act((db, actor) => svc.addMaterial(db, actor, parsed.data));
+}
+
+export async function deleteMaterial(id: string) {
+  return act((db, actor) => svc.deleteMaterial(db, actor, Id.parse(id)));
+}
+
 export async function applyImport(rows: unknown, fileName: string) {
   return act((db, actor) => svc.applyImport(db, actor, ImportRows.parse(rows), z.string().max(200).parse(fileName)));
 }
@@ -173,6 +218,24 @@ export async function revertImport(undo: ImportUndo) {
 }
 
 // ── Recipes ─────────────────────────────────────────────────────────────────
+
+export async function addProduct(form: { name: string; batchKg: number; upb: number; upc: number }) {
+  const parsed = z.object({ name: Name, batchKg: Qty, upb: Count, upc: Count }).safeParse(form);
+  if (!parsed.success) return fieldFail(parsed.error);
+  return act((db, actor) => svc.addProduct(db, actor, parsed.data));
+}
+
+export async function deleteProduct(id: string) {
+  return act((db, actor) => svc.deleteProduct(db, actor, Id.parse(id)));
+}
+
+export async function addRecipeLine(productId: string, ingredientId: string, qty: number) {
+  return act((db, actor) => svc.addRecipeLine(db, actor, Id.parse(productId), Id.parse(ingredientId), Qty.parse(qty)));
+}
+
+export async function removeRecipeLine(productId: string, ingredientId: string) {
+  return act((db, actor) => svc.removeRecipeLine(db, actor, Id.parse(productId), Id.parse(ingredientId)));
+}
 
 export async function setRecipeQty(productId: string, ingredientId: string, qty: number) {
   return act((db, actor) => svc.setRecipeQty(db, actor, Id.parse(productId), Id.parse(ingredientId), Qty.parse(qty)));
@@ -186,22 +249,28 @@ export async function setBatchKg(productId: string, kg: number) {
   return act((db, actor) => svc.setBatchKg(db, actor, Id.parse(productId), Qty.parse(kg)));
 }
 
-// ── Users ───────────────────────────────────────────────────────────────────
+// ── Team ────────────────────────────────────────────────────────────────────
 
-export async function approveRequest(id: string) {
-  return act((db, actor) => svc.approveRequest(db, actor, Id.parse(id)));
+export async function createMember(form: { name: string; username: string; email: string; role: string; password: string }) {
+  const parsed = z
+    .object({ name: Name, username: Username, email: z.union([z.literal(''), Email]), role: RoleZ, password: Password })
+    .safeParse(form);
+  if (!parsed.success) return fieldFail(parsed.error);
+  return act((db, actor) => svc.createMember(db, actor, { ...parsed.data, email: parsed.data.email || null }));
 }
 
-export async function declineRequest(id: string) {
-  return act((db, actor) => svc.declineRequest(db, actor, Id.parse(id)));
+export async function setMemberRole(userId: string, role: string) {
+  return act((db, actor) => svc.setMemberRole(db, actor, Id.parse(userId), RoleZ.parse(role)));
 }
 
-export async function reopenRequest(id: string) {
-  return act((db, actor) => svc.reopenRequest(db, actor, Id.parse(id)));
+export async function resetMemberPassword(userId: string, password: string) {
+  const parsed = Password.safeParse(password);
+  if (!parsed.success) return { ok: false as const, error: parsed.error.issues[0].message, fieldErrors: { password: parsed.error.issues[0].message } };
+  return act((db, actor) => svc.resetMemberPassword(db, actor, Id.parse(userId), parsed.data));
 }
 
-export async function setUserRole(userId: string, role: string) {
-  return act((db, actor) => svc.setUserRole(db, actor, Id.parse(userId), RoleZ.parse(role)));
+export async function removeMember(userId: string) {
+  return act((db, actor) => svc.removeMember(db, actor, Id.parse(userId)));
 }
 
 // ── Production ──────────────────────────────────────────────────────────────

@@ -7,7 +7,7 @@ import { useStore } from './store';
 import type { Role, User } from './types';
 import { useUI, type UIState } from './ui';
 
-export type Tab = 'home' | 'stock' | 'plan' | 'orders' | 'setup';
+export type Tab = 'home' | 'stock' | 'plan' | 'orders' | 'setup' | 'team';
 
 export const TAB_PATH: Record<Tab, string> = {
   home: '/',
@@ -15,6 +15,7 @@ export const TAB_PATH: Record<Tab, string> = {
   plan: '/plan',
   orders: '/orders',
   setup: '/setup',
+  team: '/team',
 };
 
 export function tabOf(pathname: string): Tab {
@@ -27,8 +28,8 @@ export function useCurrentUser() {
   const me = useStore((s) => s.me);
   const users = useStore((s) => s.data.users);
   const role: Role = me?.role ?? 'Production';
-  const user: User = users.find((u) => u.id === me?.userId) ?? { id: me?.userId ?? '', name: '—', username: '', email: '', role };
-  return { user, role, baseRole: me?.baseRole ?? role, demo: me?.demo ?? false, perms: PERMS[role] };
+  const user: User = users.find((u) => u.id === me?.userId) ?? { id: me?.userId ?? '', name: '—', username: '', email: '', role, isOwner: false };
+  return { user, role, baseRole: me?.baseRole ?? role, isOwner: me?.isOwner ?? false, org: me?.org ?? null, demo: me?.demo ?? false, perms: PERMS[role] };
 }
 
 /** Matches the desktop breakpoint in the stylesheets. */

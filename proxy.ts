@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
 const SESSION_COOKIE = 'stockops_session';
-const AUTH_PAGES = ['/signin', '/signup', '/forgot'];
+const AUTH_PAGES = ['/signin', '/create-org', '/forgot'];
 
 /**
  * Fast redirect based on whether a session cookie exists. This is only a convenience:

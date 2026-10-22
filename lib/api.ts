@@ -1,13 +1,15 @@
 /** Shapes exchanged between the browser and the server. */
-import type { Data, Role } from './types';
+import type { Data, Organization, Role } from './types';
 
 export interface Me {
   userId: string;
+  org: Organization;
+  isOwner: boolean;
   /** The role the app is acting as (an Admin previewing another role gets that role). */
   role: Role;
   /** The account's real role. */
   baseRole: Role;
-  /** Demo conveniences such as "Reset demo data" are available. */
+  /** Demo conveniences such as "Replace with sample data" are available. */
   demo: boolean;
 }
 
@@ -23,7 +25,7 @@ export type ActionResult<T = null> =
 export interface SessionInfo {
   signedIn: boolean;
   demo: boolean;
-  /** Only in demo mode: one starter account per role, for the sign-in shortcuts. */
+  /** Only in demo mode, when the demo organization exists: one account per role, for the sign-in shortcuts. */
   demoAccounts: { username: string; label: string }[];
   demoPassword: string | null;
 }

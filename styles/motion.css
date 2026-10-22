@@ -1,0 +1,274 @@
+/*
+ * Motion. Short, soft, and never in the way: pages and cards ease in, presses give
+ * feedback, values and bars glide. Everything is switched off for people who ask
+ * their device to reduce motion.
+ */
+
+:root {
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --t-fast: 140ms;
+  --t-med: 240ms;
+  --t-slow: 380ms;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+}
+@keyframes slide-down {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+
+/* ── Page & content entrances ────────────────────────────────────────── */
+
+/* Each route's content rises in; direct children follow one another. */
+.page-wrap > * {
+  animation: rise var(--t-slow) var(--ease-out) both;
+}
+.page-wrap > *:nth-child(2) {
+  animation-delay: 40ms;
+}
+.page-wrap > *:nth-child(3) {
+  animation-delay: 80ms;
+}
+.page-wrap > .col > * {
+  animation: rise var(--t-slow) var(--ease-out) both;
+}
+.page-wrap > .col > *:nth-child(2) {
+  animation-delay: 50ms;
+}
+.page-wrap > .col > *:nth-child(3) {
+  animation-delay: 100ms;
+}
+.page-wrap > .col > *:nth-child(n + 4) {
+  animation-delay: 150ms;
+}
+
+/* Lists cascade in on first render (capped so long lists don't wait). */
+.list > * {
+  animation: fade var(--t-med) var(--ease-out) both;
+}
+.list > *:nth-child(2) { animation-delay: 30ms; }
+.list > *:nth-child(3) { animation-delay: 60ms; }
+.list > *:nth-child(4) { animation-delay: 90ms; }
+.list > *:nth-child(5) { animation-delay: 120ms; }
+.list > *:nth-child(n + 6) { animation-delay: 150ms; }
+
+.kpi,
+.action,
+.stock-card,
+.plan-card,
+.mat-grid > .card {
+  animation: rise var(--t-slow) var(--ease-out) both;
+}
+.kpis > :nth-child(2),
+.actions > :nth-child(2) { animation-delay: 40ms; }
+.kpis > :nth-child(3),
+.actions > :nth-child(3) { animation-delay: 80ms; }
+.kpis > :nth-child(4),
+.actions > :nth-child(4) { animation-delay: 120ms; }
+
+/* Forms and panels that open in place. */
+.credentials,
+.onboarding,
+.member-reset,
+.ios-steps,
+.install-banner,
+form.card {
+  animation: slide-down var(--t-med) var(--ease-out) both;
+}
+
+/* Auth screens. */
+.auth-card {
+  animation: rise 480ms var(--ease-out) both;
+}
+.auth-hero {
+  animation: fade 700ms var(--ease-out) 120ms both;
+}
+.auth-done .done-ico {
+  animation: pop 420ms var(--ease-spring) both;
+}
+
+/* Empty states and the offline screen. */
+.empty {
+  animation: fade var(--t-slow) var(--ease-out) both;
+}
+
+/* ── Feedback on touch & hover ───────────────────────────────────────── */
+
+.btn,
+.chip,
+.radio-card,
+.kpi,
+.action,
+.step-btn,
+.big-step,
+.demo-pill,
+.sg-check,
+.icon-btn,
+.row-remove,
+.sheet-close,
+.search-clear,
+.toast-action,
+.step-row,
+.side-item,
+.side-account,
+.m-account,
+.pop-row,
+button.row {
+  transition:
+    background-color var(--t-fast) ease,
+    border-color var(--t-fast) ease,
+    color var(--t-fast) ease,
+    box-shadow var(--t-med) ease,
+    opacity var(--t-fast) ease,
+    transform var(--t-fast) var(--ease-out);
+}
+.btn:not(:disabled):active,
+.chip:active,
+.radio-card:active,
+.step-btn:active,
+.big-step:active,
+.demo-pill:active,
+.icon-btn:active,
+.row-remove:active,
+.sheet-close:active,
+.toast-action:active,
+.step-row:active,
+.m-account:active {
+  transform: scale(0.97);
+}
+.kpi:active,
+.action:active {
+  transform: scale(0.985);
+}
+@media (hover: hover) {
+  .kpi:hover,
+  .action:not(.dark):hover {
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+    transform: translateY(-1px);
+  }
+}
+
+/* Inputs: focus ring eases in. */
+.input,
+.input-shell,
+.unit-input,
+.search-box,
+.role-select {
+  transition:
+    border-color var(--t-fast) ease,
+    box-shadow var(--t-fast) ease;
+}
+.input:focus,
+.input-shell:focus-within,
+.unit-input:focus-within,
+.search-box:focus-within {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(191, 160, 90, 0.18);
+}
+
+/* Radios and checkboxes. */
+.radio-dot,
+.check-box {
+  transition:
+    background-color var(--t-fast) ease,
+    border-color var(--t-fast) ease,
+    transform var(--t-fast) var(--ease-spring);
+}
+[aria-checked='true'] > .radio-dot,
+.check-box.on {
+  transform: scale(1.06);
+}
+.check-box svg {
+  animation: pop var(--t-med) var(--ease-spring) both;
+}
+
+/* Tabs: the gold underline slides in. */
+.tab {
+  transition:
+    color var(--t-fast) ease,
+    border-color var(--t-med) ease;
+}
+
+/* Bottom tabs: the active pill grows in. */
+.bn-item {
+  transition: color var(--t-fast) ease;
+}
+.bn-pill {
+  transition:
+    background-color var(--t-med) var(--ease-out),
+    color var(--t-fast) ease,
+    transform var(--t-med) var(--ease-spring);
+}
+.bn-item[aria-current='page'] .bn-pill {
+  animation: pop var(--t-med) var(--ease-spring);
+}
+.bn-item:active .bn-pill {
+  transform: scale(0.9);
+}
+.side-ico {
+  transition: color var(--t-fast) ease;
+}
+
+/* Count badges pop when they appear. */
+.bn-badge,
+.side-count,
+.pill {
+  animation: pop var(--t-med) var(--ease-spring) both;
+}
+
+/* ── Values that change ──────────────────────────────────────────────── */
+
+.bar-fill,
+.bar-par,
+.impact-bar > div {
+  transition:
+    width var(--t-slow) var(--ease-out),
+    left var(--t-slow) var(--ease-out),
+    background-color var(--t-med) ease;
+}
+
+/* Search dropdown. */
+.search-pop {
+  animation: slide-down var(--t-med) var(--ease-out) both;
+  transform-origin: top center;
+}
+
+/* Toast leaves as smoothly as it arrives (see Toast.tsx). */
+.toast[data-leaving='true'] {
+  opacity: 0;
+  transform: translateY(8px);
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease;
+}
+
+/* ── Reduce motion ───────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 1ms !important;
+  }
+}

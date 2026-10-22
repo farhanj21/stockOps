@@ -242,8 +242,10 @@ export function Stock() {
 
       {!rows.length && (
         <div className="empty" style={{ padding: '24px 20px' }}>
-          <div className="empty-t">Nothing here</div>
-          <div className="empty-s">No materials match this filter.</div>
+          <div className="empty-t">{m.ings.length ? 'Nothing here' : 'No materials yet'}</div>
+          <div className="empty-s">
+            {m.ings.length ? 'No materials match this filter.' : perms.setup ? 'Add materials in Setup, or import your stock sheet with Import Excel.' : 'An Admin needs to add materials first.'}
+          </div>
         </div>
       )}
     </div>

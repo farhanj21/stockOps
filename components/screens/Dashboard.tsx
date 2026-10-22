@@ -116,6 +116,7 @@ export function Dashboard() {
           </button>
         </div>
 
+        <GetStarted />
         <div className="home-grid">
           <section style={{ gridArea: 'alerts' }} className="min0">
             <div className="sec-head">
@@ -198,6 +199,7 @@ export function Dashboard() {
               <span className="sec-meta">In-hand + pipeline</span>
             </div>
             <div className="card clip list">
+              {!m.data.products.length && <div className="empty-inline">No products yet.</div>}
               {m.data.products.map((p) => {
                 const c = m.capacity(p, m.total);
                 return (
@@ -276,5 +278,47 @@ export function Dashboard() {
         </div>
       </div>
     </div>
+  );
+}
+
+/** Checklist for a new organization until it has materials, recipes and a team. */
+function GetStarted() {
+  const m = useModel();
+  const { perms } = useCurrentUser();
+  const go = useGo();
+  const hasRecipe = m.data.products.some((p) => m.recipeOf(p.id).length > 0);
+  const steps = [
+    { done: m.ings.length > 0, title: 'Add your materials', sub: 'Type them in, or import your stock spreadsheet.', to: () => go('setup', { setupTab: 'materials' }) },
+    { done: hasRecipe, title: 'Create products and recipes', sub: 'Batch size, units per case and what goes into each batch.', to: () => go('setup', { setupTab: 'recipes' }) },
+    { done: m.data.users.length > 1, title: 'Add your team', sub: 'Accounts for warehouse, production and other admins.', to: () => go('team') },
+  ];
+  if (steps.every((s) => s.done) || !perms.setup) {
+    if (m.ings.length || perms.setup) return null;
+    return (
+      <div className="empty">
+        <div className="empty-t">Nothing set up yet</div>
+        <div className="empty-s">Your Admin is still adding materials and recipes. Check back soon.</div>
+      </div>
+    );
+  }
+  return (
+    <section className="card pad onboarding">
+      <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--navy)' }}>Set up your plant</div>
+      <div className="muted" style={{ fontSize: 13, marginTop: 2 }}>
+        Three steps and StockOps can work out capacity, alerts and orders for you.
+      </div>
+      <div className="col" style={{ gap: 8, marginTop: 14 }}>
+        {steps.map((s, ix) => (
+          <button key={s.title} type="button" className="step-row" data-done={s.done} onClick={s.to}>
+            <span className="step-num">{s.done ? <Icon name="check" size={14} stroke={3} /> : ix + 1}</span>
+            <span className="row-main">
+              <span style={{ fontSize: 14, fontWeight: 700 }}>{s.title}</span>
+              <span className="row-sub">{s.sub}</span>
+            </span>
+            {!s.done && <span className="chev">›</span>}
+          </button>
+        ))}
+      </div>
+    </section>
   );
 }

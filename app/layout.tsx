@@ -7,6 +7,7 @@ import '@/styles/shell.css';
 import '@/styles/auth.css';
 import '@/styles/screens.css';
 import '@/styles/sheet.css';
+import '@/styles/motion.css';
 
 const sans = Hanken_Grotesk({
   variable: '--font-sans',

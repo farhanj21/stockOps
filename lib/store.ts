@@ -32,7 +32,12 @@ interface StoreState {
   signOut: () => Promise<void>;
   /** Admins only: preview the app as another role. */
   switchRole: (role: Role) => Promise<void>;
-  resetDemo: () => Promise<boolean>;
+  /** Owner, demo mode: swap all materials, recipes, plans and POs for the sample plant. */
+  replaceWithSample: () => Promise<boolean>;
+  /** Run any action; on error show it in a toast and resync. Returns the action's value or null. */
+  send: <T>(call: () => Promise<ActionResult<T>>) => Promise<T | null>;
+  /** Run a form action; returns the whole result so the form can show field errors. */
+  submit: <T>(call: () => Promise<ActionResult<T>>) => Promise<ActionResult<T>>;
 
   stepIngredient: (id: string, field: StockField, dir: 1 | -1) => void;
   /** Typed edits to stock counts or cost / pack / par; saved after a short pause. */
@@ -43,9 +48,7 @@ interface StoreState {
   setProductField: (productId: string, field: 'upb' | 'upc', v: Num) => void;
   setBatchKg: (productId: string, v: Num) => void;
 
-  approveRequest: (id: string) => Promise<{ name: string; role: Role } | null>;
-  declineRequest: (id: string) => Promise<{ name: string; undo: Undo } | null>;
-  setUserRole: (userId: string, role: Role) => void;
+  setMemberRole: (userId: string, role: Role) => void;
 
   addForecast: (f: { productId: string; batches: number; date: string }) => Promise<boolean>;
   removeForecast: (id: string) => Promise<Undo | null>;
@@ -55,7 +58,7 @@ interface StoreState {
   receivePO: (id: string) => Promise<boolean>;
 }
 
-const EMPTY: Data = { ingredients: [], products: [], recipes: {}, forecasts: [], pos: [], users: [], requests: [] };
+const EMPTY: Data = { ingredients: [], products: [], recipes: {}, forecasts: [], pos: [], users: [] };
 const SAVE_DELAY_MS = 500;
 
 export const useStore = create<StoreState>()((set, get) => {
@@ -157,7 +160,21 @@ export const useStore = create<StoreState>()((set, get) => {
     switchRole: async (role) => {
       await send(() => api.switchRole(role));
     },
-    resetDemo: async () => (await send(() => api.resetDemoData())) !== null,
+    replaceWithSample: async () => (await send(() => api.replaceWithSample())) !== null,
+    send,
+    submit: async (call) => {
+      begin();
+      try {
+        const res = await call();
+        if (res.ok && res.snapshot) latest = res.snapshot;
+        if (!res.ok && res.signedOut) set({ status: 'signed-out', me: null });
+        return res;
+      } catch {
+        return { ok: false, error: "Couldn't reach the server. Check your connection." };
+      } finally {
+        end();
+      }
+    },
 
     stepIngredient: (id, field, dir) => {
       mapIng(id, (i) => ({ ...i, [field]: round(Math.max(0, num(i[field]) + dir * num(i.pack))) }));
@@ -209,18 +226,9 @@ export const useStore = create<StoreState>()((set, get) => {
       sendLater(`batch|${productId}`, num(v) > 0 ? v : '', (n) => api.setBatchKg(productId, n));
     },
 
-    approveRequest: async (id) => {
-      edit((d) => ({ requests: d.requests.filter((r) => r.id !== id) }));
-      return send(() => api.approveRequest(id));
-    },
-    declineRequest: async (id) => {
-      edit((d) => ({ requests: d.requests.filter((r) => r.id !== id) }));
-      const res = await send(() => api.declineRequest(id));
-      return res && { name: res.name, undo: () => void send(() => api.reopenRequest(id)) };
-    },
-    setUserRole: (userId, role) => {
+    setMemberRole: (userId, role) => {
       edit((d) => ({ users: d.users.map((u) => (u.id === userId ? { ...u, role } : u)) }));
-      void send(() => api.setUserRole(userId, role));
+      void send(() => api.setMemberRole(userId, role));
     },
 
     addForecast: async (f) => (await send(() => api.addForecast(f))) !== null,

@@ -49,8 +49,9 @@
     padding: 48px 32px;
   }
   .auth-card {
+    max-width: 440px;
     margin: 0;
-    padding: 32px;
+    padding: 40px 40px 36px;
     box-shadow: var(--shadow-pop);
   }
 }
@@ -86,7 +87,8 @@
   line-height: 1.12;
 }
 .auth-hero-s {
-  margin-top: 16px;
+  max-width: 420px;
+  margin-top: 18px;
   font-size: 15px;
   line-height: 1.6;
   color: var(--on-navy);
@@ -99,7 +101,37 @@
 .auth-form {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 18px;
+}
+.auth-head {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+.auth-form .field-label {
+  margin-bottom: 6px;
+}
+.form-section {
+  margin-top: 6px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--subtle);
+}
+.sample-row {
+  align-items: flex-start;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--hover);
+  line-height: 1.45;
+}
+.sample-row .check-box {
+  margin-top: 1px;
 }
 .auth-title {
   margin: 0;
@@ -110,14 +142,19 @@
   color: var(--navy);
 }
 .auth-sub {
-  margin-top: 2px;
-  font-size: 13px;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
   color: var(--muted);
 }
 .auth-switch {
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
-  gap: 6px;
+  gap: 4px 6px;
+  margin-top: 2px;
+  text-align: center;
+  line-height: 1.5;
   font-size: 13px;
   color: var(--muted);
 }
@@ -129,7 +166,8 @@
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  margin-bottom: 4px;
+  gap: 12px;
+  margin-bottom: 6px;
 }
 .pass-toggle {
   height: 40px;

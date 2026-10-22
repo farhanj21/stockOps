@@ -8,7 +8,7 @@ export type { ImportRow } from './import-plan';
 
 export type SheetType = 'material' | 'product' | 'run' | 'import' | 'account';
 export type StockFilter = 'all' | 'low' | 'ingredient' | 'packaging';
-export type SetupTab = 'recipes' | 'materials' | 'users';
+export type SetupTab = 'recipes' | 'materials';
 
 export interface ToastAction {
   label: string;

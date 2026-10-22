@@ -9,6 +9,7 @@ function pctBom(kg: number, pcts: [string, number][], packs: [string, number][] 
   ];
 }
 
+/** Sample chocolate plant: materials, three products with recipes, two plans, two POs and a demo team. */
 export function seed(): Data {
   return {
     ingredients: [
@@ -64,11 +65,10 @@ export function seed(): Data {
       { id: 'PO-2039', date: '2026-10-12', status: 'Received', received: '2026-10-15', by: 'Ana Reyes', lines: [{ ing: 'coconut', packs: 5, qty: 1000 }, { ing: 'smp', packs: 8, qty: 200 }] },
     ],
     users: [
-      { id: 'u1', name: 'Ana Reyes', username: 'areyes', email: 'areyes@plant1.co', role: 'Admin' },
-      { id: 'u2', name: 'Marco Silva', username: 'msilva', email: 'msilva@plant1.co', role: 'Warehouse' },
-      { id: 'u3', name: 'Priya Nair', username: 'pnair', email: 'pnair@plant1.co', role: 'Production' },
-      { id: 'u4', name: 'Tom Okafor', username: 'tokafor', email: 'tokafor@plant1.co', role: 'Warehouse' },
+      { id: 'u1', name: 'Ana Reyes', username: 'areyes', email: 'areyes@plant1.co', role: 'Admin', isOwner: true },
+      { id: 'u2', name: 'Marco Silva', username: 'msilva', email: 'msilva@plant1.co', role: 'Warehouse', isOwner: false },
+      { id: 'u3', name: 'Priya Nair', username: 'pnair', email: 'pnair@plant1.co', role: 'Production', isOwner: false },
+      { id: 'u4', name: 'Tom Okafor', username: 'tokafor', email: 'tokafor@plant1.co', role: 'Warehouse', isOwner: false },
     ],
-    requests: [{ id: 'r1', name: 'Lena Fischer', email: 'lfischer@plant1.co', role: 'Production', date: '2026-10-19' }],
   };
 }

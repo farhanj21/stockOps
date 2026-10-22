@@ -2,6 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef, type ReactNode } from 'react';
+import { InstallBanner } from '@/components/InstallApp';
 import { Sheet } from '@/components/sheets/Sheet';
 import { tabOf, useCurrentUser, type Tab } from '@/lib/hooks';
 import { useModel } from '@/lib/model';
@@ -31,7 +32,8 @@ function TopBar({ tab }: { tab: Tab }) {
     stock: ['Stock', stockSummary],
     plan: ['Production plan', 'Forecast batches and check material impact before you commit.'],
     orders: ['Purchase orders', 'Quantities round up to full supplier packs.'],
-    setup: ['Setup', 'Admin only. Changes recalculate capacity and orders instantly.'],
+    setup: ['Setup', 'Products, recipes and materials. Changes recalculate capacity and orders instantly.'],
+    team: ['Team', 'Create accounts for your warehouse, production and admin people.'],
   };
   const [title, sub] = titles[tab];
   return (
@@ -64,7 +66,11 @@ export function AppShell({ children }: { children: ReactNode }) {
         <MobileHeader />
         <TopBar tab={tab} />
         <main ref={mainRef} className="app-main">
-          <div className="page-wrap">{children}</div>
+          {/* Keyed by route so each page enters with the page transition. */}
+          <div className="page-wrap" key={pathname}>
+            {tab === 'home' && <InstallBanner />}
+            {children}
+          </div>
         </main>
         <BottomNav tab={tab} />
       </div>

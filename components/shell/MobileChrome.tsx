@@ -9,7 +9,7 @@ import { useUI } from '@/lib/ui';
 import { onNavigate, useNavItems } from './nav';
 
 export function MobileHeader() {
-  const { user, role } = useCurrentUser();
+  const { user, role, org } = useCurrentUser();
   const openSheet = useUI((s) => s.openSheet);
   return (
     <header className="m-header n-only">
@@ -17,7 +17,7 @@ export function MobileHeader() {
         <Logo size="sm" />
         <div className="row-main" style={{ gap: 0 }}>
           <span className="m-header-name">StockOps</span>
-          <span className="side-plant">Plant 1 · Chocolate lines</span>
+          <span className="side-plant ellipsis">{org?.name}</span>
         </div>
         <button type="button" className="m-account" aria-label="Account and role" onClick={() => openSheet('account')}>
           <span style={{ fontSize: 12, fontWeight: 600 }}>{role}</span>

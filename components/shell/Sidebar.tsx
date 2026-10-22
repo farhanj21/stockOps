@@ -12,7 +12,7 @@ import { onNavigate, useNavItems } from './nav';
 
 export function Sidebar({ tab }: { tab: Tab }) {
   const items = useNavItems();
-  const { user, role, baseRole } = useCurrentUser();
+  const { user, role, baseRole, org } = useCurrentUser();
   const signOut = useStore((s) => s.signOut);
   const openSheet = useUI((s) => s.openSheet);
   const router = useRouter();
@@ -23,7 +23,7 @@ export function Sidebar({ tab }: { tab: Tab }) {
         <Logo size="md" />
         <div className="min0">
           <div className="side-name">StockOps</div>
-          <div className="side-plant">Plant 1 · Chocolate lines</div>
+          <div className="side-plant ellipsis">{org?.name}</div>
         </div>
       </div>
       <div className="side-label">Workspace</div>

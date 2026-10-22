@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import '@/lib/install'; // start listening for the browser's install prompt as early as possible
 import { Toast } from './Toast';
 
 /** App-wide client bits: register the service worker, show toasts. */

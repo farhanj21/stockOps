@@ -10,7 +10,8 @@
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx scripts/migrate.ts",
-    "user:password": "tsx scripts/set-password.ts"
+    "user:password": "tsx scripts/set-password.ts",
+    "db:seed-demo": "tsx scripts/seed-demo.ts"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.10",

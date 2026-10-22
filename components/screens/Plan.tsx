@@ -4,12 +4,33 @@ import { useState } from 'react';
 import { Icon } from '@/components/Icon';
 import { SHOW_COST } from '@/lib/config';
 import { daysFromToday, fmt, fmtDate, inputVal, money, num, plural, qu } from '@/lib/format';
-import { useGo } from '@/lib/hooks';
+import { useCurrentUser, useGo } from '@/lib/hooks';
 import { packTxt, useModel } from '@/lib/model';
 import { useStore } from '@/lib/store';
 import { toast, useUI } from '@/lib/ui';
 
 export function Plan() {
+  const hasProducts = useModel().data.products.length > 0;
+  return hasProducts ? <Planner /> : <NoProducts />;
+}
+
+function NoProducts() {
+  const { perms } = useCurrentUser();
+  const go = useGo();
+  return (
+    <div className="empty" style={{ padding: '28px 20px' }}>
+      <div className="empty-t">No products yet</div>
+      <div className="empty-s">Plans are made per product. {perms.setup ? 'Add your products and their recipes first.' : 'Ask an Admin to add products and recipes.'}</div>
+      {perms.setup && (
+        <button type="button" className="btn btn-primary" style={{ marginTop: 14 }} onClick={() => go('setup', { setupTab: 'recipes' })}>
+          Set up products
+        </button>
+      )}
+    </div>
+  );
+}
+
+function Planner() {
   const m = useModel();
   const go = useGo();
   const [busy, setBusy] = useState(false);

@@ -4,7 +4,8 @@
  * - `DATABASE_URL` set → any PostgreSQL server (Supabase, Neon, RDS, local Postgres).
  * - Not set → PGlite, an embedded Postgres stored in `.data/pglite`, so the app runs with zero setup.
  *
- * Migrations in /drizzle run automatically on first use; an empty database is seeded (see db/seed.ts).
+ * Migrations in /drizzle run automatically on first use. A new database starts empty: the first
+ * visitor creates an organization (see `npm run db:seed-demo` for a ready-made demo one).
  */
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
@@ -16,7 +17,6 @@ import { drizzle as drizzlePostgres } from 'drizzle-orm/postgres-js';
 import { migrate as migratePostgres } from 'drizzle-orm/postgres-js/migrator';
 import postgres from 'postgres';
 import * as schema from './schema';
-import { seedIfEmpty } from './seed';
 
 export type Db = PgDatabase<PgQueryResultHKT, typeof schema>;
 
@@ -41,7 +41,6 @@ async function openPostgres(url: string) {
 async function init(): Promise<Db> {
   const url = process.env.DATABASE_URL;
   const { db } = url ? await openPostgres(url) : await openPglite(process.env.PGLITE_DIR ?? path.join(process.cwd(), '.data', 'pglite'));
-  await seedIfEmpty(db);
   return db;
 }
 
