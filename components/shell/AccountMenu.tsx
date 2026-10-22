@@ -72,7 +72,7 @@ export function AccountMenu({ variant }: { variant: 'sidebar' | 'header' }) {
           danger: true,
         });
         if (!ok || !(await replaceWithSample())) return;
-        go('home', { poExcluded: {}, planBatches: 4, planProduct: '', setupProduct: '', planDate: null });
+        go('home', { poExcluded: {}, poPacks: {}, poExtra: [], planBatches: 4, planProduct: '', setupProduct: '', planDate: null });
         toast('Sample data loaded.');
       }),
     },

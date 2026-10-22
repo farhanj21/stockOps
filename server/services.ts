@@ -418,6 +418,17 @@ export async function addProduct(db: Db, actor: Actor, input: { name: string; ba
   return { id };
 }
 
+export async function renameProduct(db: Db, actor: Actor, id: string, name: string) {
+  requirePerm(actor, 'setup');
+  await ownProduct(db, actor, id);
+  try {
+    await db.update(t.products).set({ name: name.trim() }).where(eq(t.products.id, id));
+  } catch (e) {
+    if (isUniqueViolation(e)) throw new AppError(`A product called "${name.trim()}" already exists.`, 'conflict');
+    throw e;
+  }
+}
+
 /** Deletes the product with its recipe, plans and run history. */
 export async function deleteProduct(db: Db, actor: Actor, id: string) {
   requirePerm(actor, 'setup');
@@ -559,33 +570,62 @@ export async function logRun(db: Db, actor: Actor, forecastId: string, batches: 
 
 // ── Purchasing (everyone raises POs; Admin/Warehouse receive) ───────────────
 
+export interface PoLineInput {
+  ingredientId: string;
+  /** Whole supplier packs; the quantity is always packs × the material's pack size. */
+  packs: number;
+}
+
 /**
- * Raise a PO from the current suggestions (deficit vs plans or par, rounded up to whole packs),
- * leaving out materials the user unticked. Quantities are recomputed here, never taken from the client.
+ * Raise a purchase order with any materials and pack counts the user chose, suggested or not.
+ * Quantities and costs come from each material's saved pack size, never from the client.
  */
-export async function generatePO(db: Db, actor: Actor, excluded: string[]) {
+export async function createPO(db: Db, actor: Actor, input: PoLineInput[]) {
+  const packsById = new Map<string, number>();
+  for (const l of input) {
+    if (!Number.isInteger(l.packs) || l.packs < 1) throw new AppError('Order at least one whole pack per line.');
+    packsById.set(l.ingredientId, (packsById.get(l.ingredientId) ?? 0) + l.packs);
+  }
+  if (!packsById.size) throw new AppError('Add at least one material to the order.');
+
   for (let attempt = 0; ; attempt++) {
     try {
       return await db.transaction(async (tx) => {
         await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${'po:' + actor.organizationId}))`);
         const m = buildModel(await loadData(tx as unknown as Db, actor.organizationId, { all: false }));
-        const lines = m.suggestions.filter((s) => !excluded.includes(s.i.id));
-        if (!lines.length) throw new AppError('Nothing to order — stock covers every plan and par level.', 'conflict');
         const code = m.nextPoId;
         const id = newId('po');
-        await tx.insert(t.purchaseOrders).values({ id, organizationId: actor.organizationId, code, status: 'Open', placedOn: plantToday(), createdBy: actor.userId });
-        await tx.insert(t.poLines).values(lines.map((s, position) => ({ poId: id, ingredientId: s.i.id, packs: s.packs, qty: s.qty, position })));
-        for (const s of lines) {
-          const ing = await lockIngredient(tx, actor, s.i.id);
-          await writeStock(tx, actor, ing, 'pipeline', ing.pipeline + s.qty, 'po_created', code);
+        const rows: { ing: Ingredient; packs: number; qty: number }[] = [];
+        for (const [ingredientId, packs] of packsById) {
+          const ing = await lockIngredient(tx, actor, ingredientId);
+          if (ing.kind === 'utility') throw new AppError(`${ing.name} is a utility and isn't ordered.`);
+          rows.push({ ing, packs, qty: round(packs * ing.pack) });
         }
-        return { id: code, lines: lines.length };
+        await tx.insert(t.purchaseOrders).values({ id, organizationId: actor.organizationId, code, status: 'Open', placedOn: plantToday(), createdBy: actor.userId });
+        await tx.insert(t.poLines).values(rows.map((r, position) => ({ poId: id, ingredientId: r.ing.id, packs: r.packs, qty: r.qty, position })));
+        for (const r of rows) await writeStock(tx, actor, r.ing, 'pipeline', r.ing.pipeline + r.qty, 'po_created', code);
+        return { id: code, lines: rows.length };
       });
     } catch (e) {
       if (attempt < 2 && isUniqueViolation(e)) continue;
       throw e;
     }
   }
+}
+
+/**
+ * Raise a PO straight from the current suggestions (deficit vs plans or par, rounded up to
+ * whole packs), leaving out the given materials.
+ */
+export async function generatePO(db: Db, actor: Actor, excluded: string[]) {
+  const m = buildModel(await loadData(db, actor.organizationId, { all: false }));
+  const lines = m.suggestions.filter((s) => !excluded.includes(s.i.id));
+  if (!lines.length) throw new AppError('Nothing to order — stock covers every plan and par level.', 'conflict');
+  return createPO(
+    db,
+    actor,
+    lines.map((s) => ({ ingredientId: s.i.id, packs: s.packs })),
+  );
 }
 
 /** Delivery arrived: move each line from pipeline into in-hand. `code` is the PO number, e.g. PO-2041. */

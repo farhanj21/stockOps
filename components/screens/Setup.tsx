@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, type FormEvent, type KeyboardEvent } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 import * as api from '@/app/actions';
 import { FormField } from '@/components/FormField';
 import { Icon } from '@/components/Icon';
-import { fmt, inputVal, money, num, qu, round } from '@/lib/format';
+import { fmt, inputVal, money, num, plural, qu, round } from '@/lib/format';
 import { useModel } from '@/lib/model';
 import { useStore } from '@/lib/store';
 import type { MaterialKind } from '@/lib/types';
@@ -51,61 +51,120 @@ export function Setup() {
 
 // ── Products & recipes ──────────────────────────────────────────────────────
 
+/** How complete a product's recipe is: mix lines should add up to 100% of the batch weight. */
+function useRecipeStatus() {
+  const m = useModel();
+  return (productId: string) => {
+    const p = m.prodById[productId];
+    const bom = m.recipeOf(productId);
+    const isMix = (ing: string) => !!m.byId[ing] && m.byId[ing].kind !== 'packaging';
+    const mixTotal = bom.reduce((acc, r) => acc + (isMix(r.ing) ? num(r.qty) : 0), 0);
+    const pct = (mixTotal / Math.max(num(p.batchKg), 1e-9)) * 100;
+    if (!bom.length) return { pct, mixTotal, lines: 0, label: 'No recipe', tone: 'neutral' as const, ok: false };
+    const ok = Math.abs(pct - 100) <= 0.005;
+    return { pct, mixTotal, lines: bom.length, label: ok ? '100%' : `${pct.toFixed(1)}%`, tone: ok ? ('ok' as const) : ('warn' as const), ok };
+  };
+}
+
+/**
+ * Products on the left, the selected product's settings and recipe on the right.
+ * On phones the list and the detail are separate steps, with a back link.
+ */
 function Recipes() {
   const m = useModel();
   const setupProduct = useUI((s) => s.setupProduct);
   const setUI = useUI((s) => s.set);
+  const status = useRecipeStatus();
   const [adding, setAdding] = useState(false);
+  const [view, setView] = useState<'list' | 'detail'>('list');
   const products = m.data.products;
-  const sp = m.prodById[setupProduct] ?? products[0];
+  const selected = m.prodById[setupProduct] ?? products[0];
+  const creating = adding || !products.length;
 
-  if (!products.length || adding) {
-    return (
-      <div className="recipe-grid">
-        <div className="col min0" style={{ gap: 14 }}>
-          {!products.length && (
-            <div className="empty" style={{ textAlign: 'left' }}>
-              <div className="empty-t">Add your first product</div>
-              <div className="empty-s">
-                A product is something you make in batches. Give it a batch size, then build its recipe from your materials.
-                {!m.ings.length && ' Add materials first (Materials tab or Excel import) so the recipe has something to use.'}
-              </div>
-            </div>
-          )}
-          <NewProduct
-            onCancel={products.length ? () => setAdding(false) : undefined}
-            onCreated={(id) => {
-              setUI({ setupProduct: id });
-              setAdding(false);
-            }}
-          />
-        </div>
-      </div>
-    );
-  }
+  const select = (id: string) => {
+    setUI({ setupProduct: id });
+    setAdding(false);
+    setView('detail');
+  };
 
   return (
-    <div className="recipe-grid">
-      <div className="col min0" style={{ gap: 14 }}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }} role="group" aria-label="Product">
-          {products.map((p) => (
-            <button key={p.id} type="button" className="chip" aria-pressed={p.id === sp.id} onClick={() => setUI({ setupProduct: p.id })}>
-              {p.name}
-            </button>
-          ))}
-          <button type="button" className="chip chip-add" onClick={() => setAdding(true)}>
-            <Icon name="plus" size={14} stroke={2.4} /> New product
+    <div className="prod-layout" data-view={creating ? 'detail' : view}>
+      <aside className="prod-list card clip" aria-label="Products">
+        <div className="prod-list-head">
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--navy)' }}>Products</div>
+            <div className="row-sub">{products.length ? `${products.length} in this plant` : 'None yet'}</div>
+          </div>
+          <button
+            type="button"
+            className="btn btn-primary"
+            style={{ height: 38, padding: '0 12px' }}
+            onClick={() => {
+              setAdding(true);
+              setView('detail');
+            }}
+          >
+            <Icon name="plus" size={15} stroke={2.4} />
+            New
           </button>
         </div>
-        <ProductCard key={sp.id} id={sp.id} />
-      </div>
-      <RecipeTable key={`bom-${sp.id}`} productId={sp.id} />
+        <div className="prod-items">
+          {products.map((p) => {
+            const st = status(p.id);
+            const active = !creating && p.id === selected?.id;
+            return (
+              <button key={p.id} type="button" className="prod-item" aria-current={active ? 'true' : undefined} onClick={() => select(p.id)}>
+                <span className="row-main">
+                  <span className="prod-item-name">{p.name}</span>
+                  <span className="row-sub">
+                    {qu(num(p.batchKg), 'kg')} batch · {st.lines} {st.lines === 1 ? 'material' : 'materials'}
+                  </span>
+                </span>
+                <span className={`pill sm ${st.tone}`}>{st.label}</span>
+                <Icon name="chevronRight" size={16} color="var(--subtle)" className="n-only" />
+              </button>
+            );
+          })}
+          {!products.length && (
+            <div className="empty-inline">
+              A product is something you make in batches. Add one, then build its recipe from your materials.
+            </div>
+          )}
+        </div>
+      </aside>
+
+      <section className="prod-detail min0">
+        {creating ? (
+          <>
+            {products.length > 0 && (
+              <button type="button" className="back-link n-only" onClick={() => setView('list')}>
+                <Icon name="chevronLeft" size={16} /> All products
+              </button>
+            )}
+            {!m.ings.length && (
+              <div className="stock-hint" style={{ marginBottom: 12 }}>
+                Tip: add your materials first (Materials tab or Excel import) so the recipe has something to use.
+              </div>
+            )}
+            <NewProduct
+              onCancel={products.length ? () => setAdding(false) : undefined}
+              onCreated={(id) => {
+                setUI({ setupProduct: id });
+                setAdding(false);
+              }}
+            />
+          </>
+        ) : (
+          selected && <ProductDetail key={selected.id} id={selected.id} onBack={() => setView('list')} />
+        )}
+      </section>
     </div>
   );
 }
 
-function ProductCard({ id }: { id: string }) {
+function ProductDetail({ id, onBack }: { id: string; onBack: () => void }) {
   const m = useModel();
+  const renameProduct = useStore((s) => s.renameProduct);
   const setProductField = useStore((s) => s.setProductField);
   const setBatchKg = useStore((s) => s.setBatchKg);
   const send = useStore((s) => s.send);
@@ -114,59 +173,137 @@ function ProductCard({ id }: { id: string }) {
   const bkg = Math.max(num(sp.batchKg), 1e-9);
   const batchCost = m.batchCost(sp);
   const perCase = m.perCase(sp);
+  const capacity = m.capacity(sp, m.total);
+
+  const stats: [string, string][] = [
+    ['Cases / batch', fmt(perCase)],
+    ['Batch cost', money(batchCost)],
+    ['Cost / kg', money(batchCost / bkg)],
+    ['Cost / case', money(batchCost / Math.max(perCase, 1e-9))],
+  ];
 
   return (
-    <div className="card pad">
-      <div className="grid2" style={{ gap: 10 }}>
-        <div style={{ gridColumn: '1 / -1' }}>
-          <label htmlFor="bkg" className="field-label sm">
-            Batch size
-          </label>
-          <div className="input-shell" style={{ height: 46 }}>
-            <input id="bkg" type="number" inputMode="decimal" style={{ fontWeight: 600 }} value={sp.batchKg} onChange={(e) => setBatchKg(sp.id, inputVal(e.target.value))} />
-            <span className="subtle" style={{ paddingRight: 14, fontSize: 12 }}>
-              kg · % lines scale with it
-            </span>
+    <div className="col" style={{ gap: 16 }}>
+      <button type="button" className="back-link n-only" onClick={onBack}>
+        <Icon name="chevronLeft" size={16} /> All products
+      </button>
+
+      <div className="card pad prod-head">
+        <label htmlFor="prod-name" className="sr-only">
+          Product name
+        </label>
+        <TitleInput id="prod-name" value={sp.name} onChange={(v) => renameProduct(sp.id, v)} />
+        <div className="muted" style={{ fontSize: 13, marginTop: 2 }}>
+          Stock on hand makes {plural(capacity.batches, 'batch', 'batches')} ({fmt(capacity.cases)} cases)
+          {capacity.lim ? ` · limited by ${capacity.lim.name}` : ''}
+        </div>
+
+        <div className="prod-stats">
+          {stats.map(([label, value]) => (
+            <div key={label} className="cell">
+              <div className="cell-k">{label}</div>
+              <div className="cell-v tnum">{value}</div>
+            </div>
+          ))}
+        </div>
+
+        <div className="grid3 keep3" style={{ marginTop: 16 }}>
+          <div>
+            <label htmlFor="bkg" className="field-label sm">
+              Batch size
+            </label>
+            <div className="input-shell" style={{ height: 46 }}>
+              <input id="bkg" type="number" inputMode="decimal" style={{ fontWeight: 600 }} value={sp.batchKg} onChange={(e) => setBatchKg(sp.id, inputVal(e.target.value))} />
+              <span className="subtle" style={{ paddingRight: 14, fontSize: 12 }}>
+                kg
+              </span>
+            </div>
+          </div>
+          <div>
+            <label htmlFor="upb" className="field-label sm">
+              Units per batch
+            </label>
+            <input id="upb" type="number" inputMode="numeric" className="input h46" value={sp.upb} onChange={(e) => setProductField(sp.id, 'upb', inputVal(e.target.value, true))} />
+          </div>
+          <div>
+            <label htmlFor="upc" className="field-label sm">
+              Units per case
+            </label>
+            <input id="upc" type="number" inputMode="numeric" className="input h46" value={sp.upc} onChange={(e) => setProductField(sp.id, 'upc', inputVal(e.target.value, true))} />
           </div>
         </div>
-        <div>
-          <label htmlFor="upb" className="field-label sm">
-            Units per batch
-          </label>
-          <input id="upb" type="number" inputMode="numeric" className="input h46" value={sp.upb} onChange={(e) => setProductField(sp.id, 'upb', inputVal(e.target.value, true))} />
-        </div>
-        <div>
-          <label htmlFor="upc" className="field-label sm">
-            Units per case
-          </label>
-          <input id="upc" type="number" inputMode="numeric" className="input h46" value={sp.upc} onChange={(e) => setProductField(sp.id, 'upc', inputVal(e.target.value, true))} />
+        <div className="subtle" style={{ marginTop: 8, fontSize: 12 }}>
+          Changing the batch size scales every ingredient so the recipe percentages stay the same. Packaging stays per batch.
         </div>
       </div>
-      <div className="muted tnum" style={{ marginTop: 10, fontSize: 12, lineHeight: 1.5 }}>
-        {fmt(perCase)} cases per batch · {money(batchCost / bkg)} per kg · batch cost {money(batchCost)} · {money(batchCost / Math.max(perCase, 1e-9))} per case
+
+      <RecipeTable productId={sp.id} />
+
+      <div className="danger-zone">
+        <div className="min0">
+          <div style={{ fontSize: 14, fontWeight: 700 }}>Delete this product</div>
+          <div className="row-sub">Its recipe, committed plans and production history go with it.</div>
+        </div>
+        <button
+          type="button"
+          className="btn btn-outline danger-btn"
+          onClick={async () => {
+            const ok = await confirmDialog({
+              title: `Delete ${sp.name}?`,
+              body: "Its recipe, committed plans and production history are deleted too. This can't be undone.",
+              confirmLabel: 'Delete product',
+              danger: true,
+            });
+            if (!ok) return;
+            const res = await send(() => api.deleteProduct(sp.id));
+            if (res) {
+              setUI({ setupProduct: '' });
+              onBack();
+              toast(`${res.name} deleted.`);
+            }
+          }}
+        >
+          <Icon name="trash" size={15} /> Delete
+        </button>
       </div>
-      <button
-        type="button"
-        className="btn-link danger"
-        style={{ marginTop: 12, fontSize: 12 }}
-        onClick={async () => {
-          const ok = await confirmDialog({
-            title: `Delete ${sp.name}?`,
-            body: 'Its recipe, committed plans and production history are deleted too. This can\'t be undone.',
-            confirmLabel: 'Delete product',
-            danger: true,
-          });
-          if (!ok) return;
-          const res = await send(() => api.deleteProduct(sp.id));
-          if (res) {
-            setUI({ setupProduct: '' });
-            toast(`${res.name} deleted.`);
-          }
-        }}
-      >
-        <Icon name="trash" size={13} /> Delete product
-      </button>
     </div>
+  );
+}
+
+/** Product name as an editable heading that wraps onto more lines instead of cutting off. */
+function TitleInput({ id, value, onChange }: { id: string; value: string; onChange: (v: string) => void }) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  // Fit the height to the text; while hidden (phone list view) there's nothing to measure, so re-fit on resize.
+  const fit = () => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    if (el.scrollHeight) el.style.height = `${el.scrollHeight}px`;
+  };
+  useLayoutEffect(fit, [value]);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => fit());
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return (
+    <textarea
+      ref={ref}
+      id={id}
+      rows={1}
+      className="title-input"
+      value={value}
+      spellCheck={false}
+      onChange={(e) => onChange(e.target.value.replace(/\n/g, ' '))}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          e.currentTarget.blur();
+        }
+      }}
+    />
   );
 }
 
@@ -174,16 +311,22 @@ function RecipeTable({ productId }: { productId: string }) {
   const m = useModel();
   const setRecipeQty = useStore((s) => s.setRecipeQty);
   const send = useStore((s) => s.send);
+  const st = useRecipeStatus()(productId);
   const sp = m.prodById[productId];
   const bom = m.recipeOf(sp.id);
   const isMix = (ing: string) => !!m.byId[ing] && m.byId[ing].kind !== 'packaging';
   const bkg = Math.max(num(sp.batchKg), 1e-9);
-  const mixTotal = bom.reduce((a, r) => a + (isMix(r.ing) ? num(r.qty) : 0), 0);
-  const pctSum = (mixTotal / bkg) * 100;
-  const off = bom.length > 0 && Math.abs(pctSum - 100) > 0.005;
+  const off = bom.length > 0 && !st.ok;
 
   return (
     <div className="card clip min0">
+      <div className="recipe-head">
+        <div className="min0">
+          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--navy)' }}>Recipe</div>
+          <div className="row-sub">Ingredients as % of the batch weight; packaging as a count per batch.</div>
+        </div>
+        <span className={`pill ${st.tone}`}>{st.label}</span>
+      </div>
       <div className="bom-row bom-head">
         <span>Material</span>
         <span>% or qty</span>
@@ -219,20 +362,20 @@ function RecipeTable({ productId }: { productId: string }) {
             </div>
           );
         })}
-        {!bom.length && <div className="empty-inline">No materials in this recipe yet. Add the first one below.</div>}
+        {!bom.length && <div className="empty-inline">No materials in this recipe yet. Pick the first one below.</div>}
       </div>
       <AddRecipeLine productId={sp.id} />
       {bom.length > 0 && (
         <div className="bom-total tnum">
           <span>Formula total</span>
           <span style={{ color: off ? 'var(--warn)' : '#2E6B45' }}>
-            {pctSum.toFixed(3)}% · {qu(mixTotal, 'kg')}
+            {st.pct.toFixed(3)}% · {qu(st.mixTotal, 'kg')}
           </span>
         </div>
       )}
       {off && (
         <div className="bom-off">
-          Formula is {pctSum > 100 ? 'over' : 'under'} 100% by {Math.abs(pctSum - 100).toFixed(3)}% — batch weight won&apos;t match {qu(num(sp.batchKg), 'kg')}.
+          Formula is {st.pct > 100 ? 'over' : 'under'} 100% by {Math.abs(st.pct - 100).toFixed(3)}% — batch weight won&apos;t match {qu(num(sp.batchKg), 'kg')}.
         </div>
       )}
     </div>
@@ -307,10 +450,15 @@ function NewProduct({ onCancel, onCreated }: { onCancel?: () => void; onCreated:
   }
 
   return (
-    <form className="card pad col" style={{ gap: 12 }} onSubmit={save} noValidate>
-      <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--navy)' }}>New product</div>
+    <form className="card pad col" style={{ gap: 14 }} onSubmit={save} noValidate>
+      <div>
+        <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--navy)' }}>New product</div>
+        <div className="row-sub" style={{ marginTop: 2 }}>
+          Set the batch size and how it&apos;s packed. You&apos;ll add the recipe next.
+        </div>
+      </div>
       <FormField id="np-name" label="Product name" error={err.name}>
-        <input id="np-name" className="input" placeholder="Product name" value={f.name} aria-invalid={!!err.name} onChange={(e) => set('name', e.target.value)} />
+        <input id="np-name" className="input" placeholder="Product name" autoFocus value={f.name} aria-invalid={!!err.name} onChange={(e) => set('name', e.target.value)} />
       </FormField>
       <div className="grid3">
         <FormField id="np-kg" label="Batch size (kg)" error={err.batchKg}>

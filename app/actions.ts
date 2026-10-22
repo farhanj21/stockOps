@@ -230,6 +230,10 @@ export async function addProduct(form: { name: string; batchKg: number; upb: num
   return act((db, actor) => svc.addProduct(db, actor, parsed.data));
 }
 
+export async function renameProduct(id: string, name: string) {
+  return act((db, actor) => svc.renameProduct(db, actor, Id.parse(id), Name.parse(name)));
+}
+
 export async function deleteProduct(id: string) {
   return act((db, actor) => svc.deleteProduct(db, actor, Id.parse(id)));
 }
@@ -300,8 +304,13 @@ export async function logRun(forecastId: string, batches: number) {
 
 // ── Purchasing ──────────────────────────────────────────────────────────────
 
-export async function generatePO(excluded: string[]) {
-  return act((db, actor) => svc.generatePO(db, actor, z.array(Id).max(5000).parse(excluded)));
+/** Raise a PO with the materials and pack counts the user chose. */
+export async function createPO(lines: { ingredientId: string; packs: number }[]) {
+  const Lines = z
+    .array(z.object({ ingredientId: Id, packs: z.number().int('Order whole packs.').min(1, 'Order at least one pack.').max(100000) }))
+    .min(1, 'Add at least one material to the order.')
+    .max(1000);
+  return act((db, actor) => svc.createPO(db, actor, Lines.parse(lines)));
 }
 
 export async function receivePO(id: string) {

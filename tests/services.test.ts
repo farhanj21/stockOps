@@ -261,6 +261,42 @@ describe('stock, orders and production', () => {
   });
 });
 
+describe('custom purchase orders', () => {
+  it('orders any materials in any whole number of packs; quantity comes from the pack size', async () => {
+    const sugar = await material(db, orgId, SUGAR);
+    const cartons = await material(db, orgId, 'Cartons');
+    const po = await svc.createPO(db, warehouse, [
+      { ingredientId: sugar.id, packs: 3 },
+      { ingredientId: cartons.id, packs: 2 },
+    ]);
+    expect(po).toEqual({ id: 'PO-2041', lines: 2 });
+    const [row] = await db.select().from(t.purchaseOrders).where(and(eq(t.purchaseOrders.organizationId, orgId), eq(t.purchaseOrders.code, 'PO-2041')));
+    const lines = await db.select().from(t.poLines).where(eq(t.poLines.poId, row.id));
+    expect(Object.fromEntries(lines.map((l) => [l.ingredientId, [l.packs, l.qty]]))).toEqual({ [sugar.id]: [3, 75], [cartons.id]: [2, 100] });
+    expect((await material(db, orgId, SUGAR)).pipeline).toBe(456 + 75);
+  });
+
+  it('merges repeated materials into one line', async () => {
+    const sugar = await material(db, orgId, SUGAR);
+    await svc.createPO(db, admin, [
+      { ingredientId: sugar.id, packs: 1 },
+      { ingredientId: sugar.id, packs: 2 },
+    ]);
+    expect((await material(db, orgId, SUGAR)).pipeline).toBe(456 + 75);
+  });
+
+  it('rejects empty orders, part packs, utilities and other organizations’ materials', async () => {
+    const sugar = await material(db, orgId, SUGAR);
+    const water = await material(db, orgId, 'Water (process)');
+    await expect(svc.createPO(db, admin, [])).rejects.toBeInstanceOf(AppError);
+    await expect(svc.createPO(db, admin, [{ ingredientId: sugar.id, packs: 0 }])).rejects.toBeInstanceOf(AppError);
+    await expect(svc.createPO(db, admin, [{ ingredientId: sugar.id, packs: 1.5 }])).rejects.toBeInstanceOf(AppError);
+    await expect(svc.createPO(db, admin, [{ ingredientId: water.id, packs: 1 }])).rejects.toThrow(/utility/);
+    await svc.createOrganization(db, { orgName: 'Other', name: 'O', email: 'o@x.co', username: 'other', password: 'pw-12345678', sample: false });
+    await expect(svc.createPO(db, await actorFor(db, 'other'), [{ ingredientId: sugar.id, packs: 1 }])).rejects.toMatchObject({ code: 'not_found' });
+  });
+});
+
 describe('spreadsheet import', () => {
   const rows = [
     { name: SUGAR, inHand: 3000, cost: 200 },

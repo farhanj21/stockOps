@@ -47,6 +47,8 @@ interface StoreState {
   setRecipeQty: (productId: string, ing: string, qty: Num) => void;
   setProductField: (productId: string, field: 'upb' | 'upc', v: Num) => void;
   setBatchKg: (productId: string, v: Num) => void;
+  /** Typed product name; saved after a short pause. */
+  renameProduct: (productId: string, name: string) => void;
 
   setMemberRole: (userId: string, role: Role) => void;
 
@@ -54,7 +56,7 @@ interface StoreState {
   removeForecast: (id: string) => Promise<Undo | null>;
   logRun: (forecastId: string, batches: number) => Promise<{ product: string; units: number } | null>;
 
-  generatePO: (excluded: string[]) => Promise<{ id: string; lines: number } | null>;
+  createPO: (lines: { ingredientId: string; packs: number }[]) => Promise<{ id: string; lines: number } | null>;
   receivePO: (id: string) => Promise<boolean>;
 }
 
@@ -203,6 +205,10 @@ export const useStore = create<StoreState>()((set, get) => {
       edit((d) => ({ products: d.products.map((p) => (p.id === productId ? { ...p, [field]: v } : p)) }));
       sendLater(`product|${productId}|${field}`, v, (n) => api.setProductCounts(productId, field, n));
     },
+    renameProduct: (productId, name) => {
+      edit((d) => ({ products: d.products.map((p) => (p.id === productId ? { ...p, name } : p)) }));
+      sendLater(`product|${productId}|name`, name, (v: string) => api.renameProduct(productId, v));
+    },
     setBatchKg: (productId, v) => {
       // Preview the scaled recipe locally; the server rescales from the saved weight, so typing
       // through intermediate values ("5", "50", "500") can't accumulate rounding error.
@@ -240,7 +246,7 @@ export const useStore = create<StoreState>()((set, get) => {
     },
     logRun: (forecastId, batches) => send(() => api.logRun(forecastId, batches)),
 
-    generatePO: (excluded) => send(() => api.generatePO(excluded)),
+    createPO: (lines) => send(() => api.createPO(lines)),
     receivePO: async (id) => (await send(() => api.receivePO(id))) !== null,
   };
 });

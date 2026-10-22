@@ -1063,3 +1063,287 @@ select.cell-input {
 .stock-hint strong {
   color: var(--navy);
 }
+
+/* ── Products & recipes: list + detail ───────────────────────────────── */
+
+.prod-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+@media (min-width: 960px) {
+  .prod-layout {
+    grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+    gap: 24px;
+  }
+  .prod-list {
+    position: sticky;
+    top: 0;
+  }
+}
+@media (min-width: 1400px) {
+  .prod-layout {
+    grid-template-columns: 340px minmax(0, 1fr);
+  }
+}
+/* Phones: list first, then the chosen product on its own. */
+@media (max-width: 959.98px) {
+  .prod-layout[data-view='list'] .prod-detail,
+  .prod-layout[data-view='detail'] .prod-list {
+    display: none;
+  }
+}
+.prod-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 14px 12px 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--hover);
+}
+.prod-items {
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  gap: 2px;
+}
+.prod-item {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 12px 12px 14px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 140ms ease;
+}
+.prod-item:hover {
+  background: var(--bg);
+}
+.prod-item[aria-current='true'] {
+  background: var(--gold-bg);
+}
+.prod-item[aria-current='true']::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 3px;
+  border-radius: 3px;
+  background: var(--gold);
+}
+.prod-item-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--navy);
+}
+.title-input {
+  width: 100%;
+  margin: -4px 0 0 -8px;
+  padding: 2px 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  font-family: var(--serif);
+  font-size: 26px;
+  line-height: 1.25;
+  color: var(--navy);
+  resize: none;
+  overflow: hidden;
+  display: block;
+  transition: border-color 140ms ease, background-color 140ms ease, box-shadow 140ms ease;
+}
+@media (max-width: 520px) {
+  .title-input {
+    font-size: 22px;
+  }
+}
+@media (hover: hover) {
+  .title-input:hover {
+    border-color: var(--line);
+  }
+}
+.title-input:focus {
+  border-color: var(--gold);
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(191, 160, 90, 0.18);
+}
+.prod-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 16px;
+}
+@media (max-width: 620px) {
+  .prod-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.recipe-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.danger-zone {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px dashed var(--danger-line);
+  border-radius: 14px;
+  background: #fff;
+}
+.danger-btn {
+  border-color: var(--danger-line);
+  color: var(--danger);
+}
+.danger-btn:not(:disabled):hover {
+  background: var(--danger-bg);
+}
+
+button.back-link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* Short number fields stay side by side even on phones. */
+.grid3.keep3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+/* ── Purchase order builder ──────────────────────────────────────────── */
+
+.po-intro {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line-soft);
+  background: var(--hover);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.po-row {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px 10px;
+  padding: 10px 16px 10px 6px;
+  transition: opacity 160ms ease;
+}
+.po-row[data-off='true'] .po-row-main,
+.po-row[data-off='true'] .po-row-qty {
+  opacity: 0.45;
+}
+.po-row-qty {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.po-row-total {
+  min-width: 112px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.po-row-total strong {
+  font-size: 15px;
+  color: var(--navy);
+}
+.po-stepper {
+  display: grid;
+  grid-template-columns: 36px 52px 36px;
+  height: 38px;
+  border: 1px solid var(--line-2);
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
+}
+.po-stepper button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: var(--hover);
+  color: var(--navy);
+  cursor: pointer;
+  transition: background-color 140ms ease;
+}
+.po-stepper button:hover:not(:disabled) {
+  background: var(--fill);
+}
+.po-stepper button:disabled {
+  color: var(--line-2);
+  cursor: default;
+}
+.po-stepper input {
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-left: 1px solid var(--line);
+  border-right: 1px solid var(--line);
+  text-align: center;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--navy);
+  font-variant-numeric: tabular-nums;
+}
+.po-stepper input:focus {
+  outline: none;
+  background: var(--gold-bg);
+}
+/* Phones: the pack stepper and total sit under the material name. */
+@media (max-width: 620px) {
+  .po-row {
+    grid-template-columns: 44px minmax(0, 1fr);
+  }
+  .po-row-qty {
+    grid-column: 2;
+    justify-content: space-between;
+  }
+}
+.po-add {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--line);
+  background: var(--hover);
+}
+
+.po-remove {
+  justify-self: center;
+}
+.po-removed {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 12px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--line-soft);
+  font-size: 12px;
+  color: var(--muted);
+}

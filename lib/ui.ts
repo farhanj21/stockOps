@@ -37,6 +37,10 @@ export interface UIState {
   setupTab: SetupTab;
   setupProduct: string;
   poExcluded: Record<string, boolean>;
+  /** Pack counts the user typed over the suggestion (or for materials they added). */
+  poPacks: Record<string, Num>;
+  /** Materials added to the order by hand, in the order they were added. */
+  poExtra: string[];
   runId: string | null;
   runBatches: number;
   imp: ImportState;
@@ -64,6 +68,8 @@ export const useUI = create<UIState>()((set) => ({
   setupTab: 'recipes',
   setupProduct: 'fudge',
   poExcluded: {},
+  poPacks: {},
+  poExtra: [],
   runId: null,
   runBatches: 1,
   imp: { stage: 'pick' },
