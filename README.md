@@ -41,9 +41,19 @@ Phones can only install it when the site is served over **HTTPS**, so deploy it 
 2. **Hosting:** import this repository into [Vercel](https://vercel.com) and add these environment variables:
    - `DATABASE_URL`: the connection string
    - `PLANT_TIMEZONE`: e.g. `Asia/Karachi`, so PO and delivery dates follow plant time
+   - `GEMINI_API_KEY` (optional): turns on the AI assistant (below)
 3. Deploy, open the site, and create your organization.
 
 All settings are listed in `.env.example`.
+
+## AI assistant
+
+With `GEMINI_API_KEY` set (a Google Gemini key from [AI Studio](https://aistudio.google.com/apikey)), every screen shows an **Ask StockOps** button. The assistant explains how the app works and, for Admins, can add materials, create products with their recipes, add to recipes and create team accounts.
+
+- It only **proposes** changes: each one appears as a card, and nothing is saved until the person taps **Confirm**. Saves go through the same role checks as the rest of the app.
+- For new team members, the app creates the temporary password and shows it on screen. It is never sent to Gemini.
+- The key stays on the server. Gemini sees the chat plus a summary of the organization's materials, products, plans and team names.
+- `GEMINI_MODEL` picks the model (default `gemini-3.8-flash`).
 
 ## Who can do what
 

@@ -16,7 +16,7 @@
   gap: 28px;
   padding: calc(20px + env(safe-area-inset-top)) 20px 20px;
   background: var(--navy);
-  color: var(--bg);
+  color: var(--on-brand);
 }
 .auth-form-wrap {
   display: flex;
@@ -30,7 +30,7 @@
   max-width: 420px;
   margin: 0;
   padding: 24px 20px;
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 18px;
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
@@ -147,7 +147,7 @@
   font-size: 26px;
   font-weight: 400;
   line-height: 1.2;
-  color: var(--navy);
+  color: var(--strong);
 }
 .auth-sub {
   margin: 0;
@@ -217,7 +217,7 @@
   padding: 0 14px;
   border: 1px solid var(--line-2);
   border-radius: 999px;
-  background: #fff;
+  background: var(--surface);
   color: var(--ink);
   font-size: 12px;
   font-weight: 600;
@@ -252,7 +252,7 @@
   text-decoration: none;
 }
 .back-link:hover {
-  color: var(--navy);
+  color: var(--strong);
 }
 
 .auth-done {
@@ -273,19 +273,19 @@
 .done-ico.ok {
   background: var(--ok-bg);
   color: var(--ok);
-  box-shadow: 0 0 0 10px #f1f8f3;
+  box-shadow: 0 0 0 10px var(--ok-bg);
 }
 .done-ico.mail {
   background: var(--gold-bg);
   color: var(--gold-ink);
-  box-shadow: 0 0 0 10px #fbf6ea;
+  box-shadow: 0 0 0 10px var(--gold-bg);
 }
 .done-title {
   margin: 6px 0 0;
   font-family: var(--serif);
   font-size: 26px;
   font-weight: 400;
-  color: var(--navy);
+  color: var(--strong);
 }
 .done-text {
   font-size: 14px;

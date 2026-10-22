@@ -2,12 +2,14 @@ import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
 import { Hanken_Grotesk, Marcellus } from 'next/font/google';
 import { Providers } from '@/components/Providers';
+import { BOOT_SCRIPT } from '@/lib/boot';
 import './globals.css';
 import '@/styles/shell.css';
 import '@/styles/auth.css';
 import '@/styles/screens.css';
 import '@/styles/sheet.css';
 import '@/styles/motion.css';
+import '@/styles/assistant.css';
 
 const sans = Hanken_Grotesk({
   variable: '--font-sans',
@@ -38,7 +40,11 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
-    <html lang="en" className={`${sans.variable} ${serif.variable}`}>
+    // The head script sets data-theme / data-sidebar on <html> before React loads, hence suppressHydrationWarning.
+    <html lang="en" className={`${sans.variable} ${serif.variable}`} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: BOOT_SCRIPT }} />
+      </head>
       <body>
         {children}
         <Providers />

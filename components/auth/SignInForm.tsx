@@ -56,7 +56,7 @@ export function SignInForm() {
     <form onSubmit={submit} noValidate className="auth-form">
       <div className="auth-head">
         <h1 className="auth-title">Sign in</h1>
-        <p className="auth-sub">Welcome back. Use the account your admin set up for you.</p>
+        <p className="auth-sub">Welcome back. Use the account set up by your admin.</p>
       </div>
       <Field
         id="si-user"
@@ -77,13 +77,11 @@ export function SignInForm() {
           <label htmlFor="si-pass" className="field-label" style={{ marginBottom: 0 }}>
             Password
           </label>
-          <Link href="/forgot" className="btn-link" style={{ fontSize: 12, textDecoration: 'none' }}>
-            Forgot password?
-          </Link>
+          {/* "Forgot password?" (/forgot) is hidden until password-reset emails are set up. */}
         </div>
         <div className="input-shell" style={{ height: 48 }} aria-invalid={!!err.pass}>
           <input
-            id="si-pass"
+            id="si-pass" placeholder="Enter your password"
             type={show ? 'text' : 'password'}
             autoComplete="current-password"
             value={pass}

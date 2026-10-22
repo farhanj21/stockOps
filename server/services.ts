@@ -193,6 +193,29 @@ export async function setMemberRole(db: Db, actor: Actor, userId: string, role: 
   });
 }
 
+/** Change someone's display name or email. Only the owner edits the owner's details. */
+export async function updateMember(db: Db, actor: Actor, userId: string, input: { name: string; email: string | null }) {
+  requirePerm(actor, 'setup');
+  const u = await ownMember(db, actor, userId);
+  if (u.isOwner && !actor.isOwner) throw new AppError("Only the owner can change the owner's details.", 'forbidden');
+  const name = input.name.trim();
+  const email = input.email?.trim().toLowerCase() || null;
+  if (email) {
+    const [taken] = await db
+      .select({ id: t.users.id })
+      .from(t.users)
+      .where(and(eq(sql`lower(${t.users.email})`, email), ne(t.users.id, userId)));
+    if (taken) throw new AppError('An account with that email already exists.', 'conflict', { email: 'An account with that email already exists.' });
+  }
+  try {
+    await db.update(t.users).set({ name, email }).where(eq(t.users.id, userId));
+  } catch (e) {
+    if (isUniqueViolation(e)) throw new AppError('An account with that email already exists.', 'conflict', { email: 'An account with that email already exists.' });
+    throw e;
+  }
+  return { name };
+}
+
 export async function resetMemberPassword(db: Db, actor: Actor, userId: string, password: string) {
   requirePerm(actor, 'setup');
   const u = await ownMember(db, actor, userId);

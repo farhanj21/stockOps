@@ -11,6 +11,8 @@ export interface Me {
   baseRole: Role;
   /** Demo conveniences such as "Replace with sample data" are available. */
   demo: boolean;
+  /** The AI assistant is configured (GEMINI_API_KEY). */
+  assistant: boolean;
 }
 
 export interface Snapshot {

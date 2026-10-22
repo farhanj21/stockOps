@@ -31,7 +31,7 @@ export function MaterialSheet({ id }: { id: string }) {
             <div className="muted" style={{ fontSize: 12 }}>
               Total available
             </div>
-            <div className="serif tnum" style={{ fontSize: 38, lineHeight: 1.1, color: 'var(--navy)' }}>
+            <div className="serif tnum" style={{ fontSize: 38, lineHeight: 1.1, color: 'var(--strong)' }}>
               {qu(t, i.unit)}
             </div>
           </div>

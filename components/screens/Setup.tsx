@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type Keyb
 import * as api from '@/app/actions';
 import { FormField } from '@/components/FormField';
 import { Icon } from '@/components/Icon';
-import { fmt, inputVal, money, num, plural, qu, round } from '@/lib/format';
+import { cap1, fmt, inputVal, money, num, plural, qu, round } from '@/lib/format';
 import { useModel } from '@/lib/model';
 import { useStore } from '@/lib/store';
 import type { MaterialKind } from '@/lib/types';
@@ -92,7 +92,7 @@ function Recipes() {
       <aside className="prod-list card clip" aria-label="Products">
         <div className="prod-list-head">
           <div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--navy)' }}>Products</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--strong)' }}>Products</div>
             <div className="row-sub">{products.length ? `${products.length} in this plant` : 'None yet'}</div>
           </div>
           <button
@@ -213,7 +213,7 @@ function ProductDetail({ id, onBack }: { id: string; onBack: () => void }) {
               Batch size
             </label>
             <div className="input-shell" style={{ height: 46 }}>
-              <input id="bkg" type="number" inputMode="decimal" style={{ fontWeight: 600 }} value={sp.batchKg} onChange={(e) => setBatchKg(sp.id, inputVal(e.target.value))} />
+              <input id="bkg" placeholder="Enter kg" type="number" inputMode="decimal" style={{ fontWeight: 600 }} value={sp.batchKg} onChange={(e) => setBatchKg(sp.id, inputVal(e.target.value))} />
               <span className="subtle" style={{ paddingRight: 14, fontSize: 12 }}>
                 kg
               </span>
@@ -223,13 +223,13 @@ function ProductDetail({ id, onBack }: { id: string; onBack: () => void }) {
             <label htmlFor="upb" className="field-label sm">
               Units per batch
             </label>
-            <input id="upb" type="number" inputMode="numeric" className="input h46" value={sp.upb} onChange={(e) => setProductField(sp.id, 'upb', inputVal(e.target.value, true))} />
+            <input id="upb" placeholder="Enter units" type="number" inputMode="numeric" className="input h46" value={sp.upb} onChange={(e) => setProductField(sp.id, 'upb', inputVal(e.target.value, true))} />
           </div>
           <div>
             <label htmlFor="upc" className="field-label sm">
               Units per case
             </label>
-            <input id="upc" type="number" inputMode="numeric" className="input h46" value={sp.upc} onChange={(e) => setProductField(sp.id, 'upc', inputVal(e.target.value, true))} />
+            <input id="upc" placeholder="Enter units" type="number" inputMode="numeric" className="input h46" value={sp.upc} onChange={(e) => setProductField(sp.id, 'upc', inputVal(e.target.value, true))} />
           </div>
         </div>
         <div className="subtle" style={{ marginTop: 8, fontSize: 12 }}>
@@ -293,7 +293,7 @@ function TitleInput({ id, value, onChange }: { id: string; value: string; onChan
       ref={ref}
       id={id}
       rows={1}
-      className="title-input"
+      className="title-input" placeholder="Enter product name"
       value={value}
       spellCheck={false}
       onChange={(e) => onChange(e.target.value.replace(/\n/g, ' '))}
@@ -322,7 +322,7 @@ function RecipeTable({ productId }: { productId: string }) {
     <div className="card clip min0">
       <div className="recipe-head">
         <div className="min0">
-          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--navy)' }}>Recipe</div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--strong)' }}>Recipe</div>
           <div className="row-sub">Ingredients as % of the batch weight; packaging as a count per batch.</div>
         </div>
         <span className={`pill ${st.tone}`}>{st.label}</span>
@@ -345,6 +345,7 @@ function RecipeTable({ productId }: { productId: string }) {
                   type="number"
                   inputMode="decimal"
                   value={mix && r.qty !== '' ? round((num(r.qty) / bkg) * 100) : r.qty}
+                  placeholder={mix ? '%' : 'Qty'}
                   onChange={(e) => {
                     const v = inputVal(e.target.value);
                     setRecipeQty(sp.id, r.ing, v === '' ? '' : mix ? round((v * bkg) / 100) : v);
@@ -368,7 +369,7 @@ function RecipeTable({ productId }: { productId: string }) {
       {bom.length > 0 && (
         <div className="bom-total tnum">
           <span>Formula total</span>
-          <span style={{ color: off ? 'var(--warn)' : '#2E6B45' }}>
+          <span style={{ color: off ? 'var(--warn)' : 'var(--ok)' }}>
             {st.pct.toFixed(3)}% · {qu(st.mixTotal, 'kg')}
           </span>
         </div>
@@ -452,23 +453,23 @@ function NewProduct({ onCancel, onCreated }: { onCancel?: () => void; onCreated:
   return (
     <form className="card pad col" style={{ gap: 14 }} onSubmit={save} noValidate>
       <div>
-        <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--navy)' }}>New product</div>
+        <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--strong)' }}>New product</div>
         <div className="row-sub" style={{ marginTop: 2 }}>
           Set the batch size and how it&apos;s packed. You&apos;ll add the recipe next.
         </div>
       </div>
       <FormField id="np-name" label="Product name" error={err.name}>
-        <input id="np-name" className="input" placeholder="Product name" autoFocus value={f.name} aria-invalid={!!err.name} onChange={(e) => set('name', e.target.value)} />
+        <input id="np-name" className="input" placeholder="Enter product name" autoFocus value={f.name} aria-invalid={!!err.name} onChange={(e) => set('name', e.target.value)} />
       </FormField>
       <div className="grid3">
         <FormField id="np-kg" label="Batch size (kg)" error={err.batchKg}>
-          <input id="np-kg" className="input" type="number" inputMode="decimal" value={f.batchKg} aria-invalid={!!err.batchKg} onChange={(e) => set('batchKg', e.target.value)} />
+          <input id="np-kg" placeholder="Enter batch size" className="input" type="number" inputMode="decimal" value={f.batchKg} aria-invalid={!!err.batchKg} onChange={(e) => set('batchKg', e.target.value)} />
         </FormField>
         <FormField id="np-upb" label="Units / batch" error={err.upb}>
-          <input id="np-upb" className="input" type="number" inputMode="numeric" value={f.upb} aria-invalid={!!err.upb} onChange={(e) => set('upb', e.target.value)} />
+          <input id="np-upb" placeholder="Enter units per batch" className="input" type="number" inputMode="numeric" value={f.upb} aria-invalid={!!err.upb} onChange={(e) => set('upb', e.target.value)} />
         </FormField>
         <FormField id="np-upc" label="Units / case" error={err.upc}>
-          <input id="np-upc" className="input" type="number" inputMode="numeric" value={f.upc} aria-invalid={!!err.upc} onChange={(e) => set('upc', e.target.value)} />
+          <input id="np-upc" placeholder="Enter units per case" className="input" type="number" inputMode="numeric" value={f.upc} aria-invalid={!!err.upc} onChange={(e) => set('upc', e.target.value)} />
         </FormField>
       </div>
       <div style={{ display: 'flex', gap: 8 }}>
@@ -504,6 +505,7 @@ function Materials() {
   const setUI = useUI((s) => s.set);
   const openSheet = useUI((s) => s.openSheet);
   const materials = m.data.ingredients;
+  const [adding, setAdding] = useState(false);
 
   return (
     <>
@@ -514,20 +516,36 @@ function Materials() {
             Costs, pack sizes, par levels and stock in one upload. New rows are added as materials. Or type them straight into the table.
           </div>
         </div>
-        <button
-          type="button"
-          className="btn btn-primary"
-          onClick={() => {
-            setUI({ imp: { stage: 'pick' } });
-            openSheet('import');
-          }}
-        >
-          <Icon name="upload" size={16} />
-          Import Excel
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button type="button" className="btn btn-outline n-only" onClick={() => setAdding(true)}>
+            <Icon name="plus" size={16} stroke={2.2} />
+            Add material
+          </button>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => {
+              setUI({ imp: { stage: 'pick' } });
+              openSheet('import');
+            }}
+          >
+            <Icon name="upload" size={16} />
+            Import Excel
+          </button>
+        </div>
       </div>
 
-      <div className="card clip mat-table-wrap">
+      {/* Phones: one card per material, since the wide table doesn't fit. */}
+      <div className="n-only">
+        {(adding || !materials.length) && <NewMaterial onDone={() => setAdding(false)} canCancel={materials.length > 0} />}
+        <div className="mat-grid" style={{ marginTop: adding || !materials.length ? 12 : 0 }}>
+          {materials.map((i) => (
+            <MaterialCard key={i.id} id={i.id} />
+          ))}
+        </div>
+      </div>
+
+      <div className="card clip mat-table-wrap w-only">
         <table className="mat-table">
           <thead>
             <tr>
@@ -556,7 +574,7 @@ function Materials() {
             {materials.map((i) => (
               <tr key={i.id}>
                 <th scope="row">
-                  <input className="cell-input name" value={i.name} onChange={(e) => updateText(i.id, 'name', e.target.value)} aria-label="Material name" />
+                  <input className="cell-input name" value={i.name} placeholder="Enter material name" onChange={(e) => updateText(i.id, 'name', e.target.value)} aria-label="Material name" />
                 </th>
                 <td>
                   <select className="cell-input" value={i.kind} onChange={(e) => updateText(i.id, 'kind', e.target.value)} aria-label={`${i.name} type`}>
@@ -568,16 +586,17 @@ function Materials() {
                   </select>
                 </td>
                 <td>
-                  <input className="cell-input" value={i.unit} onChange={(e) => updateText(i.id, 'unit', e.target.value)} aria-label={`${i.name} unit`} />
+                  <input className="cell-input" value={i.unit} placeholder="Enter unit" onChange={(e) => updateText(i.id, 'unit', e.target.value)} aria-label={`${i.name} unit`} />
                 </td>
                 <td>
-                  <input className="cell-input" value={i.packName} onChange={(e) => updateText(i.id, 'packName', e.target.value)} aria-label={`${i.name} pack type`} />
+                  <input className="cell-input" value={i.packName} placeholder="Enter pack type" onChange={(e) => updateText(i.id, 'packName', e.target.value)} aria-label={`${i.name} pack type`} />
                 </td>
                 {(['pack', 'cost', 'par'] as const).map((key) => (
                   <td key={key} className="num">
                     <input
                       className="cell-input num"
                       type="number"
+                      placeholder="0"
                       inputMode="decimal"
                       value={i[key]}
                       onChange={(e) => update(i.id, { [key]: inputVal(e.target.value) })}
@@ -613,7 +632,7 @@ function Materials() {
         </table>
       </div>
       {!materials.length && (
-        <div className="muted" style={{ marginTop: 10, fontSize: 12 }}>
+        <div className="muted w-only" style={{ marginTop: 10, fontSize: 12 }}>
           Type your first material into the row above, then press Add or Enter.
         </div>
       )}
@@ -622,6 +641,143 @@ function Materials() {
 }
 
 const BLANK = { name: '', kind: 'ingredient' as MaterialKind, unit: 'kg', packName: 'bag', pack: '', cost: '', par: '' };
+
+/** Phone layout: a material's name and type, with cost, pack size and par to edit. */
+function MaterialCard({ id }: { id: string }) {
+  const i = useModel().byId[id];
+  const update = useStore((s) => s.updateIngredient);
+  const send = useStore((s) => s.send);
+  if (!i) return null;
+  const fields = [
+    ['cost', `Rs / ${i.unit}`, 'Cost per unit'],
+    ['pack', `${cap1(i.packName)} (${i.unit})`, 'Pack size'],
+    ['par', `Par (${i.unit})`, 'Par level'],
+  ] as const;
+  return (
+    <div className="card flat" style={{ padding: '14px 16px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+        <span className="row-title min0 ellipsis">{i.name}</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span className="subtle" style={{ fontSize: 11 }}>
+            {KINDS.find(([v]) => v === i.kind)?.[1] ?? 'Ingredient'}
+          </span>
+          <button
+            type="button"
+            className="row-remove"
+            aria-label={`Delete ${i.name}`}
+            onClick={async () => {
+              const ok = await confirmDialog({
+                title: `Delete ${i.name}?`,
+                body: 'This removes the material for good. Materials used in a recipe or on a purchase order are kept.',
+                confirmLabel: 'Delete material',
+                danger: true,
+              });
+              if (ok && (await send(() => api.deleteMaterial(i.id))) !== null) toast(`${i.name} deleted.`);
+            }}
+          >
+            <Icon name="trash" size={14} />
+          </button>
+        </span>
+      </div>
+      <div className="mat-fields">
+        {fields.map(([key, label, aria]) => (
+          <label key={key}>
+            <div style={{ marginBottom: 4, fontSize: 11, fontWeight: 600 }}>{label}</div>
+            <input
+              type="number"
+              inputMode="decimal"
+              className="input h44"
+              value={i[key]}
+              placeholder="0"
+              onChange={(e) => update(i.id, { [key]: inputVal(e.target.value) })}
+              aria-label={`${i.name} ${aria}`}
+            />
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Phone layout: the add-a-material form. */
+function NewMaterial({ onDone, canCancel }: { onDone: () => void; canCancel: boolean }) {
+  const submit = useStore((s) => s.submit);
+  const [f, setF] = useState(BLANK);
+  const [err, setErr] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState(false);
+  const set = (k: keyof typeof BLANK, v: string) => {
+    setF((x) => ({ ...x, [k]: v }));
+    setErr((e) => ({ ...e, [k]: '' }));
+  };
+
+  async function save(e: FormEvent) {
+    e.preventDefault();
+    if (!f.name.trim()) return setErr({ name: 'Required.' });
+    if (num(f.pack) <= 0) return setErr({ pack: 'Must be more than 0.' });
+    setBusy(true);
+    const res = await submit(() => api.addMaterial({ ...f, pack: num(f.pack), cost: num(f.cost), par: num(f.par) }));
+    setBusy(false);
+    if (!res.ok) return setErr(res.fieldErrors ?? { name: res.error });
+    toast(`${f.name.trim()} added.`);
+    setF({ ...BLANK, kind: f.kind, unit: f.unit, packName: f.packName });
+    if (canCancel) onDone();
+  }
+
+  return (
+    <form className="card pad col" style={{ gap: 12 }} onSubmit={save} noValidate>
+      <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--strong)' }}>New material</div>
+      <div className="grid2" style={{ gap: 10 }}>
+        <FormField id="nm-name" label="Name" error={err.name}>
+          <input id="nm-name" className="input" placeholder="e.g. Sugar (Powdered)" value={f.name} aria-invalid={!!err.name} onChange={(e) => set('name', e.target.value)} />
+        </FormField>
+        <FormField id="nm-kind" label="Type">
+          <select
+            id="nm-kind"
+            className="input"
+            value={f.kind}
+            onChange={(e) => {
+              const k = KINDS.find(([v]) => v === e.target.value)!;
+              setF((x) => ({ ...x, kind: k[0], unit: k[2], packName: k[3] }));
+            }}
+          >
+            {KINDS.map(([v, label]) => (
+              <option key={v} value={v}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </FormField>
+      </div>
+      <div className="grid3">
+        <FormField id="nm-unit" label="Unit" error={err.unit}>
+          <input id="nm-unit" className="input" placeholder="kg" value={f.unit} onChange={(e) => set('unit', e.target.value)} />
+        </FormField>
+        <FormField id="nm-packname" label="Pack type" error={err.packName}>
+          <input id="nm-packname" className="input" placeholder="bag, drum…" value={f.packName} onChange={(e) => set('packName', e.target.value)} />
+        </FormField>
+        <FormField id="nm-pack" label={`Pack size (${f.unit || 'unit'})`} error={err.pack}>
+          <input id="nm-pack" className="input" type="number" inputMode="decimal" placeholder="25" value={f.pack} aria-invalid={!!err.pack} onChange={(e) => set('pack', e.target.value)} />
+        </FormField>
+        <FormField id="nm-cost" label={`Cost (Rs / ${f.unit || 'unit'})`} error={err.cost}>
+          <input id="nm-cost" placeholder="Enter cost" className="input" type="number" inputMode="decimal" value={f.cost} onChange={(e) => set('cost', e.target.value)} />
+        </FormField>
+        <FormField id="nm-par" label={`Par level (${f.unit || 'unit'})`} error={err.par}>
+          <input id="nm-par" placeholder="Enter par level" className="input" type="number" inputMode="decimal" value={f.par} onChange={(e) => set('par', e.target.value)} />
+        </FormField>
+      </div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button type="submit" className="btn btn-primary" style={{ flex: 1, height: 48, fontSize: 14 }} disabled={busy}>
+          {busy ? 'Adding…' : 'Add material'}
+        </button>
+        {canCancel && (
+          <button type="button" className="btn btn-outline" style={{ height: 48 }} onClick={onDone}>
+            Cancel
+          </button>
+        )}
+      </div>
+    </form>
+  );
+}
 
 /** The table's last row: fill it in and press Add (or Enter) to create a material. */
 function NewMaterialRow({ first }: { first: boolean }) {
@@ -659,7 +815,7 @@ function NewMaterialRow({ first }: { first: boolean }) {
           <input
             id="new-mat-name"
             className="cell-input name"
-            placeholder={first ? 'Material name' : '+ New material'}
+            placeholder={first ? 'Enter material name' : '+ New material'}
             value={f.name}
             onChange={(e) => set('name', e.target.value)}
             aria-label="New material name"
@@ -683,10 +839,10 @@ function NewMaterialRow({ first }: { first: boolean }) {
           </select>
         </td>
         <td>
-          <input className="cell-input" value={f.unit} onChange={(e) => set('unit', e.target.value)} aria-label="New material unit" />
+          <input className="cell-input" value={f.unit} placeholder="kg" onChange={(e) => set('unit', e.target.value)} aria-label="New material unit" />
         </td>
         <td>
-          <input className="cell-input" value={f.packName} onChange={(e) => set('packName', e.target.value)} aria-label="New material pack type" />
+          <input className="cell-input" value={f.packName} placeholder="bag" onChange={(e) => set('packName', e.target.value)} aria-label="New material pack type" />
         </td>
         {(['pack', 'cost', 'par'] as const).map((key) => (
           <td key={key} className="num">

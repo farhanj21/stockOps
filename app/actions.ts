@@ -272,6 +272,12 @@ export async function setMemberRole(userId: string, role: string) {
   return act((db, actor) => svc.setMemberRole(db, actor, Id.parse(userId), RoleZ.parse(role)));
 }
 
+export async function updateMember(userId: string, form: { name: string; email: string }) {
+  const parsed = z.object({ name: Name, email: z.union([z.literal(''), Email]) }).safeParse(form);
+  if (!parsed.success) return fieldFail(parsed.error);
+  return act((db, actor) => svc.updateMember(db, actor, Id.parse(userId), { name: parsed.data.name, email: parsed.data.email || null }));
+}
+
 export async function resetMemberPassword(userId: string, password: string) {
   const parsed = Password.safeParse(password);
   if (!parsed.success) return { ok: false as const, error: parsed.error.issues[0].message, fieldErrors: { password: parsed.error.issues[0].message } };

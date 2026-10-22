@@ -211,7 +211,7 @@ export function Dashboard() {
                       </span>
                     </span>
                     <span className="col" style={{ alignItems: 'flex-end' }}>
-                      <span className="serif tnum" style={{ fontSize: 24, lineHeight: 1.1, color: 'var(--navy)' }}>
+                      <span className="serif tnum" style={{ fontSize: 24, lineHeight: 1.1, color: 'var(--strong)' }}>
                         {fmt(c.cases)}
                       </span>
                       <span className="subtle" style={{ fontSize: 11 }}>
@@ -303,7 +303,7 @@ function GetStarted() {
   }
   return (
     <section className="card pad onboarding">
-      <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--navy)' }}>Set up your plant</div>
+      <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--strong)' }}>Set up your plant</div>
       <div className="muted" style={{ fontSize: 13, marginTop: 2 }}>
         Three steps and StockOps can work out capacity, alerts and orders for you.
       </div>

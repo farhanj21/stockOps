@@ -137,14 +137,14 @@ function AddMember({ onCancel, onCreated }: { onCancel?: () => void; onCreated: 
   return (
     <form className="card pad col" style={{ gap: 14 }} onSubmit={save} noValidate>
       <div>
-        <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--navy)' }}>Add a person</div>
+        <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--strong)' }}>Add a person</div>
         <div className="muted" style={{ marginTop: 2, fontSize: 12 }}>
           They sign in with the username and password you set here, and can change the password later.
         </div>
       </div>
       <FormField id="tm-name" label="Full name" error={err.name}>
         <input
-          id="tm-name"
+          id="tm-name" placeholder="Enter full name"
           className="input"
           autoComplete="off"
           value={form.name}
@@ -158,7 +158,7 @@ function AddMember({ onCancel, onCreated }: { onCancel?: () => void; onCreated: 
       <div className="grid2" style={{ gap: 10 }}>
         <FormField id="tm-user" label="Username" error={err.username}>
           <input
-            id="tm-user"
+            id="tm-user" placeholder="Enter a username, e.g. alikhan"
             className="input"
             autoComplete="off"
             autoCapitalize="none"
@@ -172,7 +172,7 @@ function AddMember({ onCancel, onCreated }: { onCancel?: () => void; onCreated: 
         </FormField>
         <FormField id="tm-email" label="Email (optional)" error={err.email}>
           <input
-            id="tm-email"
+            id="tm-email" placeholder="Enter email (optional)"
             className="input"
             type="email"
             autoComplete="off"
@@ -201,7 +201,7 @@ function AddMember({ onCancel, onCreated }: { onCancel?: () => void; onCreated: 
       </div>
       <FormField id="tm-pass" label="Temporary password" error={err.password}>
         <div className="input-shell" style={{ height: 48 }} aria-invalid={!!err.password}>
-          <input id="tm-pass" autoComplete="off" autoCapitalize="none" value={form.password} onChange={(e) => set('password', e.target.value)} />
+          <input id="tm-pass" placeholder="Enter a temporary password" autoComplete="off" autoCapitalize="none" value={form.password} onChange={(e) => set('password', e.target.value)} />
           <button type="button" className="pass-toggle" onClick={() => set('password', generatePassword())}>
             New
           </button>
@@ -268,6 +268,7 @@ function Member({ u }: { u: User }) {
   const submit = useStore((s) => s.submit);
   const [resetting, setResetting] = useState<string | null>(null);
   const [resetErr, setResetErr] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
   const locked = u.isOwner || u.id === me.id;
 
   return (
@@ -300,8 +301,15 @@ function Member({ u }: { u: User }) {
           ))}
         </select>
       </div>
-      {resetting === null ? (
+      {editing ? (
+        <EditMember u={u} onDone={() => setEditing(false)} />
+      ) : resetting === null ? (
         <div className="member-actions">
+          {(!u.isOwner || me.isOwner) && (
+            <button type="button" className="btn-link" onClick={() => setEditing(true)}>
+              <Icon name="edit" size={14} /> Edit
+            </button>
+          )}
           {(!u.isOwner || me.isOwner) && (
             <button
               type="button"
@@ -346,7 +354,7 @@ function Member({ u }: { u: User }) {
           }}
         >
           <div className="input-shell" style={{ height: 44, flex: 1, minWidth: 180 }} aria-invalid={!!resetErr}>
-            <input aria-label={`New password for ${u.name}`} value={resetting} autoCapitalize="none" onChange={(e) => setResetting(e.target.value)} />
+            <input aria-label={`New password for ${u.name}`} placeholder="Enter a new password" value={resetting} autoCapitalize="none" onChange={(e) => setResetting(e.target.value)} />
             <button type="button" className="pass-toggle" onClick={() => setResetting(generatePassword())}>
               New
             </button>
@@ -361,6 +369,55 @@ function Member({ u }: { u: User }) {
         </form>
       )}
     </div>
+  );
+}
+
+/** Inline form to change someone's name and email. */
+function EditMember({ u, onDone }: { u: User; onDone: () => void }) {
+  const submit = useStore((s) => s.submit);
+  const [f, setF] = useState({ name: u.name, email: u.email });
+  const [err, setErr] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState(false);
+  const set = (k: keyof typeof f, v: string) => {
+    setF((x) => ({ ...x, [k]: v }));
+    setErr((e) => ({ ...e, [k]: '' }));
+  };
+
+  async function save(e: FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    const res = await submit(() => api.updateMember(u.id, f));
+    setBusy(false);
+    if (!res.ok) return setErr(res.fieldErrors ?? { name: res.error });
+    toast(`${f.name.trim()}'s details saved.`);
+    onDone();
+  }
+
+  return (
+    <form className="member-edit" onSubmit={save} noValidate>
+      <FormField id={`me-name-${u.id}`} label="Full name" error={err.name}>
+        <input id={`me-name-${u.id}`} className="input h44" placeholder="Enter full name" value={f.name} autoFocus aria-invalid={!!err.name} onChange={(e) => set('name', e.target.value)} />
+      </FormField>
+      <FormField id={`me-email-${u.id}`} label="Email (optional)" error={err.email}>
+        <input
+          id={`me-email-${u.id}`}
+          className="input h44" placeholder="Enter email (optional)"
+          type="email"
+          autoCapitalize="none"
+          value={f.email}
+          aria-invalid={!!err.email}
+          onChange={(e) => set('email', e.target.value)}
+        />
+      </FormField>
+      <div className="member-edit-actions">
+        <button type="submit" className="btn btn-primary" disabled={busy || !f.name.trim()}>
+          {busy ? 'Saving…' : 'Save'}
+        </button>
+        <button type="button" className="btn btn-outline" onClick={onDone}>
+          Cancel
+        </button>
+      </div>
+    </form>
   );
 }
 
@@ -389,7 +446,7 @@ function Organization() {
           Name shown across the app
         </label>
         <div style={{ display: 'flex', gap: 8 }}>
-          <input id="org-name" className="input" value={name} onChange={(e) => setName(e.target.value)} />
+          <input id="org-name" className="input" placeholder="Enter organization name" value={name} onChange={(e) => setName(e.target.value)} />
           <button type="submit" className="btn btn-primary" style={{ height: 48 }} disabled={!dirty}>
             Save
           </button>

@@ -26,7 +26,7 @@
   overscroll-behavior: contain;
   padding-bottom: env(safe-area-inset-bottom);
   border-radius: 18px 18px 0 0;
-  background: #fff;
+  background: var(--surface);
   box-shadow: 0 -8px 30px rgba(15, 23, 42, 0.2);
   transform: translateY(100%);
   visibility: hidden;
@@ -62,7 +62,7 @@
   top: 0;
   z-index: 1;
   padding: 10px 12px 12px 20px;
-  background: #fff;
+  background: var(--surface);
   border-bottom: 1px solid var(--line-soft);
 }
 .sheet-grip {
@@ -70,7 +70,7 @@
   height: 4px;
   margin: 0 auto 10px;
   border-radius: 999px;
-  background: #ddd9cd;
+  background: var(--line-2);
 }
 .sheet-head-row {
   display: flex;
@@ -95,7 +95,7 @@
   font-size: 22px;
   font-weight: 400;
   line-height: 1.2;
-  color: var(--navy);
+  color: var(--strong);
 }
 .sheet-close {
   width: 44px;
@@ -130,7 +130,10 @@
   padding: 18px;
   border-radius: 16px;
   background: var(--navy);
-  color: var(--bg);
+  color: var(--on-brand);
+}
+.capacity-hero .eyebrow {
+  color: var(--gold);
 }
 .run-line {
   display: grid;
@@ -224,8 +227,10 @@
   width: min(400px, 100%);
   padding: 24px 22px 20px;
   border-radius: 18px;
-  background: #fff;
+  background: var(--surface);
   box-shadow: 0 24px 60px rgba(15, 23, 42, 0.28);
+  /* Dialogs opened from the navy sidebar would otherwise inherit its light text. */
+  color: var(--ink);
   text-align: center;
   animation: pop 240ms cubic-bezier(0.34, 1.4, 0.64, 1) backwards;
 }
@@ -261,7 +266,7 @@
   font-size: 22px;
   font-weight: 400;
   line-height: 1.25;
-  color: var(--navy);
+  color: var(--strong);
 }
 .confirm-body {
   margin: 8px 0 0;
@@ -286,11 +291,10 @@
 .btn-danger:not(:disabled):hover {
   background: #8f3029;
 }
-/* Phones: dialog sits at the bottom, within thumb reach. */
+/* Phones: centred like on desktop, using the full width. */
 @media (max-width: 520px) {
   .confirm-layer {
-    align-items: flex-end;
-    padding: 12px 12px calc(12px + env(safe-area-inset-bottom));
+    padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
   }
   .confirm {
     width: 100%;

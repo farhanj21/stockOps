@@ -137,7 +137,7 @@ export function ImportSheet() {
                 Change
               </button>
             </div>
-            <div className="sheet-list list" style={{ background: '#fff' }}>
+            <div className="sheet-list list" style={{ background: 'var(--surface)' }}>
               {plan.preview.map((r, ix) => (
                 <div key={ix} className="import-row" style={{ opacity: STATUS_OPACITY[r.status] }}>
                   <span className="row-main">

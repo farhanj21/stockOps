@@ -87,7 +87,7 @@ export function RunSheet() {
             >
               <Icon name="minus" size={20} stroke={2.2} />
             </button>
-            <span className="serif tnum" style={{ textAlign: 'center', fontSize: 38, color: 'var(--navy)' }} aria-live="polite">
+            <span className="serif tnum" style={{ textAlign: 'center', fontSize: 38, color: 'var(--strong)' }} aria-live="polite">
               {rb}
             </span>
             <button
@@ -109,7 +109,7 @@ export function RunSheet() {
             {lines.map(({ i, use, after, bad }) => (
               <div key={i.id} className="run-line tnum">
                 <span style={{ fontSize: 14, fontWeight: 700 }}>{i.name}</span>
-                <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--navy)', textAlign: 'right' }}>−{qu(use, i.unit)}</span>
+                <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--strong)', textAlign: 'right' }}>−{qu(use, i.unit)}</span>
                 {bad ? (
                   <span style={{ gridColumn: '1 / -1', fontSize: 12, fontWeight: 600, color: 'var(--danger)' }}>
                     Only {qu(num(i.inHand), i.unit)} in hand — receive stock first

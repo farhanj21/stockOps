@@ -182,7 +182,7 @@ button.row {
 .unit-input:focus-within,
 .search-box:focus-within {
   border-color: var(--gold);
-  box-shadow: 0 0 0 3px rgba(191, 160, 90, 0.18);
+  box-shadow: 0 0 0 3px var(--ring);
 }
 
 /* Radios and checkboxes. */

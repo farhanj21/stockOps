@@ -27,7 +27,7 @@ export function ProductSheet({ id }: { id: string }) {
       <SheetHeader kicker="Recipe" title={p.name} />
       <div className="sheet-body">
         <div className="capacity-hero">
-          <div className="eyebrow" style={{ color: 'var(--gold)' }}>
+          <div className="eyebrow">
             Can produce now
           </div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 4 }}>

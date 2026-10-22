@@ -83,6 +83,6 @@ export async function loadSnapshot(db: Db, actor: Actor): Promise<Snapshot> {
   ]);
   return {
     data,
-    me: { userId: actor.userId, org, isOwner: actor.isOwner, role: actor.role, baseRole: actor.baseRole, demo: demoMode() },
+    me: { userId: actor.userId, org, isOwner: actor.isOwner, role: actor.role, baseRole: actor.baseRole, demo: demoMode(), assistant: !!process.env.GEMINI_API_KEY },
   };
 }

@@ -131,7 +131,7 @@ function Planner() {
                 <Icon name="minus" size={22} stroke={2.2} />
               </button>
               <input
-                id="plan-batches"
+                id="plan-batches" placeholder="0"
                 type="number"
                 inputMode="numeric"
                 min={0}
@@ -187,12 +187,12 @@ function Planner() {
                 <div key={l.i.id} style={{ padding: '12px 16px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}>
                     <span style={{ fontSize: 14, fontWeight: 700 }}>{l.i.name}</span>
-                    <span className="tnum" style={{ fontSize: 14, fontWeight: 700, color: 'var(--navy)' }}>
+                    <span className="tnum" style={{ fontSize: 14, fontWeight: 700, color: 'var(--strong)' }}>
                       {qu(l.need, l.i.unit)}
                     </span>
                   </div>
                   <div className="impact-bar">
-                    <div style={{ left: 0, width: covered, background: 'var(--navy)' }} />
+                    <div style={{ left: 0, width: covered, background: 'var(--strong)' }} />
                     <div style={{ left: covered, width: shortW, background: 'var(--danger)' }} />
                   </div>
                   {l.short > 0 ? (

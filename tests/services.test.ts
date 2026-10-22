@@ -127,6 +127,24 @@ describe('team accounts', () => {
     expect((await loadData(db, orgId)).forecasts[0].by).toBe('Priya Nair');
   });
 
+  it('admins edit names and emails; emails stay unique and the owner is protected', async () => {
+    await svc.updateMember(db, admin, warehouse.userId, { name: 'Mateo Silva', email: 'Mateo@Plant.example' });
+    const [u] = await db.select().from(t.users).where(eq(t.users.id, warehouse.userId));
+    expect(u).toMatchObject({ name: 'Mateo Silva', email: 'mateo@plant.example' });
+    // Signing in by the new email works.
+    expect((await svc.authenticate(db, 'mateo@plant.example', PASSWORD)).id).toBe(warehouse.userId);
+
+    await expect(svc.updateMember(db, admin, production.userId, { name: 'Priya Nair', email: 'mateo@plant.example' })).rejects.toMatchObject({
+      code: 'conflict',
+      fieldErrors: { email: expect.any(String) },
+    });
+    await svc.updateMember(db, admin, warehouse.userId, { name: 'Mateo Silva', email: null });
+
+    await forbidden(svc.updateMember(db, warehouse, production.userId, { name: 'X', email: null }));
+    const other = await svc.createMember(db, admin, { name: 'Second Admin', username: 'admin2', email: null, role: 'Admin', password: '12345678' });
+    await forbidden(svc.updateMember(db, await actorFor(db, other.username), admin.userId, { name: 'Not the owner', email: null }));
+  });
+
   it('people change their own password with the current one', async () => {
     await expect(svc.changeOwnPassword(db, warehouse, 'wrong', 'new-pass-99')).rejects.toBeInstanceOf(AppError);
     await svc.changeOwnPassword(db, warehouse, PASSWORD, 'new-pass-99');

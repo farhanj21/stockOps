@@ -130,7 +130,7 @@ export function Orders() {
               <span>
                 {plural(toOrder.length, 'line')} to order
               </span>
-              {SHOW_COST && <span style={{ color: 'var(--navy)' }}>{money(poCost)}</span>}
+              {SHOW_COST && <span style={{ color: 'var(--strong)' }}>{money(poCost)}</span>}
             </div>
             <button type="button" className="btn btn-primary btn-lg" disabled={!toOrder.length || !!busy} onClick={create}>
               {busy === 'create' ? 'Creating…' : `Create ${m.nextPoId}`}
@@ -150,7 +150,7 @@ export function Orders() {
               {m.openPOs.map((po) => (
                 <div key={po.id} className="card pad">
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                    <span className="serif" style={{ fontSize: 19, color: 'var(--navy)' }}>
+                    <span className="serif" style={{ fontSize: 19, color: 'var(--strong)' }}>
                       {po.id}
                     </span>
                     <span className="pill xs info">In transit</span>
@@ -269,6 +269,7 @@ function PoDraftRow({ line, onPacks, onRemove }: { line: DraftLine; onPacks: (v:
             type="number"
             inputMode="numeric"
             min={1}
+            placeholder="0"
             value={line.packs}
             onChange={(e) => onPacks(inputVal(e.target.value, true))}
             aria-label={`Number of ${i.packName}s of ${i.name}`}

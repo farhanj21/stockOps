@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { changePassword } from '@/app/actions';
 import { Icon, type IconName } from '@/components/Icon';
+import { ThemeSwitch } from '@/components/ThemeSwitch';
 import { initialsOf } from '@/lib/format';
 import { useCurrentUser, useGo } from '@/lib/hooks';
 import { promptInstall, useInstallMode } from '@/lib/install';
@@ -91,11 +92,11 @@ export function AccountMenu({ variant }: { variant: 'sidebar' | 'header' }) {
   return (
     <div ref={wrapRef} className={`acct acct-${variant}`}>
       {variant === 'sidebar' ? (
-        <button type="button" className="side-account" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+        <button type="button" className="side-account" aria-label="Account menu" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
           <span className="avatar" style={{ width: 36, height: 36 }}>
             {initialsOf(user.name)}
           </span>
-          <span className="row-main" style={{ gap: 0 }}>
+          <span className="row-main side-text" style={{ gap: 0 }}>
             <span className="ellipsis" style={{ fontSize: 13, fontWeight: 700 }}>
               {user.name}
             </span>
@@ -117,7 +118,7 @@ export function AccountMenu({ variant }: { variant: 'sidebar' | 'header' }) {
               {initialsOf(user.name)}
             </span>
             <div className="min0">
-              <div className="ellipsis" style={{ fontSize: 14, fontWeight: 700, color: 'var(--navy)' }}>
+              <div className="ellipsis" style={{ fontSize: 14, fontWeight: 700, color: 'var(--strong)' }}>
                 {user.name}
               </div>
               <div className="row-sub ellipsis">
@@ -125,6 +126,10 @@ export function AccountMenu({ variant }: { variant: 'sidebar' | 'header' }) {
               </div>
               {org && <div className="row-sub ellipsis">{org.name}</div>}
             </div>
+          </div>
+          <div className="acct-theme">
+            <span className="acct-theme-label">Theme</span>
+            <ThemeSwitch />
           </div>
           {items
             .filter((it) => !it.hidden)
@@ -185,14 +190,14 @@ function PasswordDialog({ onClose }: { onClose: () => void }) {
           <label htmlFor="cp-cur" className="field-label">
             Current password
           </label>
-          <input id="cp-cur" className="input" type="password" autoComplete="current-password" autoFocus value={current} aria-invalid={!!err.current} onChange={(e) => setCurrent(e.target.value)} />
+          <input id="cp-cur" className="input" placeholder="Enter your current password" type="password" autoComplete="current-password" autoFocus value={current} aria-invalid={!!err.current} onChange={(e) => setCurrent(e.target.value)} />
           {err.current && <div className="field-err">{err.current}</div>}
         </div>
         <div>
           <label htmlFor="cp-new" className="field-label">
             New password
           </label>
-          <input id="cp-new" className="input" type="password" autoComplete="new-password" value={next} aria-invalid={!!err.next} onChange={(e) => setNext(e.target.value)} />
+          <input id="cp-new" className="input" placeholder="Enter a new password" type="password" autoComplete="new-password" value={next} aria-invalid={!!err.next} onChange={(e) => setNext(e.target.value)} />
           {err.next ? <div className="field-err">{err.next}</div> : <div className="subtle" style={{ marginTop: 4, fontSize: 12 }}>At least 8 characters.</div>}
         </div>
         <div className="confirm-actions" style={{ marginTop: 8 }}>

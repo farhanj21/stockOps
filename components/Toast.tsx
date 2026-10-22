@@ -25,7 +25,7 @@ export function Toast() {
     <div aria-live="polite" className="toast-region">
       {shown && (
         <div key={shown.id} className="toast" role="status" data-leaving={leaving}>
-          <Icon name="check" size={16} stroke={2.5} color="var(--gold)" />
+          <Icon name="check" size={16} stroke={2.5} color="var(--gold)" className="toast-check" />
           <span className="toast-text">{shown.text}</span>
           {shown.action && !leaving && (
             <button

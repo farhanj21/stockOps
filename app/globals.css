@@ -23,6 +23,14 @@
   --track: #eeebe2;
   --on-navy: #b9c2d0;
   --on-navy-2: #8da0bc;
+  /* Cards, panels, inputs. */
+  --surface: #fff;
+  /* Headings and emphasis (navy in the light theme). */
+  --strong: #0f2038;
+  /* Text on navy (sidebar, primary buttons) and on gold. */
+  --on-brand: #f6f4ef;
+  --on-gold: #0f2038;
+  --ring: rgba(191, 160, 90, 0.18);
 
   --danger: #a63a32;
   --danger-bg: #faeae8;
@@ -38,8 +46,102 @@
   --shadow-card: 0 1px 3px rgba(15, 23, 42, 0.05);
   --shadow-pop: 0 20px 40px rgba(15, 23, 42, 0.08);
 
+  color-scheme: light;
   --sans: var(--font-sans), 'Hanken Grotesk', system-ui, sans-serif;
   --serif: var(--font-serif), 'Marcellus', serif;
+}
+
+/* Themes: chosen under Personalize in the account menu (lib/theme.ts sets data-theme on <html>). */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --navy: #22324f;
+  --navy-2: #2b3d5e;
+  --navy-3: #354a70;
+  --gold: #c9ab64;
+  --gold-ink: #d9bc78;
+  --gold-bg: #2b261a;
+  --bg: #0e131b;
+  --surface: #161c26;
+  --ink: #e4e7ec;
+  --strong: #f1f3f6;
+  --muted: #9aa2b1;
+  --subtle: #938d7e;
+  --line: #263042;
+  --line-2: #36435a;
+  --line-soft: #1f2836;
+  --hover: #1b2230;
+  --fill: #1f2734;
+  --track: #263042;
+  --danger: #e5695e;
+  --danger-bg: #3a1d1b;
+  --danger-line: #5c2c28;
+  --ok: #5cc28b;
+  --ok-bg: #16301f;
+  --ok-line: #24503a;
+  --warn: #e3b866;
+  --warn-bg: #352a14;
+  --info: #9db8e6;
+  --info-bg: #1a2740;
+  --ring: rgba(201, 171, 100, 0.28);
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-pop: 0 20px 40px rgba(0, 0, 0, 0.45);
+}
+
+/* Monotone: near-black pages and dark grey cards, with a white sidebar, white buttons and white accents.
+   Red, green and amber stay so alerts still stand out. */
+:root[data-theme='mono'] {
+  color-scheme: dark;
+  --navy: #fff;
+  --navy-2: #ececec;
+  --navy-3: #dcdcdc;
+  --gold: #fff;
+  --gold-ink: #fff;
+  --gold-bg: #383838;
+  --bg: #1b1b1b;
+  --surface: #262626;
+  --ink: #ececec;
+  --strong: #fff;
+  --on-brand: #111;
+  --on-gold: #111;
+  --muted: #a6a6a6;
+  --subtle: #999;
+  --line: #363636;
+  --line-2: #4a4a4a;
+  --line-soft: #2f2f2f;
+  --hover: #2e2e2e;
+  --fill: #313131;
+  --track: #3a3a3a;
+  --on-navy: #333;
+  --on-navy-2: #666;
+  --danger: #e5695e;
+  --danger-bg: #3a1d1b;
+  --danger-line: #5c2c28;
+  --ok: #5cc28b;
+  --ok-bg: #16301f;
+  --ok-line: #24503a;
+  --warn: #e3b866;
+  --warn-bg: #352a14;
+  --info: #ddd;
+  --info-bg: #313131;
+  --ring: rgba(255, 255, 255, 0.25);
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-pop: 0 20px 40px rgba(0, 0, 0, 0.45);
+}
+/* Accents that sit on the white sidebar and buttons turn dark so they stay visible. */
+:root[data-theme='mono'] :is(.ai-fab, .ai-badge, .ai-send, .auth-hero-k, .kpi.dark .kpi-k, .action.dark .action-ico, .logo, .side-item[aria-current='page'] .side-ico, .toast-action, .capacity-hero .eyebrow) {
+  color: var(--on-brand);
+}
+:root[data-theme='mono'] .theme-switch button[aria-checked='true'] {
+  background: var(--navy);
+  color: var(--on-brand);
+}
+:root[data-theme='mono'] .toast-check {
+  stroke: var(--on-brand);
+}
+/* White on white needs an edge. */
+:root[data-theme='mono'] :is(.avatar, .side-count.gold, .install-banner .btn-primary) {
+  outline: 1px solid var(--line-2);
+  outline-offset: -1px;
 }
 
 *,
@@ -63,7 +165,7 @@ a {
   color: var(--gold-ink);
 }
 a:hover {
-  color: var(--navy);
+  color: var(--strong);
 }
 :focus {
   outline: none;
@@ -138,7 +240,7 @@ input[type='number'] {
   font-family: var(--serif);
   font-size: 26px;
   line-height: 1.2;
-  color: var(--navy);
+  color: var(--strong);
 }
 .page-sub {
   margin-top: 2px;
@@ -170,7 +272,7 @@ input[type='number'] {
 /* ── Cards & lists ───────────────────────────────────────────────────── */
 
 .card {
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 16px;
   box-shadow: var(--shadow-card);
@@ -275,8 +377,8 @@ button.row:hover {
   color: var(--muted);
 }
 .pill.new {
-  background: #e6f2ea;
-  color: #2e6b45;
+  background: var(--ok-bg);
+  color: var(--ok);
 }
 
 /* ── Buttons ─────────────────────────────────────────────────────────── */
@@ -302,13 +404,13 @@ button.row:hover {
 }
 .btn-primary {
   background: var(--navy);
-  color: var(--bg);
+  color: var(--on-brand);
 }
 .btn-primary:not(:disabled):hover {
   background: var(--navy-2);
 }
 .btn-outline {
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--line-2);
   color: var(--ink);
 }
@@ -331,7 +433,7 @@ button.row:hover {
   cursor: pointer;
 }
 .btn-link:hover {
-  color: var(--navy);
+  color: var(--strong);
 }
 .icon-btn {
   width: 44px;
@@ -359,7 +461,7 @@ button.row:hover {
   padding: 0 16px;
   border: 1px solid var(--line-2);
   border-radius: 999px;
-  background: #fff;
+  background: var(--surface);
   color: var(--ink);
   font: inherit;
   font-size: 13px;
@@ -369,8 +471,8 @@ button.row:hover {
 }
 .chip[aria-pressed='true'] {
   background: var(--navy);
-  border-color: var(--navy);
-  color: var(--bg);
+  border-color: var(--strong);
+  color: var(--on-brand);
 }
 
 .radio-card {
@@ -382,14 +484,14 @@ button.row:hover {
   padding: 10px 14px;
   border: 1px solid var(--line);
   border-radius: 14px;
-  background: #fff;
+  background: var(--surface);
   color: var(--ink);
   font: inherit;
   text-align: left;
   cursor: pointer;
 }
 .radio-card[aria-checked='true'] {
-  border: 1.5px solid var(--navy);
+  border: 1.5px solid var(--strong);
 }
 .radio-dot {
   width: 20px;
@@ -397,15 +499,15 @@ button.row:hover {
   flex: none;
   border-radius: 50%;
   border: 2px solid var(--line-2);
-  background: #fff;
-  box-shadow: inset 0 0 0 3px #fff;
+  background: var(--surface);
+  box-shadow: inset 0 0 0 3px var(--surface);
 }
 .radio-dot.sm {
   width: 18px;
   height: 18px;
 }
 [aria-checked='true'] > .radio-dot {
-  border-color: var(--navy);
+  border-color: var(--strong);
   background: var(--navy);
 }
 
@@ -418,11 +520,11 @@ button.row:hover {
   justify-content: center;
   border: 1.5px solid var(--line-2);
   border-radius: 7px;
-  background: #fff;
-  color: var(--bg);
+  background: var(--surface);
+  color: var(--on-brand);
 }
 .check-box.on {
-  border-color: var(--navy);
+  border-color: var(--strong);
   background: var(--navy);
 }
 .check-box.err {
@@ -447,7 +549,7 @@ button.row:hover {
   margin-top: 2px;
   font-size: 17px;
   font-weight: 700;
-  color: var(--navy);
+  color: var(--strong);
   font-variant-numeric: tabular-nums;
 }
 .cell-k.plain {
@@ -492,13 +594,13 @@ button.row:hover {
   padding: 22px 20px;
   border: 1px solid var(--line);
   border-radius: 14px;
-  background: #fff;
+  background: var(--surface);
   text-align: center;
 }
 .empty-t {
   font-size: 15px;
   font-weight: 700;
-  color: var(--navy);
+  color: var(--strong);
 }
 .empty-s {
   margin-top: 4px;
@@ -529,7 +631,7 @@ button.row:hover {
   padding: 0 14px;
   border: 1px solid var(--line-2);
   border-radius: 12px;
-  background: #fff;
+  background: var(--surface);
   font: inherit;
   font-size: 16px;
   color: var(--ink);
@@ -552,7 +654,7 @@ button.row:hover {
   align-items: center;
   border: 1px solid var(--line-2);
   border-radius: 12px;
-  background: #fff;
+  background: var(--surface);
 }
 .input-shell > input {
   flex: 1;

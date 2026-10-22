@@ -48,13 +48,27 @@ export function Stock() {
   const setField = (id: string, field: Field) => (e: ChangeEvent<HTMLInputElement>) =>
     update(id, { [field]: inputVal(e.target.value) });
 
+  const openImport = () => {
+    setUI({ imp: { stage: 'pick' } });
+    openSheet('import');
+  };
+
   return (
     <div className="col" style={{ gap: 16 }}>
-      <div className="n-only">
-        <h1 className="page-title" style={{ margin: 0, fontWeight: 400 }}>
-          Stock
-        </h1>
-        <div className="page-sub">{summary}</div>
+      {/* Phones: the import button sits beside the heading, clear of the filters. */}
+      <div className="n-only" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div className="min0" style={{ flex: 1 }}>
+          <h1 className="page-title" style={{ margin: 0, fontWeight: 400 }}>
+            Stock
+          </h1>
+          <div className="page-sub">{summary}</div>
+        </div>
+        {perms.stock && (
+          <button type="button" className="btn btn-outline" style={{ flex: 'none', padding: '0 14px' }} onClick={openImport}>
+            <Icon name="upload" size={16} />
+            Import
+          </button>
+        )}
       </div>
 
       <div className="chips-row">
@@ -66,18 +80,9 @@ export function Stock() {
           ))}
         </div>
         {perms.stock && (
-          <button
-            type="button"
-            className="btn btn-outline"
-            aria-label="Import from Excel"
-            style={{ flex: 'none', padding: '0 14px' }}
-            onClick={() => {
-              setUI({ imp: { stage: 'pick' } });
-              openSheet('import');
-            }}
-          >
+          <button type="button" className="btn btn-outline w-only" style={{ flex: 'none', padding: '0 14px' }} onClick={openImport}>
             <Icon name="upload" size={16} />
-            <span className="w-only">Import Excel</span>
+            Import Excel
           </button>
         )}
       </div>
@@ -130,6 +135,7 @@ export function Stock() {
                       type="number"
                       inputMode="decimal"
                       className="step-input"
+                      placeholder="0"
                       value={i[field]}
                       onChange={setField(i.id, field)}
                       aria-label={`${i.name} ${field === 'inHand' ? 'in-hand' : 'pipeline'} quantity`}
@@ -158,7 +164,7 @@ export function Stock() {
               </div>
             )}
             <div className="bar" style={{ marginTop: 14 }}>
-              <div className="bar-fill" style={{ width: pct, background: low ? 'var(--danger)' : 'var(--navy)' }} />
+              <div className="bar-fill" style={{ width: pct, background: low ? 'var(--danger)' : 'var(--strong)' }} />
               <div className="bar-par" style={{ left: parPos }} />
             </div>
             <div className="stock-foot tnum">
@@ -206,6 +212,7 @@ export function Stock() {
                         <input
                           type="number"
                           inputMode="decimal"
+                          placeholder="0"
                           value={i[field]}
                           onChange={setField(i.id, field)}
                           aria-label={`${i.name} ${field === 'inHand' ? 'in-hand' : 'pipeline'} quantity`}
@@ -224,7 +231,7 @@ export function Stock() {
                       </span>
                     ),
                   )}
-                  <span className="tnum" style={{ fontSize: 14, fontWeight: 700, color: 'var(--navy)' }} role="cell">
+                  <span className="tnum" style={{ fontSize: 14, fontWeight: 700, color: 'var(--strong)' }} role="cell">
                     {qu(t, i.unit)}
                   </span>
                   <div className="col" style={{ gap: 6 }} role="cell">
@@ -235,7 +242,7 @@ export function Stock() {
                       {low ? <span className="pill sm danger">−{qu(m.shortOf(i), i.unit)}</span> : <span className="pill sm ok">At par</span>}
                     </div>
                     <div className="bar">
-                      <div className="bar-fill" style={{ width: pct, background: low ? 'var(--danger)' : 'var(--navy)' }} />
+                      <div className="bar-fill" style={{ width: pct, background: low ? 'var(--danger)' : 'var(--strong)' }} />
                       <div className="bar-par" style={{ left: parPos }} />
                     </div>
                   </div>

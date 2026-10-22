@@ -67,7 +67,7 @@ export function CreateOrgForm() {
 
       <div className="form-section">Your account</div>
       <Field
-        id="co-name"
+        id="co-name" placeholder="Enter your full name"
         label="Your full name"
         autoComplete="name"
         value={f.name}
@@ -77,9 +77,9 @@ export function CreateOrgForm() {
           if (!usernameTouched) set('username', e.target.value.trim().toLowerCase().split(/\s+/)[0]?.replace(/[^a-z0-9._-]/g, '') ?? '');
         }}
       />
-      <Field id="co-email" label="Work email" type="email" autoComplete="email" autoCapitalize="none" value={f.email} error={err.email} onChange={(e) => set('email', e.target.value)} />
+      <Field id="co-email" placeholder="Enter your work email" label="Work email" type="email" autoComplete="email" autoCapitalize="none" value={f.email} error={err.email} onChange={(e) => set('email', e.target.value)} />
       <Field
-        id="co-user"
+        id="co-user" placeholder="Enter a username"
         label="Username"
         autoComplete="username"
         autoCapitalize="none"
@@ -91,8 +91,8 @@ export function CreateOrgForm() {
         }}
       />
       <div className="grid2" style={{ gap: 10 }}>
-        <Field id="co-pass" label="Password" type="password" autoComplete="new-password" value={f.password} error={err.password} onChange={(e) => set('password', e.target.value)} />
-        <Field id="co-pass2" label="Confirm" type="password" autoComplete="new-password" value={f.password2} error={err.password2} onChange={(e) => set('password2', e.target.value)} />
+        <Field id="co-pass" placeholder="Enter a password" label="Password" type="password" autoComplete="new-password" value={f.password} error={err.password} onChange={(e) => set('password', e.target.value)} />
+        <Field id="co-pass2" placeholder="Re-enter password" label="Confirm" type="password" autoComplete="new-password" value={f.password2} error={err.password2} onChange={(e) => set('password2', e.target.value)} />
       </div>
 
       <button type="button" role="checkbox" aria-checked={f.sample} className="check-row sample-row" onClick={() => set('sample', !f.sample)}>
