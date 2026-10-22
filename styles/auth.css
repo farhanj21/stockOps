@@ -5,7 +5,8 @@
   overflow-y: auto;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  align-content: start;
+  /* Phones: a compact brand bar on top, the card centred in the space below it. */
+  grid-template-rows: auto 1fr;
   background: var(--bg);
 }
 .auth-brand {
@@ -13,21 +14,21 @@
   flex-direction: column;
   justify-content: flex-start;
   gap: 28px;
-  padding: calc(44px + env(safe-area-inset-top)) 24px 84px;
+  padding: calc(20px + env(safe-area-inset-top)) 20px 20px;
   background: var(--navy);
   color: var(--bg);
 }
 .auth-form-wrap {
   display: flex;
   justify-content: center;
-  align-items: flex-start;
-  padding: 0 16px calc(32px + env(safe-area-inset-bottom));
+  align-items: center;
+  padding: 24px 16px calc(24px + env(safe-area-inset-bottom));
 }
 .auth-card {
   position: relative;
   width: 100%;
   max-width: 420px;
-  margin: -56px 0 0;
+  margin: 0;
   padding: 24px 20px;
   background: #fff;
   border: 1px solid var(--line);
@@ -38,11 +39,18 @@
 @media (min-width: 960px) {
   .auth {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
     align-content: stretch;
   }
+  /* Desktop: the brand panel's logo, headline and footer share one column, centred in the panel. */
   .auth-brand {
     justify-content: space-between;
-    padding: 48px 56px;
+    align-items: center;
+    padding: 56px 48px;
+  }
+  .auth-brand > * {
+    width: 100%;
+    max-width: 480px;
   }
   .auth-form-wrap {
     align-items: center;
