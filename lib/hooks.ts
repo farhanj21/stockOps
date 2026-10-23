@@ -29,7 +29,7 @@ export function useCurrentUser() {
   const users = useStore((s) => s.data.users);
   const role: Role = me?.role ?? 'Production';
   const user: User = users.find((u) => u.id === me?.userId) ?? { id: me?.userId ?? '', name: '—', username: '', email: '', role, isOwner: false };
-  return { user, role, baseRole: me?.baseRole ?? role, isOwner: me?.isOwner ?? false, org: me?.org ?? null, demo: me?.demo ?? false, perms: PERMS[role] };
+  return { user, role, baseRole: me?.baseRole ?? role, isOwner: me?.isOwner ?? false, org: me?.org ?? null, demo: me?.demo ?? false, sampleData: me?.sampleData ?? false, perms: PERMS[role] };
 }
 
 /** Matches the desktop breakpoint in the stylesheets. */

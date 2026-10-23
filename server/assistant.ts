@@ -117,7 +117,9 @@ StockOps is production MRP and inventory control for a manufacturing plant (ofte
 Screens:
 - Dashboard: greeting, a getting-started checklist for new organizations, below-par alerts, what can be produced now, open plans and POs.
 - Stock: every material with in-hand and pipeline (ordered, not yet delivered) quantities. +/− buttons step by one supplier pack; tap a number to type a count. "Import" uploads an Excel/CSV stock sheet (preview first, can be undone).
-- Production plan: pick a product, a number of batches and a date to forecast; it shows material impact before committing. "Log run" when batches are made: deducts the recipe from in-hand stock (refused if stock doesn't cover it).
+- Production plan: pick a product, a number of batches and a date to forecast; it shows material impact before committing.
+- Production → Batches: production staff log every batch made with a unique batch number, production date, kg actually produced, units and cases; logging deducts one batch of the recipe from in-hand stock (refused if stock doesn't cover it). Wastage = recipe kg − kg produced; cost per kg after wastage = material cost ÷ kg produced.
+- Production → Reports: monthly and yearly kg, units, cases, wastage and average cost per kg for each product, plus a month-by-month table for the year.
 - Purchase orders: suggested orders (shortfall against plans or par, rounded up to whole supplier packs). Raise a PO (adds to pipeline); "Receive" moves it from pipeline into in-hand.
 - Setup (Admin): Recipes tab (products: batch kg, units per batch, units per case, recipe lines; ingredients entered as % of batch weight, packaging as a count per batch; the formula should total 100%) and Materials tab (name, type, unit, pack type, pack size, cost Rs/unit, par level; also a spreadsheet import).
 - Team (Admin): add people with a username and a temporary password to hand over; change roles, reset passwords, remove people. There is no public sign-up.

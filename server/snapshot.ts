@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, gt, inArray, isNull } from 'drizzle-orm';
 import type { Db } from '@/db';
 import * as t from '@/db/schema';
-import { demoMode } from '@/db/seed';
+import { demoMode, sampleDataEnabled } from '@/db/seed';
 import type { Snapshot } from '@/lib/api';
 import type { Data, RecipeLine } from '@/lib/types';
 import { can, type Actor } from './actor';
@@ -12,7 +12,7 @@ import { can, type Actor } from './actor';
  */
 export async function loadData(db: Db, organizationId: string, people: { all: boolean; selfId?: string } = { all: true }): Promise<Data> {
   const org = organizationId;
-  const [ingredients, products, forecasts, pos, users] = await Promise.all([
+  const [ingredients, products, forecasts, pos, users, batches] = await Promise.all([
     db.select().from(t.ingredients).where(eq(t.ingredients.organizationId, org)).orderBy(asc(t.ingredients.position), asc(t.ingredients.name)),
     db.select().from(t.products).where(eq(t.products.organizationId, org)).orderBy(asc(t.products.position), asc(t.products.name)),
     db
@@ -32,6 +32,12 @@ export async function loadData(db: Db, organizationId: string, people: { all: bo
       .from(t.users)
       .where(and(eq(t.users.organizationId, org), eq(t.users.active, true), ...(people.all ? [] : [eq(t.users.id, people.selfId ?? '')])))
       .orderBy(desc(t.users.isOwner), asc(t.users.createdAt), asc(t.users.name)),
+    db
+      .select({ b: t.productionBatches, by: t.users.name })
+      .from(t.productionBatches)
+      .leftJoin(t.users, eq(t.productionBatches.createdBy, t.users.id))
+      .where(eq(t.productionBatches.organizationId, org))
+      .orderBy(desc(t.productionBatches.producedOn), desc(t.productionBatches.createdAt)),
   ]);
 
   const productIds = products.map((p) => p.id);
@@ -72,6 +78,20 @@ export async function loadData(db: Db, organizationId: string, people: { all: bo
       by: by ?? '—',
       lines: poLines.filter((l) => l.poId === po.id).map((l) => ({ ing: l.ingredientId, packs: l.packs, qty: l.qty })),
     })),
+    batches: batches.map(({ b, by }) => ({
+      id: b.id,
+      batchNo: b.batchNo,
+      date: b.producedOn,
+      productId: b.productId,
+      forecastId: b.forecastId,
+      plannedKg: b.plannedKg,
+      actualKg: b.actualKg,
+      units: b.units,
+      cases: b.cases,
+      materialCost: b.materialCost,
+      notes: b.notes ?? '',
+      by: by ?? '—',
+    })),
     users: users.map((u) => ({ id: u.id, name: u.name, username: u.username, email: u.email ?? '', role: u.role, isOwner: u.isOwner })),
   };
 }
@@ -88,6 +108,6 @@ export async function loadSnapshot(db: Db, actor: Actor): Promise<Snapshot> {
   const logoUrl = org.logoUpdatedAt ? `/api/org-logo?v=${org.logoUpdatedAt.getTime()}` : null;
   return {
     data,
-    me: { userId: actor.userId, org: { id: org.id, name: org.name, logoUrl }, isOwner: actor.isOwner, role: actor.role, baseRole: actor.baseRole, demo: demoMode(), assistant: !!process.env.GEMINI_API_KEY },
+    me: { userId: actor.userId, org: { id: org.id, name: org.name, logoUrl }, isOwner: actor.isOwner, role: actor.role, baseRole: actor.baseRole, demo: demoMode(), sampleData: sampleDataEnabled(), assistant: !!process.env.GEMINI_API_KEY },
   };
 }

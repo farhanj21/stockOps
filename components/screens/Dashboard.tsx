@@ -11,7 +11,7 @@ import { useModel } from '@/lib/model';
 import type { Role } from '@/lib/types';
 import { useUI } from '@/lib/ui';
 
-type ActionKey = 'plan' | 'stock' | 'stockLow' | 'orders' | 'setup' | 'run';
+type ActionKey = 'plan' | 'stock' | 'stockLow' | 'orders' | 'setup' | 'batch';
 
 interface QuickAction {
   title: string;
@@ -37,7 +37,7 @@ const QUICK_ACTIONS: Record<Role, QuickAction[]> = {
   ],
   Production: [
     { title: 'Plan batches', sub: 'Forecast & preview', icon: 'calendar', to: 'plan' },
-    { title: 'Log batches run', sub: 'Deducts in-hand', icon: 'check', iconStroke: 2.2, to: 'run' },
+    { title: 'Log a batch', sub: 'Batch no. · kg · cases', icon: 'check', iconStroke: 2.2, to: 'batch' },
     { title: 'Check stock', sub: 'View only', icon: 'box', to: 'stock' },
     { title: 'Generate PO', sub: 'Rounded to packs', icon: 'receipt', to: 'orders' },
   ],
@@ -52,10 +52,10 @@ export function Dashboard() {
   const hasQuery = useUI((s) => !!s.query.trim());
 
   const run = (to: ActionKey) => {
-    if (to === 'run') {
+    if (to === 'batch') {
       const ui = useUI.getState();
-      ui.set({ runId: null, runBatches: 1 });
-      ui.openSheet('run');
+      ui.set({ runId: null });
+      ui.openSheet('batch');
     } else if (to === 'stockLow') go('stock', { stockFilter: 'low' });
     else if (to === 'stock') go('stock', { stockFilter: 'all' });
     else go(to);

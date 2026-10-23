@@ -8,11 +8,12 @@ import { and, count, eq, inArray, isNull, ne, or, sql } from 'drizzle-orm';
 import type { Db } from '@/db';
 import { newId } from '@/db/ids';
 import * as t from '@/db/schema';
-import { clearContent, demoMode, insertSampleContent } from '@/db/seed';
+import { clearContent, insertSampleContent, sampleDataEnabled } from '@/db/seed';
 import type { ImportUndo } from '@/lib/api';
 import { num, qu, round } from '@/lib/format';
 import { planImport, type ImportRow } from '@/lib/import-plan';
 import { buildModel } from '@/lib/mrp';
+import { normBatchNo } from '@/lib/production';
 import type { MaterialKind, Role } from '@/lib/types';
 import { can, plantToday, requirePerm, type Actor } from './actor';
 import { AppError, isUniqueViolation } from './errors';
@@ -130,9 +131,9 @@ export async function setOrganizationLogo(db: Db, actor: Actor, logo: string | n
     .where(eq(t.organizations.id, actor.organizationId));
 }
 
-/** Demo mode only: swap the organization's materials, recipes, plans and POs for the sample plant. */
+/** Development (or demo mode): swap the organization's materials, recipes, plans and POs for the sample plant. */
 export async function replaceWithSample(db: Db, actor: Actor) {
-  if (!demoMode()) throw new AppError('Sample data is turned off on this server.', 'forbidden');
+  if (!sampleDataEnabled()) throw new AppError('Sample data is turned off on this server.', 'forbidden');
   if (!actor.isOwner) throw new AppError('Only the organization owner can replace all data.', 'forbidden');
   await db.transaction(async (tx) => {
     await clearContent(tx, actor.organizationId);
@@ -585,26 +586,112 @@ export async function restoreForecast(db: Db, actor: Actor, id: string) {
     .where(and(eq(t.forecasts.id, id), eq(t.forecasts.organizationId, actor.organizationId)));
 }
 
-/** Record batches actually produced: deduct the recipe from in-hand stock and count the plan down. */
-export async function logRun(db: Db, actor: Actor, forecastId: string, batches: number) {
+export interface BatchInput {
+  batchNo: string;
+  /** YYYY-MM-DD the batch was made. */
+  date: string;
+  actualKg: number;
+  units: number;
+  cases: number;
+  notes?: string;
+}
+
+function checkBatchFigures(input: BatchInput) {
+  if (input.date > plantToday()) throw new AppError("The production date can't be in the future.", 'invalid', { date: "Can't be in the future." });
+  if (!(input.actualKg > 0)) throw new AppError('Enter the kg actually produced.', 'invalid', { actualKg: 'Must be more than 0.' });
+}
+
+async function assertBatchNoFree(tx: Db | Tx, actor: Actor, batchNo: string, exceptId?: string) {
+  const [dupe] = await tx
+    .select({ id: t.productionBatches.id })
+    .from(t.productionBatches)
+    .where(
+      and(
+        eq(t.productionBatches.organizationId, actor.organizationId),
+        eq(t.productionBatches.batchNo, batchNo),
+        ...(exceptId ? [ne(t.productionBatches.id, exceptId)] : []),
+      ),
+    );
+  if (dupe) throw new AppError(`Batch number ${batchNo} is already used.`, 'conflict', { batchNo: 'Already used — each batch needs its own number.' });
+}
+
+/**
+ * Record one batch made (Production / Admin): its own batch number and date, what came out
+ * (kg, units, cases), deduct one batch of the recipe from in-hand stock, fix its material cost,
+ * and count the linked plan down by one.
+ */
+export async function logBatch(db: Db, actor: Actor, input: BatchInput & { productId: string; forecastId?: string | null }) {
   requirePerm(actor, 'plan');
-  return db.transaction(async (tx) => {
-    const f = await ownForecast(tx, actor, forecastId, true);
-    if (!f || f.deletedAt || f.batches <= 0) throw new AppError('That plan has no batches left to run.', 'conflict');
-    if (batches > f.batches) throw new AppError(`Only ${f.batches} batches are left on that plan.`);
-    const lines = await tx.select().from(t.recipeLines).where(eq(t.recipeLines.productId, f.productId));
-    for (const l of lines) {
-      const ing = await lockIngredient(tx, actor, l.ingredientId);
-      if (ing.kind === 'utility') continue;
-      const use = l.qtyPerBatch * batches;
-      if (ing.inHand + EPS < use) throw new AppError(`Only ${qu(ing.inHand, ing.unit)} of ${ing.name} in hand — receive stock first.`, 'conflict');
-      await writeStock(tx, actor, ing, 'inHand', ing.inHand - use, 'production_run', forecastId);
-    }
-    await tx.update(t.forecasts).set({ batches: f.batches - batches }).where(eq(t.forecasts.id, forecastId));
-    await tx.insert(t.productionRuns).values({ organizationId: actor.organizationId, forecastId, productId: f.productId, batches, runBy: actor.userId });
-    const [p] = await tx.select({ name: t.products.name, upb: t.products.unitsPerBatch }).from(t.products).where(eq(t.products.id, f.productId));
-    return { product: p?.name ?? '', units: (p?.upb ?? 0) * batches };
-  });
+  checkBatchFigures(input);
+  const batchNo = normBatchNo(input.batchNo);
+  try {
+    return await db.transaction(async (tx) => {
+      const p = await ownProduct(tx, actor, input.productId);
+      await assertBatchNoFree(tx, actor, batchNo);
+      if (input.forecastId) {
+        const f = await ownForecast(tx, actor, input.forecastId, true);
+        if (!f || f.deletedAt || f.batches <= 0) throw new AppError('That plan has no batches left to run.', 'conflict');
+        if (f.productId !== p.id) throw new AppError("That plan is for a different product.");
+        await tx.update(t.forecasts).set({ batches: f.batches - 1 }).where(eq(t.forecasts.id, f.id));
+      }
+      const lines = await tx.select().from(t.recipeLines).where(eq(t.recipeLines.productId, p.id));
+      if (!lines.length) throw new AppError(`${p.name} has no recipe yet, so there's nothing to deduct. Add its recipe in Setup first.`, 'conflict');
+      let materialCost = 0;
+      for (const l of lines) {
+        const ing = await lockIngredient(tx, actor, l.ingredientId);
+        materialCost += l.qtyPerBatch * ing.cost;
+        if (ing.kind === 'utility') continue;
+        if (ing.inHand + EPS < l.qtyPerBatch)
+          throw new AppError(`Only ${qu(ing.inHand, ing.unit)} of ${ing.name} in hand — receive stock first.`, 'conflict');
+        await writeStock(tx, actor, ing, 'inHand', ing.inHand - l.qtyPerBatch, 'production_run', batchNo);
+      }
+      await tx.insert(t.productionBatches).values({
+        id: newId('bat'),
+        organizationId: actor.organizationId,
+        batchNo,
+        producedOn: input.date,
+        productId: p.id,
+        forecastId: input.forecastId ?? null,
+        plannedKg: p.batchKg,
+        actualKg: round(input.actualKg),
+        units: input.units,
+        cases: input.cases,
+        materialCost: Math.round(materialCost * 100) / 100,
+        notes: input.notes?.trim() || null,
+        createdBy: actor.userId,
+      });
+      return { batchNo, product: p.name };
+    });
+  } catch (e) {
+    if (isUniqueViolation(e)) throw new AppError(`Batch number ${batchNo} is already used.`, 'conflict', { batchNo: 'Already used — each batch needs its own number.' });
+    throw e;
+  }
+}
+
+/** Correct a batch record (number, date, kg, units, cases, notes). Stock isn't touched. */
+export async function updateBatch(db: Db, actor: Actor, id: string, input: BatchInput) {
+  requirePerm(actor, 'plan');
+  checkBatchFigures(input);
+  const batchNo = normBatchNo(input.batchNo);
+  try {
+    return await db.transaction(async (tx) => {
+      const [b] = await tx
+        .select()
+        .from(t.productionBatches)
+        .where(and(eq(t.productionBatches.id, id), eq(t.productionBatches.organizationId, actor.organizationId)))
+        .for('update');
+      if (!b) throw new AppError('That batch no longer exists.', 'not_found');
+      await assertBatchNoFree(tx, actor, batchNo, id);
+      await tx
+        .update(t.productionBatches)
+        .set({ batchNo, producedOn: input.date, actualKg: round(input.actualKg), units: input.units, cases: input.cases, notes: input.notes?.trim() || null, updatedAt: new Date() })
+        .where(eq(t.productionBatches.id, id));
+      return { batchNo };
+    });
+  } catch (e) {
+    if (isUniqueViolation(e)) throw new AppError(`Batch number ${batchNo} is already used.`, 'conflict', { batchNo: 'Already used — each batch needs its own number.' });
+    throw e;
+  }
 }
 
 // ── Purchasing (everyone raises POs; Admin/Warehouse receive) ───────────────

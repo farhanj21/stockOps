@@ -1387,3 +1387,135 @@ button.back-link {
 .org-logo-actions .btn:focus-within {
   box-shadow: 0 0 0 3px var(--ring);
 }
+
+/* ── Production records & reports ────────────────────────────────────── */
+
+@media (max-width: 520px) {
+  .grid3.keep3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.report-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+.report-bar > .input {
+  flex: 1 1 160px;
+  width: auto;
+}
+@media (min-width: 960px) {
+  .report-bar > .input {
+    flex: 0 1 220px;
+  }
+  .report-bar > .btn {
+    margin-left: auto;
+  }
+}
+@media (max-width: 959px) {
+  .report-bar > .btn {
+    flex: 1 1 100%;
+  }
+}
+.report-inline-select {
+  width: auto;
+  height: 38px;
+  font-size: 14px;
+}
+.seg {
+  display: inline-flex;
+  padding: 3px;
+  border: 1px solid var(--line-2);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.seg button {
+  height: 40px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.seg button[aria-checked='true'] {
+  background: var(--navy);
+  color: var(--on-navy);
+}
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+@media (min-width: 760px) {
+  .kpi-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+.report-wrap {
+  position: relative;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.report-table {
+  width: 100%;
+  min-width: 640px;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.report-table th,
+.report-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line-soft);
+  text-align: left;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.report-table th:first-child,
+.report-table td:first-child {
+  padding-left: 16px;
+}
+.report-table thead th {
+  background: var(--hover);
+  border-bottom: 1px solid var(--line);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--subtle);
+}
+.report-table tbody th {
+  font-weight: 600;
+}
+.report-table .num {
+  text-align: right;
+}
+.report-table .strong {
+  font-weight: 700;
+  color: var(--strong);
+}
+.report-table tbody tr:hover > * {
+  background: var(--hover);
+}
+.report-table tr.quiet > * {
+  color: var(--subtle);
+}
+.report-table tfoot th,
+.report-table tfoot td {
+  border-bottom: 0;
+  border-top: 1px solid var(--line);
+  font-weight: 700;
+  color: var(--strong);
+}
+.batch-card {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}

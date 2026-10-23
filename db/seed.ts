@@ -13,6 +13,9 @@ export const isProduction = () => process.env.NODE_ENV === 'production';
 /** Demo conveniences (sign-in shortcuts for the demo org, "Replace with sample data") are on in development, opt-in in production. */
 export const demoMode = () => (process.env.DEMO_MODE ? process.env.DEMO_MODE === 'true' : !isProduction());
 
+/** "Load sample data" for the owner: always available in development, and in production when demo mode is on. */
+export const sampleDataEnabled = () => !isProduction() || demoMode();
+
 const n = (v: number | '') => (v === '' ? 0 : v);
 
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
@@ -80,6 +83,26 @@ export async function insertSampleContent(db: Db | Tx, organizationId: string, a
     });
     await db.insert(t.poLines).values(po.lines.map((l, position) => ({ poId: id, ingredientId: ingId.get(l.ing)!, packs: l.packs, qty: l.qty, position })));
   }
+  // Past batches: material cost = recipe quantities × sample prices.
+  const costOf = new Map(d.ingredients.map((i) => [i.id, n(i.cost)]));
+  const batchCost = (productId: string) => (d.recipes[productId] ?? []).reduce((acc, l) => acc + n(l.qty) * (costOf.get(l.ing) ?? 0), 0);
+  if (d.batches.length) {
+    await db.insert(t.productionBatches).values(
+      d.batches.map((b) => ({
+        id: newId('bat'),
+        organizationId,
+        batchNo: b.batchNo,
+        producedOn: b.date,
+        productId: prodId.get(b.productId)!,
+        plannedKg: b.plannedKg,
+        actualKg: b.actualKg,
+        units: b.units,
+        cases: b.cases,
+        materialCost: Math.round(batchCost(b.productId) * 100) / 100,
+        createdBy: authorFor(b.by),
+      })),
+    );
+  }
 }
 
 /** Remove every material, product, plan, PO and stock movement of an organization. People stay. */
@@ -89,6 +112,7 @@ export async function clearContent(db: Db | Tx, organizationId: string) {
   await db.delete(t.stockMovements).where(eq(t.stockMovements.organizationId, organizationId));
   await db.delete(t.poLines).where(inArray(t.poLines.poId, pos));
   await db.delete(t.purchaseOrders).where(eq(t.purchaseOrders.organizationId, organizationId));
+  await db.delete(t.productionBatches).where(eq(t.productionBatches.organizationId, organizationId));
   await db.delete(t.productionRuns).where(eq(t.productionRuns.organizationId, organizationId));
   await db.delete(t.forecasts).where(eq(t.forecasts.organizationId, organizationId));
   await db.delete(t.recipeLines).where(inArray(t.recipeLines.productId, prods));

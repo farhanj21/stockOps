@@ -54,13 +54,12 @@ interface StoreState {
 
   addForecast: (f: { productId: string; batches: number; date: string }) => Promise<boolean>;
   removeForecast: (id: string) => Promise<Undo | null>;
-  logRun: (forecastId: string, batches: number) => Promise<{ product: string; units: number } | null>;
 
   createPO: (lines: { ingredientId: string; packs: number }[]) => Promise<{ id: string; lines: number } | null>;
   receivePO: (id: string) => Promise<boolean>;
 }
 
-const EMPTY: Data = { ingredients: [], products: [], recipes: {}, forecasts: [], pos: [], users: [] };
+const EMPTY: Data = { ingredients: [], products: [], recipes: {}, forecasts: [], pos: [], users: [], batches: [] };
 const SAVE_DELAY_MS = 500;
 
 export const useStore = create<StoreState>()((set, get) => {
@@ -244,7 +243,6 @@ export const useStore = create<StoreState>()((set, get) => {
       const ok = await send(() => api.removeForecast(id));
       return ok === null ? null : () => void send(() => api.restoreForecast(id));
     },
-    logRun: (forecastId, batches) => send(() => api.logRun(forecastId, batches)),
 
     createPO: (lines) => send(() => api.createPO(lines)),
     receivePO: async (id) => (await send(() => api.receivePO(id))) !== null,

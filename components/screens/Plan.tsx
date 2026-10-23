@@ -7,11 +7,50 @@ import { daysFromToday, fmt, fmtDate, inputVal, money, num, plural, qu } from '@
 import { useCurrentUser, useGo } from '@/lib/hooks';
 import { packTxt, useModel } from '@/lib/model';
 import { useStore } from '@/lib/store';
-import { toast, useUI } from '@/lib/ui';
+import { toast, useUI, type PlanTab } from '@/lib/ui';
+import { BatchRecords, ProductionReports } from './Batches';
 
+const TABS: [PlanTab, string][] = [
+  ['plan', 'Plan'],
+  ['batches', 'Batches'],
+  ['reports', 'Reports'],
+];
+
+/** Production: plan batches, record each batch made, and see monthly / yearly totals. */
 export function Plan() {
   const hasProducts = useModel().data.products.length > 0;
-  return hasProducts ? <Planner /> : <NoProducts />;
+  const tab = useUI((s) => s.planTab);
+  const setUI = useUI((s) => s.set);
+  if (!hasProducts) return <NoProducts />;
+  return (
+    <div className="col" style={{ gap: 18 }}>
+      <div className="n-only">
+        <h1 className="page-title" style={{ margin: 0, fontWeight: 400 }}>
+          Production
+        </h1>
+        <div className="page-sub">Plan batches, record each batch made, and see monthly and yearly totals.</div>
+      </div>
+      <div className="tabs" role="tablist" aria-label="Production sections">
+        {TABS.map(([k, label]) => (
+          <button
+            key={k}
+            type="button"
+            role="tab"
+            id={`tab-${k}`}
+            aria-selected={tab === k}
+            aria-controls={`panel-${k}`}
+            className="tab"
+            onClick={() => setUI({ planTab: k })}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`}>
+        {tab === 'batches' ? <BatchRecords /> : tab === 'reports' ? <ProductionReports /> : <Planner />}
+      </div>
+    </div>
+  );
 }
 
 function NoProducts() {
@@ -80,13 +119,6 @@ function Planner() {
 
   return (
     <div className="col" style={{ gap: 22 }}>
-      <div className="n-only">
-        <h1 className="page-title" style={{ margin: 0, fontWeight: 400 }}>
-          Plan
-        </h1>
-        <div className="page-sub">Forecast batches and check material impact before you commit.</div>
-      </div>
-
       <div className="plan-grid">
         <div className="plan-left">
           <section>
@@ -238,11 +270,11 @@ function Planner() {
                   className="btn btn-outline"
                   style={{ padding: '0 14px' }}
                   onClick={() => {
-                    ui.set({ runId: f.id, runBatches: 1 });
-                    ui.openSheet('run');
+                    ui.set({ runId: f.id });
+                    ui.openSheet('batch');
                   }}
                 >
-                  Log run
+                  Log batch
                 </button>
                 <button
                   type="button"

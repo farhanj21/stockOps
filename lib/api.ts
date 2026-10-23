@@ -9,8 +9,10 @@ export interface Me {
   role: Role;
   /** The account's real role. */
   baseRole: Role;
-  /** Demo conveniences such as "Replace with sample data" are available. */
+  /** Demo conveniences (sign-in shortcuts for the demo organization) are on. */
   demo: boolean;
+  /** The owner can load the sample plant ("Load sample data"): always in development. */
+  sampleData: boolean;
   /** The AI assistant is configured (GEMINI_API_KEY). */
   assistant: boolean;
 }

@@ -6,7 +6,8 @@ import type { Num } from './types';
 
 export type { ImportRow } from './import-plan';
 
-export type SheetType = 'material' | 'product' | 'run' | 'import';
+export type SheetType = 'material' | 'product' | 'batch' | 'import';
+export type PlanTab = 'plan' | 'batches' | 'reports';
 export type StockFilter = 'all' | 'low' | 'ingredient' | 'packaging';
 export type SetupTab = 'recipes' | 'materials';
 
@@ -41,7 +42,12 @@ export interface UIState {
   poPacks: Record<string, Num>;
   /** Materials added to the order by hand, in the order they were added. */
   poExtra: string[];
+  /** Production screen section. */
+  planTab: PlanTab;
+  /** Plan (forecast) to log the next batch against, or null for none. */
   runId: string | null;
+  /** Product to log the next batch for when it isn't from a plan. */
+  batchProduct: string | null;
   runBatches: number;
   imp: ImportState;
   sheet: { type: SheetType; id?: string } | null;
@@ -70,7 +76,9 @@ export const useUI = create<UIState>()((set) => ({
   poExcluded: {},
   poPacks: {},
   poExtra: [],
+  planTab: 'plan',
   runId: null,
+  batchProduct: null,
   runBatches: 1,
   imp: { stage: 'pick' },
   sheet: null,

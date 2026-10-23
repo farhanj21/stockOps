@@ -18,7 +18,7 @@ type Dialog = 'password' | 'install' | null;
  * or down from the avatar in the header (phone).
  */
 export function AccountMenu({ variant }: { variant: 'sidebar' | 'header' }) {
-  const { user, role, isOwner, org, demo } = useCurrentUser();
+  const { user, role, isOwner, org, sampleData } = useCurrentUser();
   const signOut = useStore((s) => s.signOut);
   const replaceWithSample = useStore((s) => s.replaceWithSample);
   const setUI = useUI((s) => s.set);
@@ -64,7 +64,7 @@ export function AccountMenu({ variant }: { variant: 'sidebar' | 'header' }) {
     {
       icon: 'box',
       label: 'Load sample data',
-      hidden: !(demo && isOwner),
+      hidden: !(sampleData && isOwner),
       onClick: run(async () => {
         const ok = await confirmDialog({
           title: 'Load the sample plant?',

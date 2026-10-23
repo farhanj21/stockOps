@@ -22,6 +22,13 @@
       "when": 1792695483196,
       "tag": "0002_org_logo",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792777392529,
+      "tag": "0003_production_batches",
+      "breakpoints": true
     }
   ]
 }

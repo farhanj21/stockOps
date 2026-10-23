@@ -157,6 +157,7 @@ export const forecasts = pgTable(
   (t) => [check('forecast_batches_non_negative', sql`${t.batches} >= 0`), index('forecasts_org_idx').on(t.organizationId)],
 );
 
+/** Older run log (several batches per row). Kept for history; new production is recorded in production_batches. */
 export const productionRuns = pgTable('production_runs', {
   id: serial('id').primaryKey(),
   organizationId: orgId(),
@@ -168,6 +169,41 @@ export const productionRuns = pgTable('production_runs', {
   runBy: text('run_by').references(() => users.id),
   createdAt: createdAt(),
 });
+
+/**
+ * One row per batch actually made, filled in by Production: its batch number, the date it was made,
+ * and what came out (kg, units, cases). The material cost is fixed at the moment the batch is logged
+ * (recipe × material prices), so cost per kg after wastage = material cost ÷ actual kg.
+ */
+export const productionBatches = pgTable(
+  'production_batches',
+  {
+    id: text('id').primaryKey(),
+    organizationId: orgId(),
+    /** Unique within the organization, e.g. B-261023-01. */
+    batchNo: text('batch_no').notNull(),
+    producedOn: date('produced_on', { mode: 'string' }).notNull(),
+    productId: text('product_id')
+      .notNull()
+      .references(() => products.id, { onDelete: 'cascade' }),
+    forecastId: text('forecast_id').references(() => forecasts.id, { onDelete: 'set null' }),
+    /** The recipe's batch weight when the batch was made. */
+    plannedKg: qty('planned_kg').notNull(),
+    actualKg: qty('actual_kg').notNull(),
+    units: integer('units').notNull(),
+    cases: integer('cases').notNull(),
+    materialCost: numeric('material_cost', { precision: 14, scale: 2, mode: 'number' }).notNull(),
+    notes: text('notes'),
+    createdBy: text('created_by').references(() => users.id),
+    createdAt: createdAt(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    unique('production_batches_org_no').on(t.organizationId, t.batchNo),
+    index('production_batches_org_date_idx').on(t.organizationId, t.producedOn),
+    check('production_batches_amounts', sql`${t.actualKg} > 0 and ${t.units} >= 0 and ${t.cases} >= 0 and ${t.materialCost} >= 0`),
+  ],
+);
 
 // ── Purchasing ──────────────────────────────────────────────────────────────
 

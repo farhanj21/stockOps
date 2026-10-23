@@ -39,6 +39,25 @@ export interface Forecast {
   by: string;
 }
 
+/** One batch actually produced, recorded by Production. */
+export interface Batch {
+  id: string;
+  batchNo: string;
+  /** YYYY-MM-DD */
+  date: string;
+  productId: string;
+  forecastId: string | null;
+  /** Recipe batch weight when it was made. */
+  plannedKg: number;
+  actualKg: number;
+  units: number;
+  cases: number;
+  /** Recipe × material prices at the time it was logged. */
+  materialCost: number;
+  notes: string;
+  by: string;
+}
+
 export interface PoLine {
   ing: string;
   packs: number;
@@ -70,6 +89,7 @@ export interface Data {
   forecasts: Forecast[];
   pos: PurchaseOrder[];
   users: User[];
+  batches: Batch[];
 }
 
 export interface Organization {

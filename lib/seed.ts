@@ -64,6 +64,8 @@ export function seed(): Data {
       { id: 'PO-2040', date: '2026-10-17', status: 'Open', by: 'Marco Silva', lines: [{ ing: 'sugar', packs: 8, qty: 200 }, { ing: 'cocoaN', packs: 4, qty: 100 }, { ing: 'lecithin', packs: 1, qty: 200 }] },
       { id: 'PO-2039', date: '2026-10-12', status: 'Received', received: '2026-10-15', by: 'Ana Reyes', lines: [{ ing: 'coconut', packs: 5, qty: 1000 }, { ing: 'smp', packs: 8, qty: 200 }] },
     ],
+    // Batches already made (Aug–Oct 2026), for the production reports. Material cost is filled in when loaded.
+    batches: sampleBatches(),
     users: [
       { id: 'u1', name: 'Ana Reyes', username: 'areyes', email: 'areyes@plant1.co', role: 'Admin', isOwner: true },
       { id: 'u2', name: 'Marco Silva', username: 'msilva', email: 'msilva@plant1.co', role: 'Warehouse', isOwner: false },
@@ -71,4 +73,47 @@ export function seed(): Data {
       { id: 'u4', name: 'Tom Okafor', username: 'tokafor', email: 'tokafor@plant1.co', role: 'Warehouse', isOwner: false },
     ],
   };
+}
+
+/** A few months of sample batches with realistic small losses, numbered B-YYMMDD-NN. */
+function sampleBatches(): Data['batches'] {
+  const runs: [string, string, number, number][] = [
+    // date, product, actual kg, units
+    ['2026-08-04', 'fudge', 492, 492],
+    ['2026-08-04', 'fudge', 488, 488],
+    ['2026-08-11', 'coating', 981, 196],
+    ['2026-08-18', 'compound', 990, 990],
+    ['2026-08-25', 'fudge', 495, 495],
+    ['2026-09-02', 'coating', 975, 195],
+    ['2026-09-02', 'coating', 984, 196],
+    ['2026-09-09', 'fudge', 490, 490],
+    ['2026-09-16', 'compound', 986, 986],
+    ['2026-09-23', 'fudge', 486, 486],
+    ['2026-09-30', 'compound', 993, 993],
+    ['2026-10-06', 'fudge', 494, 494],
+    ['2026-10-06', 'fudge', 491, 491],
+    ['2026-10-13', 'coating', 978, 195],
+    ['2026-10-20', 'compound', 989, 989],
+  ];
+  const planned: Record<string, [number, number]> = { fudge: [500, 10], coating: [1000, 4], compound: [1000, 10] };
+  const perDay = new Map<string, number>();
+  return runs.map(([date, productId, actualKg, units], ix) => {
+    const n = (perDay.get(date) ?? 0) + 1;
+    perDay.set(date, n);
+    const [plannedKg, upc] = planned[productId];
+    return {
+      id: `b${ix + 1}`,
+      batchNo: `B-${date.slice(2).replace(/-/g, '')}-${String(n).padStart(2, '0')}`,
+      date,
+      productId,
+      forecastId: null,
+      plannedKg,
+      actualKg,
+      units,
+      cases: Math.floor(units / upc),
+      materialCost: 0,
+      notes: '',
+      by: 'Priya Nair',
+    };
+  });
 }

@@ -6,7 +6,7 @@ import { useUI } from '@/lib/ui';
 import { ImportSheet } from './ImportSheet';
 import { MaterialSheet } from './MaterialSheet';
 import { ProductSheet } from './ProductSheet';
-import { RunSheet } from './RunSheet';
+import { BatchSheet } from './BatchSheet';
 
 /** Bottom sheet on mobile, right-hand drawer on desktop. Content stays mounted while it slides out. */
 export function Sheet() {
@@ -30,7 +30,7 @@ export function Sheet() {
   let body: ReactNode = null;
   if (sheet?.type === 'material' && sheet.id) body = <MaterialSheet id={sheet.id} />;
   else if (sheet?.type === 'product' && sheet.id) body = <ProductSheet id={sheet.id} />;
-  else if (sheet?.type === 'run') body = <RunSheet />;
+  else if (sheet?.type === 'batch') body = <BatchSheet batchId={sheet.id} />;
   else if (sheet?.type === 'import') body = <ImportSheet />;
 
   return (
