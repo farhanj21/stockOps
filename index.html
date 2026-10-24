@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chocolate Plant Inventory Control</title>
+<style>
+:root{--brown:#3b2314;--brown2:#5b3824;--bg:#f3f4f6;--card:#fff;--text:#1f2937;--muted:#6b7280;--line:#e5e7eb;--green:#047857;--red:#be123c;--gold:#fef3c7}
+*{box-sizing:border-box}body{margin:0;padding:12px;font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:var(--bg);color:var(--text)}
+.app{max-width:1100px;margin:auto;background:#f9fafb;border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:0 4px 18px #0000000b}
+header{background:var(--brown);color:white;padding:18px 20px}header h1{margin:0;font-size:clamp(20px,3vw,28px)}header p{margin:5px 0 0;color:#fde68a;font-size:13px}
+.topbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between;padding:12px 16px;background:#fff;border-bottom:1px solid var(--line)}
+.roles,.tabs{display:flex;gap:7px;flex-wrap:wrap}.btn,button{font:inherit;cursor:pointer;border:0;border-radius:8px;padding:9px 12px}.role{background:#f3f4f6;border:1px solid var(--line);font-size:13px}.role.active,.primary{background:var(--brown);color:white}.secondary{background:#e5e7eb;color:#374151}.success{background:var(--green);color:white}.danger{background:var(--red);color:white}.small{font-size:12px;padding:7px 9px}
+nav{padding:12px 16px 0;background:#fff}.tab{background:#f3f4f6;color:#374151;border:1px solid var(--line)}.tab.active{background:var(--brown);color:white}
+main{padding:16px;display:grid;gap:16px}.panel{background:white;border:1px solid var(--line);border-radius:12px;padding:16px;min-width:0}.panel h2{font-size:17px;margin:0 0 14px}.muted{color:var(--muted);font-size:13px}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.field{display:flex;flex-direction:column;gap:5px;min-width:0}.field label{font-size:12px;font-weight:650;color:#4b5563}.field input,.field select,.field textarea,select,input{width:100%;padding:9px;border:1px solid #d1d5db;border-radius:8px;font:inherit;background:#fff;color:var(--text)}.field textarea{min-height:70px}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.stat{border:1px solid var(--line);border-radius:10px;padding:13px;background:#fff}.stat span{font-size:12px;color:var(--muted);display:block}.stat strong{font-size:22px;display:block;margin-top:4px;overflow-wrap:anywhere}
+.table-wrap{overflow-x:auto;margin-top:10px}table{width:100%;border-collapse:collapse;min-width:600px;font-size:13px}th,td{text-align:left;padding:10px;border-bottom:1px solid var(--line);vertical-align:top}th{background:#f9fafb;color:#4b5563;font-size:12px}td input,td select{min-width:85px}.badge{display:inline-block;padding:3px 7px;border-radius:5px;background:#f3f4f6;font-size:11px}.low{color:#9f1239;background:#ffe4e6}.good{color:#065f46;background:#d1fae5}.hidden{display:none!important}.notice{padding:10px 12px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;font-size:13px;margin-bottom:12px}.empty{padding:18px;color:var(--muted);text-align:center}.section-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}.section-head h2{margin-bottom:0}
+footer{text-align:center;color:#9ca3af;padding:14px;font-size:12px}
+@media(min-width:850px){main{grid-template-columns:1fr 1fr}.wide{grid-column:1/-1}}
+@media(max-width:600px){body{padding:0}.app{border-radius:0;border:0}.topbar{align-items:flex-start}.grid,.stats{grid-template-columns:1fr 1fr}main{padding:10px}.panel{padding:12px}.tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.tab{width:100%}.stat strong{font-size:18px}}
+</style>
+</head>
+<body>
+<div class="app">
+<header><h1>🍫 Chocolate Plant MRP</h1><p>Inventory • Recipes • Production • Purchasing</p></header>
+<div class="topbar">
+  <div><strong>Active role</strong> <span id="roleLabel" class="badge">Admin</span></div>
+  <div class="roles">
+    <button class="role active" data-role="Admin" onclick="setRole('Admin')">Admin</button>
+    <button class="role" data-role="Warehouse" onclick="setRole('Warehouse')">Warehouse</button>
+    <button class="role" data-role="Production" onclick="setRole('Production')">Production</button>
+  </div>
+</div>
+<nav class="tabs">
+  <button class="tab active" data-tab="dashboard" onclick="showTab('dashboard')">Dashboard</button>
+  <button class="tab" data-tab="inventory" onclick="showTab('inventory')">Inventory</button>
+  <button class="tab" data-tab="recipes" onclick="showTab('recipes')">Recipes</button>
+  <button class="tab" data-tab="production" onclick="showTab('production')">Production</button>
+  <button class="tab" data-tab="purchases" onclick="showTab('purchases')">Purchase Orders</button>
+  <button class="tab" data-tab="backup" onclick="showTab('backup')">Backup / Settings</button>
+</nav>
+<main>
+<section id="dashboard" class="panel wide">
+  <div class="section-head"><h2>Plant Overview</h2><button class="secondary small" onclick="renderAll()">Refresh</button></div>
+  <p class="muted" style="margin:7px 0 14px">Summary of the records saved in this browser on this device.</p>
+  <div class="stats">
+    <div class="stat"><span>Ingredient / material items</span><strong id="statItems">0</strong></div>
+    <div class="stat"><span>Low-stock items</span><strong id="statLow">0</strong></div>
+    <div class="stat"><span>Recipes</span><strong id="statRecipes">0</strong></div>
+    <div class="stat"><span>Production batches</span><strong id="statBatches">0</strong></div>
+  </div>
+  <h2 style="margin-top:18px">Stock status</h2><div id="dashboardStock" class="table-wrap"></div>
+</section>
+
+<section id="inventory" class="panel hidden">
+  <h2>Add / Edit Raw Material</h2>
+  <div class="notice">Enter stock in a consistent unit for each item (for example, kg for cocoa and sugar, litres for liquid ingredients, and pieces for packaging).</div>
+  <form id="itemForm">
+    <input type="hidden" id="itemId">
+    <div class="grid">
+      <div class="field"><label for="itemName">Item name *</label><input id="itemName" required placeholder="e.g. Cocoa powder or carton"></div>
+      <div class="field"><label for="itemType">Item type *</label><select id="itemType"><option value="ingredient">Ingredient / raw material</option><option value="packaging">Packaging material</option></select></div>
+      <div class="field"><label for="itemCode">Item code</label><input id="itemCode" placeholder="e.g. RM-001"></div>
+      <div class="field"><label for="itemUnit">Unit *</label><select id="itemUnit"><option>kg</option><option>g</option><option>litre</option><option>ml</option><option>piece</option><option>carton</option><option>bag</option></select></div>
+      <div class="field"><label for="itemStock">Opening / current stock (weight / quantity) *</label><input id="itemStock" type="number" min="0" step="0.001" required value="0"></div>
+      <div class="field"><label for="itemMin">Reorder level</label><input id="itemMin" type="number" min="0" step="0.001" value="0"></div>
+      <div class="field"><label for="itemCost">Purchase rate / unit cost (PKR per selected unit)</label><input id="itemCost" type="number" min="0" step="0.01" value="0"></div>
+    </div>
+    <div class="actions"><button class="primary" type="submit" id="itemSave">Save material</button><button type="button" class="secondary" onclick="resetItemForm()">Clear</button></div>
+  </form>
+  <div class="section-head" style="margin-top:20px"><h2>Stock Register</h2><button class="secondary small" onclick="exportCSV('inventory')">Export CSV</button></div>
+  <div id="inventoryTable" class="table-wrap"></div>
+  <h2 style="margin-top:22px">Stock Movement</h2>
+  <form id="movementForm">
+    <div class="grid">
+      <div class="field"><label for="moveItem">Material *</label><select id="moveItem" required></select></div>
+      <div class="field"><label for="moveType">Movement *</label><select id="moveType"><option value="in">Receipt / stock in</option><option value="out">Issue / stock out</option></select></div>
+      <div class="field"><label for="moveQty">Quantity *</label><input id="moveQty" type="number" min="0.001" step="0.001" required></div>
+      <div class="field"><label for="moveRef">Reference / reason</label><input id="moveRef" placeholder="GRN, production batch, supplier..."></div>
+    </div>
+    <div class="actions"><button class="success" type="submit">Post movement</button></div>
+  </form>
+  <div id="movementTable" class="table-wrap"></div>
+</section>
+
+<section id="recipes" class="panel hidden">
+  <h2>Recipe Formulations</h2>
+  <p class="muted" style="margin:-5px 0 12px">Ingredient/raw-material percentages must total exactly 100%. Packaging is identified separately and is excluded from the formula percentage and ingredient stock deduction.</p>
+  <form id="recipeForm">
+    <input type="hidden" id="recipeId">
+    <div class="grid">
+      <div class="field"><label for="recipeName">Recipe name *</label><input id="recipeName" required placeholder="Chocolate Hot Fudge"></div>
+      <div class="field"><label for="recipeNotes">Notes</label><input id="recipeNotes" placeholder="Version, process notes, etc."></div>
+    </div>
+    <div class="section-head" style="margin-top:15px"><h2>Ingredients and packaging</h2><button class="secondary small" type="button" onclick="addIngredientRow()">+ Add ingredient</button></div>
+    <div id="recipeLines"></div>
+    <p id="recipeTotal" class="muted" style="margin-top:8px">Ingredient total: 0.000% — must equal 100.000%</p>
+    <div class="actions"><button class="primary" type="submit">Save recipe</button><button class="secondary" type="button" onclick="resetRecipeForm()">Clear</button></div>
+  </form>
+  <h2 style="margin-top:22px">Saved Recipes</h2><div id="recipeTable" class="table-wrap"></div>
+  <div class="panel" style="margin-top:16px;background:#fffbeb">
+    <h2>Batch calculator</h2>
+    <div class="grid">
+      <div class="field"><label for="calcRecipe">Recipe</label><select id="calcRecipe"></select></div>
+      <div class="field"><label for="batchSize">Batch size (kg)</label><input id="batchSize" type="number" min="0.001" step="0.001" value="100"></div>
+    </div>
+    <div class="actions"><button class="primary" type="button" onclick="calculateBatch()">Calculate ingredients</button></div>
+    <div id="batchCalculation" class="table-wrap"></div>
+  </div>
+</section>
+
+<section id="production" class="panel hidden">
+  <h2>Production Batch</h2>
+  <p class="muted" style="margin:-5px 0 12px">Posting a batch deducts recipe ingredients from inventory and records ingredient cost plus packaging, labour, utilities, factory overhead and other manufacturing costs entered for that batch. Cost per kg uses total finished kg produced.</p>
+  <form id="productionForm">
+    <div class="grid">
+      <div class="field"><label for="prodRecipe">Recipe *</label><select id="prodRecipe" required></select></div>
+      <div class="field"><label for="prodQty">Planned batch (kg) *</label><input id="prodQty" type="number" min="0.001" step="0.001" required value="100"></div>
+      <div class="field"><label for="prodDate">Production date *</label><input id="prodDate" type="date" required></div>
+      <div class="field"><label for="prodRef">Batch number *</label><input id="prodRef" required placeholder="e.g. CH-20261023-001"></div>
+      <div class="field"><label for="prodUnits">Units produced</label><input id="prodUnits" type="number" min="0" step="1" value="0" required></div>
+      <div class="field"><label for="prodCartons">Cases / cartons produced</label><input id="prodCartons" type="number" min="0" step="1" value="0" required></div>
+      <div class="field"><label for="prodPackagingCost">Packaging cost for this batch (PKR)</label><input id="prodPackagingCost" type="number" min="0" step="0.01" value="0"></div>
+      <div class="field"><label for="prodLabourCost">Direct labour cost (PKR)</label><input id="prodLabourCost" type="number" min="0" step="0.01" value="0"></div>
+      <div class="field"><label for="prodUtilitiesCost">Utilities cost (PKR)</label><input id="prodUtilitiesCost" type="number" min="0" step="0.01" value="0"></div>
+      <div class="field"><label for="prodOverheadCost">Factory overhead cost (PKR)</label><input id="prodOverheadCost" type="number" min="0" step="0.01" value="0"></div>
+      <div class="field"><label for="prodOtherCost">Other manufacturing cost (PKR)</label><input id="prodOtherCost" type="number" min="0" step="0.01" value="0"></div>
+    </div>
+    <div class="actions"><button class="success" type="submit">Post production batch</button></div>
+  </form>
+  <div id="productionTable" class="table-wrap"></div>
+  <section class="panel" style="margin-top:18px;background:#f9fafb">
+    <div class="section-head"><h2>Monthly Production Report</h2><button class="secondary small" onclick="exportProductionReport('monthly')">Export monthly report CSV</button></div>
+    <div class="grid" style="margin-top:12px">
+      <div class="field"><label for="reportMonth">Month</label><select id="reportMonth" onchange="renderProductionReports()"><option value="01">January</option><option value="02">February</option><option value="03">March</option><option value="04">April</option><option value="05">May</option><option value="06">June</option><option value="07">July</option><option value="08">August</option><option value="09">September</option><option value="10">October</option><option value="11">November</option><option value="12">December</option></select></div>
+      <div class="field"><label for="reportMonthYear">Year</label><select id="reportMonthYear" onchange="renderProductionReports()"></select></div>
+    </div>
+    <div id="monthlyProductionReport" class="stats" style="margin-top:12px"></div>
+    <div id="monthlyProductionDetails" class="table-wrap"></div>
+  </section>
+  <section class="panel" style="margin-top:18px;background:#f9fafb">
+    <div class="section-head"><h2>Yearly Production Report</h2><button class="secondary small" onclick="exportProductionReport('yearly')">Export yearly report CSV</button></div>
+    <div class="grid" style="margin-top:12px"><div class="field"><label for="reportYear">Year</label><select id="reportYear" onchange="renderProductionReports()"></select></div></div>
+    <div id="yearlyProductionReport" class="stats" style="margin-top:12px"></div>
+    <div id="yearlyProductionDetails" class="table-wrap"></div>
+  </section>
+</section>
+
+<section id="purchases" class="panel hidden">
+  <h2>Purchase Orders</h2>
+  <form id="poForm">
+    <div class="grid">
+      <div class="field"><label for="poSupplier">Supplier *</label><input id="poSupplier" required placeholder="Supplier name"></div>
+      <div class="field"><label for="poItem">Material *</label><select id="poItem" required></select></div>
+      <div class="field"><label for="poQty">Quantity *</label><input id="poQty" type="number" min="0.001" step="0.001" required></div>
+      <div class="field"><label for="poDate">Order date *</label><input id="poDate" type="date" required></div>
+      <div class="field"><label for="poCost">Purchase rate / unit cost (PKR)</label><input id="poCost" type="number" min="0" step="0.01" value="0" required></div>
+    </div>
+    <div class="actions"><button class="primary" type="submit">Create purchase order</button></div>
+  </form>
+  <p class="muted" style="margin-top:8px">Creating an order does not increase stock. Record a stock receipt in Inventory when goods physically arrive.</p>
+  <div id="poTable" class="table-wrap"></div>
+</section>
+
+<section id="backup" class="panel hidden">
+  <h2>Backup and Data Management</h2>
+  <div class="notice"><strong>Important:</strong> this version saves data in this browser's local storage. It does not automatically synchronize across different devices or users. Export backups regularly. Clearing browser data may delete records.</div>
+  <div class="actions"><button class="primary" onclick="downloadBackup()">Download full JSON backup</button><button class="secondary" onclick="document.getElementById('restoreFile').click()">Restore JSON backup</button><input id="restoreFile" type="file" accept=".json,application/json" class="hidden"></div>
+  <div class="actions"><button class="secondary" onclick="exportCSV('movements')">Export movements CSV</button><button class="secondary" onclick="exportCSV('production')">Export production CSV</button><button class="secondary" onclick="exportCSV('purchases')">Export purchase orders CSV</button></div>
+  <h2 style="margin-top:22px">System status</h2><p id="storageStatus" class="muted"></p>
+  <div class="actions"><button class="danger" onclick="clearAllData()">Delete all app data</button></div>
+  <p class="muted" style="margin-top:8px">Delete all data is irreversible unless you have a backup. No password-based authentication is implemented; role selection is only a user-interface demonstration, not a security boundary.</p>
+</section>
+</main>
+<footer>Chocolate Plant Inventory Control • Local prototype • Back up your data regularly</footer>
+</div>
+<script>
+"use strict";
+const STORAGE_KEY = "chocolatePlantMRP_v1";
+const today = new Date().toISOString().slice(0,10);
+let state = loadState();
+let activeRole = "Admin";
+let activeTab = "dashboard";
+
+function initialState(){
+  return {
+    items:[
+      {id:uid(),name:"Sugar",code:"RM-001",type:"ingredient",unit:"kg",stock:500,min:100,cost:180},
+      {id:uid(),name:"Cocoa powder",code:"RM-002",type:"ingredient",unit:"kg",stock:120,min:30,cost:1200},
+      {id:uid(),name:"Coconut oil",code:"RM-003",type:"ingredient",unit:"kg",stock:80,min:20,cost:650},
+      {id:uid(),name:"Milk powder",code:"RM-004",type:"ingredient",unit:"kg",stock:60,min:15,cost:2200},
+      {id:uid(),name:"Water",code:"RM-005",type:"ingredient",unit:"kg",stock:1000,min:100,cost:0}
+    ],recipes:[],movements:[],production:[],purchases:[]
+  };
+}
+function uid(){return "id_"+Date.now().toString(36)+"_"+Math.random().toString(36).slice(2,8)}
+function loadState(){
+  try{const raw=localStorage.getItem(STORAGE_KEY);if(raw){const parsed=JSON.parse(raw);if(parsed&&Array.isArray(parsed.items)&&Array.isArray(parsed.recipes))return parsed;}}
+  catch(e){console.warn("Could not load saved data",e)}
+  return initialState();
+}
+function saveState(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state));renderAll();}catch(e){alert("Could not save data in this browser. Export your data and check browser storage settings.");console.error(e)}}
+function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+function num(v){return Number(v)||0}
+function fmt(v){return num(v).toLocaleString(undefined,{maximumFractionDigits:3})}
+function itemById(id){return state.items.find(x=>x.id===id)}
+function recipeById(id){return state.recipes.find(x=>x.id===id)}
+function roleCanEdit(){return activeRole==="Admin"}
+function setRole(role){
+  activeRole=role;document.getElementById("roleLabel").textContent=role;
+  document.querySelectorAll(".role").forEach(b=>b.classList.toggle("active",b.dataset.role===role));
+  document.querySelectorAll("#itemForm input,#itemForm select,#itemForm button,#recipeForm input,#recipeForm select,#recipeForm button,#poForm input,#poForm select,#poForm button").forEach(el=>{if(el.type!=="hidden")el.disabled=!roleCanEdit()});
+  document.querySelectorAll("#movementForm input,#movementForm select,#movementForm button,#productionForm input,#productionForm select,#productionForm button").forEach(el=>el.disabled=!(role==="Admin"||role==="Warehouse"&&el.closest("#movementForm")||role==="Production"&&el.closest("#productionForm")));
+  renderAll();
+}
+function showTab(tab){
+  activeTab=tab;
+  document.querySelectorAll("main > section").forEach(s=>s.classList.toggle("hidden",s.id!==tab));
+  document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b.dataset.tab===tab));
+}
+function table(headers,rows){if(!rows.length)return '<div class="empty">No records yet.</div>';return '<table><thead><tr>'+headers.map(h=>'<th>'+h+'</th>').join('')+'</tr></thead><tbody>'+rows.join('')+'</tbody></table>'}
+function renderAll(){
+  renderInventory();renderMovements();renderRecipes();renderProduction();renderPurchases();renderDashboard();
+  document.getElementById("storageStatus").textContent="Local browser storage • "+state.items.length+" materials • Last saved in this browser session; export a backup for safekeeping.";
+  setRoleControls();
+}
+function setRoleControls(){
+  document.querySelectorAll("#itemForm input,#itemForm select,#itemForm button,#recipeForm input,#recipeForm select,#recipeForm button,#poForm input,#poForm select,#poForm button").forEach(el=>{if(el.type!=="hidden")el.disabled=!roleCanEdit()});
+  document.querySelectorAll("#movementForm input,#movementForm select,#movementForm button").forEach(el=>el.disabled=!(activeRole==="Admin"||activeRole==="Warehouse"));
+  document.querySelectorAll("#productionForm input,#productionForm select,#productionForm button").forEach(el=>el.disabled=!(activeRole==="Admin"||activeRole==="Production"));
+}
+function optionsForItems(selected=""){return '<option value="">Select material</option>'+state.items.map(i=>`<option value="${i.id}" ${i.id===selected?'selected':''}>${esc(i.name)} (${esc(i.unit)})</option>`).join("")}
+function optionsForRecipes(selected=""){return '<option value="">Select recipe</option>'+state.recipes.map(r=>`<option value="${r.id}" ${r.id===selected?'selected':''}>${esc(r.name)}</option>`).join("")}
+function renderInventory(){
+  const moveSelected=document.getElementById("moveItem").value;
+  const poSelected=document.getElementById("poItem").value;
+  document.getElementById("moveItem").innerHTML=optionsForItems(moveSelected);
+  document.getElementById("poItem").innerHTML=optionsForItems(poSelected);
+  const rows=state.items.map(i=>`<tr><td>${esc(i.code||"—")}</td><td>${esc(i.name)}</td><td>${i.type==="packaging"?"Packaging":"Ingredient / raw material"}</td><td>${esc(i.unit)}</td><td>${fmt(i.stock)}</td><td>${fmt(i.min)}</td><td><span class="badge ${i.stock<=i.min?'low':'good'}">${i.stock<=i.min?'Reorder':'OK'}</span></td><td>${fmt(i.cost)}</td><td><button class="secondary small" onclick="editItem('${i.id}')">Edit</button> <button class="danger small" onclick="deleteItem('${i.id}')">Delete</button></td></tr>`);
+  document.getElementById("inventoryTable").innerHTML=table(["Code","Item","Ingredient / Packaging","Unit","On hand","Reorder at","Status","Unit cost PKR","Actions"],rows);
+}
+function renderMovements(){
+  const rows=state.movements.slice().reverse().map(m=>{const i=itemById(m.itemId);return `<tr><td>${esc(m.date)}</td><td>${esc(i?i.name:"Deleted item")}</td><td>${m.type==="in"?"Receipt":"Issue"}</td><td>${fmt(m.qty)} ${esc(i?i.unit:"")}</td><td>${esc(m.ref||"—")}</td><td>${fmt(m.balanceAfter)}</td></tr>`});
+  document.getElementById("movementTable").innerHTML=table(["Date","Material","Type","Quantity","Reference","Balance after"],rows);
+}
+function editItem(id){
+  const i=itemById(id);if(!i||!roleCanEdit())return;
+  document.getElementById("itemId").value=i.id;document.getElementById("itemName").value=i.name;document.getElementById("itemCode").value=i.code||"";document.getElementById("itemType").value=i.type||"ingredient";document.getElementById("itemUnit").value=i.unit;document.getElementById("itemStock").value=i.stock;document.getElementById("itemMin").value=i.min;document.getElementById("itemCost").value=i.cost;document.getElementById("itemSave").textContent="Update material";showTab("inventory");window.scrollTo({top:0,behavior:"smooth"});
+}
+function resetItemForm(){document.getElementById("itemForm").reset();document.getElementById("itemId").value="";document.getElementById("itemStock").value=0;document.getElementById("itemMin").value=0;document.getElementById("itemCost").value=0;document.getElementById("itemSave").textContent="Save material"}
+function deleteItem(id){if(!roleCanEdit())return;const used=state.recipes.some(r=>r.lines.some(l=>l.itemId===id));if(used){alert("This material is used in a recipe. Remove it from the recipe before deleting.");return}if(!confirm("Delete this material? Existing movement history will remain."))return;state.items=state.items.filter(i=>i.id!==id);saveState()}
+document.getElementById("poItem").addEventListener("change",()=>{
+  const item=itemById(document.getElementById("poItem").value);
+  if(item)document.getElementById("poCost").value=Number(item.cost||0);
+});
+document.getElementById("itemForm").addEventListener("submit",e=>{
+  e.preventDefault();if(!roleCanEdit())return;
+  const id=document.getElementById("itemId").value,name=document.getElementById("itemName").value.trim();
+  const stock=num(document.getElementById("itemStock").value),min=num(document.getElementById("itemMin").value),cost=num(document.getElementById("itemCost").value);
+  if(!name||stock<0||min<0||cost<0)return alert("Please enter valid material details.");
+  if(id){const old=itemById(id);if(old&&stock!==old.stock){const delta=stock-old.stock;state.movements.push({id:uid(),date:today,itemId:id,type:delta>=0?"in":"out",qty:Math.abs(delta),ref:"Manual stock adjustment",balanceAfter:stock})}Object.assign(old,{name,code:document.getElementById("itemCode").value.trim(),type:document.getElementById("itemType").value,unit:document.getElementById("itemUnit").value,stock,min,cost})}
+  else state.items.push({id:uid(),name,code:document.getElementById("itemCode").value.trim(),type:document.getElementById("itemType").value,unit:document.getElementById("itemUnit").value,stock,min,cost});
+  resetItemForm();saveState();
+});
+document.getElementById("movementForm").addEventListener("submit",e=>{
+  e.preventDefault();if(!(activeRole==="Admin"||activeRole==="Warehouse"))return;
+  const i=itemById(document.getElementById("moveItem").value),type=document.getElementById("moveType").value,qty=num(document.getElementById("moveQty").value);
+  if(!i||qty<=0)return alert("Select a material and enter a positive quantity.");
+  if(type==="out"&&qty>i.stock)return alert("Insufficient stock. Available: "+fmt(i.stock)+" "+i.unit);
+  i.stock+=type==="in"?qty:-qty;
+  state.movements.push({id:uid(),date:today,itemId:i.id,type,qty,ref:document.getElementById("moveRef").value.trim(),balanceAfter:i.stock});
+  document.getElementById("movementForm").reset();saveState();
+});
+function addIngredientRow(line={itemId:"",pct:""}){
+  const wrap=document.createElement("div");wrap.className="grid recipe-line";wrap.style.marginTop="8px";
+  wrap.innerHTML=`<div class="field"><label>Material</label><select class="line-item">${optionsForItems(line.itemId)}</select></div><div class="field"><label>Ingredient / Packaging</label><div class="line-type" style="padding:10px;border:1px solid #d1d5db;border-radius:8px;background:#f8fafc">Select material</div></div><div class="field"><label>Ingredient percentage (%)</label><div style="display:flex;gap:7px"><input class="line-pct" type="number" min="0" max="100" step="0.001" value="${esc(line.pct)}" placeholder="0.000"><button type="button" class="danger small" aria-label="Remove row">×</button></div><small class="line-help muted">Ingredient percentages must total 100%.</small></div>`;
+  const select=wrap.querySelector(".line-item"),pct=wrap.querySelector(".line-pct");
+  function syncType(){const item=itemById(select.value),isPackaging=!!item&&item.type==="packaging";wrap.querySelector(".line-type").textContent=!item?"Select material":isPackaging?"Packaging":"Ingredient / raw material";pct.disabled=isPackaging;pct.style.background=isPackaging?"#e5e7eb":"";if(isPackaging){pct.value="0";wrap.querySelector(".line-help").textContent="Packaging is excluded from formula % and ingredient deduction."}else{wrap.querySelector(".line-help").textContent="Ingredient percentages must total 100%."}updateRecipeTotal()}
+  select.addEventListener("change",syncType);pct.addEventListener("input",updateRecipeTotal);wrap.querySelector("button").addEventListener("click",()=>{wrap.remove();updateRecipeTotal()});
+  document.getElementById("recipeLines").appendChild(wrap);syncType();
+}
+function getRecipeLines(){return [...document.querySelectorAll(".recipe-line")].map(row=>{const item=itemById(row.querySelector(".line-item").value);return {itemId:row.querySelector(".line-item").value,pct:item&&item.type==="packaging"?0:num(row.querySelector(".line-pct").value),type:item&&item.type==="packaging"?"packaging":"ingredient"}}).filter(l=>l.itemId)}
+function ingredientPercentageTotal(lines=getRecipeLines()){return lines.reduce((s,l)=>{const i=itemById(l.itemId);return s+(i&&i.type!=="packaging"?num(l.pct):0)},0)}
+function updateRecipeTotal(){const lines=getRecipeLines(),total=ingredientPercentageTotal(lines),el=document.getElementById("recipeTotal"),valid=Math.abs(total-100)<0.001;el.textContent="Ingredient total: "+total.toFixed(3)+"% — "+(valid?"100% complete":"must equal 100.000% (difference "+(100-total).toFixed(3)+"%)");el.style.color=valid?"#047857":"#be123c"}
+function resetRecipeForm(){document.getElementById("recipeForm").reset();document.getElementById("recipeId").value="";document.getElementById("recipeLines").innerHTML="";addIngredientRow();addIngredientRow();document.getElementById("recipeTotal").style.color=""}
+document.getElementById("recipeForm").addEventListener("submit",e=>{
+  e.preventDefault();if(!roleCanEdit())return;
+  const name=document.getElementById("recipeName").value.trim(),lines=getRecipeLines(),total=ingredientPercentageTotal(lines),ingredientLines=lines.filter(l=>{const i=itemById(l.itemId);return i&&i.type!=="packaging"&&l.pct>0}),id=document.getElementById("recipeId").value;
+  if(!name||!ingredientLines.length)return alert("Add at least one ingredient/raw material with a percentage greater than zero.");
+  if(Math.abs(total-100)>0.001)return alert("Ingredient percentages must total 100.000%. Current ingredient total: "+total.toFixed(3)+"%. Packaging lines are excluded from this total.");
+  const recipe={id:id||uid(),name,notes:document.getElementById("recipeNotes").value.trim(),lines};
+  if(id){const idx=state.recipes.findIndex(r=>r.id===id);if(idx>=0)state.recipes[idx]=recipe;else state.recipes.push(recipe)}else state.recipes.push(recipe);
+  resetRecipeForm();saveState();
+});
+function editRecipe(id){if(!roleCanEdit())return;const r=recipeById(id);if(!r)return;document.getElementById("recipeId").value=r.id;document.getElementById("recipeName").value=r.name;document.getElementById("recipeNotes").value=r.notes||"";document.getElementById("recipeLines").innerHTML="";r.lines.forEach(addIngredientRow);updateRecipeTotal();showTab("recipes")}
+function deleteRecipe(id){if(!roleCanEdit())return;if(!confirm("Delete this recipe?"))return;state.recipes=state.recipes.filter(r=>r.id!==id);saveState()}
+function renderRecipes(){
+  document.getElementById("calcRecipe").innerHTML=optionsForRecipes();document.getElementById("prodRecipe").innerHTML=optionsForRecipes();
+  const rows=state.recipes.map(r=>{const total=ingredientPercentageTotal(r.lines);return `<tr><td>${esc(r.name)}</td><td>${r.lines.map(l=>{const i=itemById(l.itemId),isPackaging=i&&i.type==="packaging";return `<strong>${esc(i?i.name:"Deleted material")}</strong> — ${isPackaging?"Packaging (excluded from formula %)":"Ingredient / raw material: "+fmt(l.pct)+"%"}`}).join("<br>")}</td><td style="color:${Math.abs(total-100)<0.001?"#047857":"#be123c"};font-weight:700">${total.toFixed(3)}% ${Math.abs(total-100)<0.001?"✓":"⚠ Must equal 100%"}</td><td>${esc(r.notes||"—")}</td><td><button class="secondary small" onclick="editRecipe('${r.id}')">Edit</button> <button class="danger small" onclick="deleteRecipe('${r.id}')">Delete</button></td></tr>`});
+  document.getElementById("recipeTable").innerHTML=table(["Recipe","Ingredient / Packaging","Ingredient total","Notes","Actions"],rows);
+}
+function calculateBatch(){
+  const r=recipeById(document.getElementById("calcRecipe").value),kg=num(document.getElementById("batchSize").value);
+  if(!r||kg<=0)return alert("Select a recipe and enter a positive batch size.");
+  const rows=r.lines.map(l=>{const i=itemById(l.itemId),isPackaging=i&&i.type==="packaging";return `<tr><td>${esc(i?i.name:"Deleted material")}</td><td>${isPackaging?"Packaging — excluded":""+fmt(l.pct)+"%"}</td><td>${isPackaging?"Not calculated in ingredient batch":""+fmt(kg*l.pct/100)+" kg"}</td><td>${i?fmt(i.stock)+" "+esc(i.unit):"—"}</td></tr>`});
+  document.getElementById("batchCalculation").innerHTML=table(["Ingredient / Packaging","Formula %","Required for batch","Current stock"],rows);
+}
+document.getElementById("productionForm").addEventListener("submit",e=>{
+  e.preventDefault();if(!(activeRole==="Admin"||activeRole==="Production"))return;
+  const r=recipeById(document.getElementById("prodRecipe").value),qty=num(document.getElementById("prodQty").value);
+  const date=document.getElementById("prodDate").value||today,ref=document.getElementById("prodRef").value.trim();
+  const units=num(document.getElementById("prodUnits").value),cartons=num(document.getElementById("prodCartons").value);
+  if(!r||qty<=0)return alert("Select a recipe and enter a positive batch quantity.");
+  if(!ref)return alert("Enter a unique production batch number.");
+  if(state.production.some(p=>(p.ref||"").trim().toLowerCase()===ref.toLowerCase()))return alert("This batch number already exists. Enter a unique batch number.");
+  if(units<0||cartons<0||!Number.isInteger(units)||!Number.isInteger(cartons))return alert("Units and cartons must be whole numbers, zero or greater.");
+  const needs=r.lines.map(l=>({item:itemById(l.itemId),pct:num(l.pct),qty:qty*num(l.pct)/100})).filter(x=>x.item&&x.item.type!=="packaging"&&x.pct>0);
+  const shortages=needs.filter(x=>x.item.stock+1e-9<x.qty);
+  if(shortages.length)return alert("Insufficient stock:\n"+shortages.map(x=>x.item.name+": need "+fmt(x.qty)+", available "+fmt(x.item.stock)+" "+x.item.unit).join("\n"));
+  if(!confirm("Post batch "+ref+" for "+r.name+"? This will deduct recipe ingredients from stock."))return;
+  needs.forEach(x=>{x.item.stock-=x.qty;state.movements.push({id:uid(),date,itemId:x.item.id,type:"out",qty:x.qty,ref:"Production "+ref,balanceAfter:x.item.stock})});
+  const materialCost=needs.reduce((sum,x)=>sum+x.qty*num(x.item.cost),0);
+  const packagingCost=num(document.getElementById("prodPackagingCost").value),labourCost=num(document.getElementById("prodLabourCost").value),utilitiesCost=num(document.getElementById("prodUtilitiesCost").value),overheadCost=num(document.getElementById("prodOverheadCost").value),otherCost=num(document.getElementById("prodOtherCost").value);
+  const manufacturingCost=materialCost+packagingCost+labourCost+utilitiesCost+overheadCost+otherCost;
+  state.production.push({id:uid(),date,recipeId:r.id,recipeName:r.name,qty,units,cartons,ref,materialCost,materialCostPerKg:materialCost/qty,packagingCost,labourCost,utilitiesCost,overheadCost,otherCost,manufacturingCost,manufacturingCostPerKg:manufacturingCost/qty,ingredientCosts:needs.map(x=>({itemId:x.item.id,itemName:x.item.name,qty:x.qty,unit:x.item.unit,unitCost:num(x.item.cost),lineCost:x.qty*num(x.item.cost)}))});
+  document.getElementById("prodRef").value="";document.getElementById("prodUnits").value="0";document.getElementById("prodCartons").value="0";["prodPackagingCost","prodLabourCost","prodUtilitiesCost","prodOverheadCost","prodOtherCost"].forEach(id=>document.getElementById(id).value="0");saveState();alert("Production batch posted and ingredient stock deducted. Full manufacturing cost has been recorded.");
+});
+function renderProduction(){
+  const rows=state.production.slice().sort((a,b)=>(b.date||"").localeCompare(a.date||"")).map(p=>`<tr><td>${esc(p.date)}</td><td><strong>${esc(p.ref||"—")}</strong></td><td>${esc(p.recipeName)}</td><td>${fmt(p.qty)} kg</td><td>${fmt(p.units||0)}</td><td>${fmt(p.cartons||0)}</td><td>${fmt(p.materialCost||0)}</td><td>${fmt(p.packagingCost||0)}</td><td>${fmt(p.labourCost||0)}</td><td>${fmt(p.utilitiesCost||0)}</td><td>${fmt(p.overheadCost||0)}</td><td>${fmt(p.otherCost||0)}</td><td>${fmt(p.manufacturingCost??p.materialCost??0)}</td><td>${fmt(p.manufacturingCostPerKg??p.materialCostPerKg??0)}</td></tr>`);
+  document.getElementById("productionTable").innerHTML=table(["Production date","Batch number","Product / recipe","Quantity (kg)","Units","Cases","Ingredient cost PKR","Packaging PKR","Labour PKR","Utilities PKR","Factory overhead PKR","Other PKR","Full manufacturing cost PKR","Full cost/kg PKR"],rows);
+  renderProductionReports();
+}
+function fullCost(p){return num(p.manufacturingCost??p.materialCost)}
+function productionTotals(records){const t=records.reduce((a,p)=>({batches:a.batches+1,kg:a.kg+num(p.qty),units:a.units+num(p.units),cartons:a.cartons+num(p.cartons),cost:a.cost+fullCost(p)}),{batches:0,kg:0,units:0,cartons:0,cost:0});t.costPerKg=t.kg?t.cost/t.kg:0;return t}
+function reportStatsHTML(t){return `<div class="stat"><span>Batches</span><strong>${fmt(t.batches)}</strong></div><div class="stat"><span>Total production (kg)</span><strong>${fmt(t.kg)}</strong></div><div class="stat"><span>Total units</span><strong>${fmt(t.units)}</strong></div><div class="stat"><span>Total cases</span><strong>${fmt(t.cartons)}</strong></div><div class="stat"><span>Full manufacturing cost (PKR)</span><strong>${fmt(t.cost)}</strong></div><div class="stat"><span>Weighted average cost/kg (PKR)</span><strong>${fmt(t.costPerKg)}</strong></div>`}
+function productSummary(records){const groups={};records.forEach(p=>{const k=p.recipeName||"Unnamed product";if(!groups[k])groups[k]={product:k,batches:0,kg:0,units:0,cases:0,cost:0};const g=groups[k];g.batches++;g.kg+=num(p.qty);g.units+=num(p.units);g.cases+=num(p.cartons);g.cost+=fullCost(p)});return Object.values(groups).map(g=>({...g,costPerKg:g.kg?g.cost/g.kg:0}))}
+function productSummaryTable(records){return table(["Product","Batches","Kg produced","Units","Cases","Full manufacturing cost PKR","Average cost/kg PKR"],productSummary(records).map(g=>`<tr><td>${esc(g.product)}</td><td>${fmt(g.batches)}</td><td>${fmt(g.kg)}</td><td>${fmt(g.units)}</td><td>${fmt(g.cases)}</td><td>${fmt(g.cost)}</td><td>${fmt(g.costPerKg)}</td></tr>`))}
+function renderProductionReports(){
+  const yearMonthEl=document.getElementById("reportMonthYear"),yearEl=document.getElementById("reportYear");if(!yearMonthEl||!yearEl)return;
+  const years=[...new Set([new Date().getFullYear(),...state.production.map(p=>Number((p.date||"").slice(0,4))).filter(y=>y>0)])].sort((a,b)=>b-a);
+  const fillYear=(el)=>{const old=el.value;el.innerHTML=years.map(y=>`<option value="${y}">${y}</option>`).join("");el.value=years.includes(Number(old))?old:String(new Date().getFullYear())};fillYear(yearMonthEl);fillYear(yearEl);
+  const month=document.getElementById("reportMonth").value||String(new Date().getMonth()+1).padStart(2,"0"),my=yearMonthEl.value,yy=yearEl.value;
+  const monthly=state.production.filter(p=>(p.date||"").slice(0,7)===`${my}-${month}`),yearly=state.production.filter(p=>(p.date||"").slice(0,4)===String(yy));
+  document.getElementById("monthlyProductionReport").innerHTML=reportStatsHTML(productionTotals(monthly));
+  document.getElementById("yearlyProductionReport").innerHTML=reportStatsHTML(productionTotals(yearly));
+  const details=(list)=>table(["Date","Batch number","Product / recipe","Kg","Units","Cartons"],list.slice().sort((a,b)=>(a.date||"").localeCompare(b.date||"")).map(p=>`<tr><td>${esc(p.date)}</td><td>${esc(p.ref||"—")}</td><td>${esc(p.recipeName)}</td><td>${fmt(p.qty)}</td><td>${fmt(p.units||0)}</td><td>${fmt(p.cartons||0)}</td></tr>`));
+  document.getElementById("monthlyProductionDetails").innerHTML='<h3>Product-wise monthly totals and average cost</h3>'+productSummaryTable(monthly)+'<h3 style="margin-top:16px">Batch details</h3>'+details(monthly);document.getElementById("yearlyProductionDetails").innerHTML='<h3>Product-wise yearly totals and average cost</h3>'+productSummaryTable(yearly)+'<h3 style="margin-top:16px">Batch details</h3>'+details(yearly);
+}
+function exportProductionReport(period){
+  const month=document.getElementById("reportMonth").value,monthYear=document.getElementById("reportMonthYear").value,year=document.getElementById("reportYear").value;
+  const records=state.production.filter(p=>period==="monthly"?(p.date||"").slice(0,7)===`${monthYear}-${month}`:(p.date||"").slice(0,4)===String(year));
+  const headers=["Date","Batch number","Product / recipe","Quantity kg","Units","Cases","Ingredient cost PKR","Packaging cost PKR","Labour cost PKR","Utilities cost PKR","Factory overhead PKR","Other cost PKR","Full manufacturing cost PKR","Full cost per kg PKR"];
+  const rows=records.map(p=>[p.date,p.ref,p.recipeName,p.qty,p.units||0,p.cartons||0,p.materialCost||0,p.packagingCost||0,p.labourCost||0,p.utilitiesCost||0,p.overheadCost||0,p.otherCost||0,fullCost(p),p.manufacturingCostPerKg??p.materialCostPerKg??0]);
+  download(`chocolate-plant-production-${period}-${period==="monthly"?monthYear+"-"+month:year}.csv`,[headers,...rows].map(r=>r.map(csvCell).join(",")).join("\r\n"),"text/csv;charset=utf-8");
+}
+document.getElementById("poForm").addEventListener("submit",e=>{
+  e.preventDefault();if(!roleCanEdit())return;
+  const supplier=document.getElementById("poSupplier").value.trim(),item=itemById(document.getElementById("poItem").value),qty=num(document.getElementById("poQty").value);
+  if(!supplier||!item||qty<=0)return alert("Enter supplier, material and positive quantity.");
+  const poCost=num(document.getElementById("poCost").value);
+  state.purchases.push({id:uid(),po:"PO-"+String(state.purchases.length+1).padStart(4,"0"),supplier,itemId:item.id,itemName:item.name,qty,unit:item.unit,date:document.getElementById("poDate").value||today,cost:poCost,status:"Open",received:0});
+  document.getElementById("poForm").reset();document.getElementById("poCost").value=0;saveState();
+});
+function receivePO(id){
+  if(!(activeRole==="Admin"||activeRole==="Warehouse"))return alert("Switch to Admin or Warehouse role to receive stock.");
+  const p=state.purchases.find(x=>x.id===id);if(!p||p.status!=="Open")return;
+  const qty=Number(prompt("Quantity received ("+p.unit+"). Ordered: "+p.qty,p.qty));if(!Number.isFinite(qty)||qty<=0||qty>p.qty)return alert("Enter a valid received quantity no greater than the ordered quantity.");
+  const i=itemById(p.itemId);if(!i)return alert("Material no longer exists.");
+  const oldStock=num(i.stock),oldCost=num(i.cost),receiptCost=num(p.cost);
+  i.stock+=qty;
+  // Update the material's moving-average unit cost when the receipt is posted.
+  if(receiptCost>=0&&i.stock>0)i.cost=((oldStock*oldCost)+(qty*receiptCost))/i.stock;
+  state.movements.push({id:uid(),date:today,itemId:i.id,type:"in",qty,unitCost:receiptCost,lineCost:qty*receiptCost,ref:"Receipt for "+p.po,balanceAfter:i.stock});
+  p.received=(p.received||0)+qty;if(p.received>=p.qty)p.status="Received";saveState();
+}
+function renderPurchases(){const rows=state.purchases.slice().reverse().map(p=>`<tr><td>${esc(p.po)}</td><td>${esc(p.date)}</td><td>${esc(p.supplier)}</td><td>${esc(p.itemName)}</td><td>${fmt(p.qty)} ${esc(p.unit)}</td><td>${fmt(p.cost)}</td><td>${fmt(p.qty*p.cost)}</td><td><span class="badge ${p.status==="Received"?'good':''}">${esc(p.status)}${p.received?"; received "+fmt(p.received):""}</span></td><td>${p.status==="Open"?`<button class="success small" onclick="receivePO('${p.id}')">Receive</button>`:"—"}</td></tr>`);document.getElementById("poTable").innerHTML=table(["PO No.","Date","Supplier","Material","Ordered","Unit cost PKR","Order value PKR","Status","Action"],rows)}
+function renderDashboard(){
+  document.getElementById("statItems").textContent=state.items.length;
+  document.getElementById("statLow").textContent=state.items.filter(i=>i.stock<=i.min).length;
+  document.getElementById("statRecipes").textContent=state.recipes.length;
+  document.getElementById("statBatches").textContent=state.production.length;
+  const rows=state.items.map(i=>`<tr><td>${esc(i.name)}</td><td>${fmt(i.stock)} ${esc(i.unit)}</td><td>${fmt(i.min)} ${esc(i.unit)}</td><td><span class="badge ${i.stock<=i.min?'low':'good'}">${i.stock<=i.min?'Reorder':'OK'}</span></td></tr>`);
+  document.getElementById("dashboardStock").innerHTML=table(["Material","Current stock","Reorder level","Status"],rows);
+}
+function download(filename,content,type){const blob=new Blob([content],{type}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url)}
+function downloadBackup(){download("chocolate-plant-backup-"+today+".json",JSON.stringify({version:1,exportedAt:new Date().toISOString(),data:state},null,2),"application/json")}
+document.getElementById("restoreFile").addEventListener("change",async e=>{
+  const file=e.target.files[0];if(!file)return;
+  try{const parsed=JSON.parse(await file.text()),data=parsed.data||parsed;if(!Array.isArray(data.items)||!Array.isArray(data.recipes)||!Array.isArray(data.movements)||!Array.isArray(data.production)||!Array.isArray(data.purchases))throw new Error("Backup file structure is not recognized.");if(!confirm("Replace current app data with this backup? Download a backup of current data first if needed."))return;state=data;saveState();alert("Backup restored.");}catch(err){alert("Could not restore backup: "+err.message)}finally{e.target.value=""}
+});
+function csvCell(v){return '"'+String(v??"").replace(/"/g,'""')+'"'}
+function exportCSV(kind){
+  let headers=[],rows=[];
+  if(kind==="inventory"){headers=["Code","Item","Ingredient / Packaging","Unit","Stock","Reorder level","Unit cost PKR"];rows=state.items.map(i=>[i.code,i.name,i.type==="packaging"?"Packaging":"Ingredient / raw material",i.unit,i.stock,i.min,i.cost])}
+  if(kind==="movements"){headers=["Date","Material","Type","Quantity","Reference","Balance after"];rows=state.movements.map(m=>{const i=itemById(m.itemId);return [m.date,i?i.name:"Deleted item",m.type,m.qty,m.ref,m.balanceAfter]})}
+  if(kind==="production"){headers=["Date","Batch number","Product","Quantity kg","Units","Cases","Ingredient cost PKR","Packaging cost PKR","Labour cost PKR","Utilities cost PKR","Factory overhead PKR","Other cost PKR","Full manufacturing cost PKR","Full cost per kg PKR"];rows=state.production.map(p=>[p.date,p.ref,p.recipeName,p.qty,p.units||0,p.cartons||0,p.materialCost||0,p.packagingCost||0,p.labourCost||0,p.utilitiesCost||0,p.overheadCost||0,p.otherCost||0,fullCost(p),p.manufacturingCostPerKg??p.materialCostPerKg??0])}
+  if(kind==="purchases"){headers=["PO","Date","Supplier","Material","Quantity","Unit","Unit cost PKR","Order value PKR","Status","Received"];rows=state.purchases.map(p=>[p.po,p.date,p.supplier,p.itemName,p.qty,p.unit,p.cost,p.qty*p.cost,p.status,p.received||0])}
+  download("chocolate-plant-"+kind+"-"+today+".csv",[headers,...rows].map(r=>r.map(csvCell).join(",")).join("\r\n"),"text/csv;charset=utf-8");
+}
+function clearAllData(){if(!confirm("Permanently delete all inventory, recipes, movements, production and purchase orders from this browser?"))return;if(!confirm("Final confirmation: this cannot be undone without a backup."))return;state={items:[],recipes:[],movements:[],production:[],purchases:[]};saveState();resetItemForm();resetRecipeForm()}
+document.getElementById("prodDate").value=today;document.getElementById("poDate").value=today;document.getElementById("reportMonth").value=String(new Date().getMonth()+1).padStart(2,"0");
+resetRecipeForm();renderAll();showTab("dashboard");
+</script>
+</body>
+</html>
