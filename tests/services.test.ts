@@ -331,6 +331,23 @@ describe('stock, orders and production', () => {
     await expect(svc.receivePO(db, warehouse, 'PO-2040')).rejects.toMatchObject({ code: 'conflict' });
   });
 
+  it('deleting an order in transit takes it out of pipeline; its number is never reused', async () => {
+    const before = await material(db, orgId, SUGAR);
+    await forbidden(svc.deletePO(db, production, 'PO-2040'));
+    await svc.deletePO(db, warehouse, 'PO-2040');
+    expect(await material(db, orgId, SUGAR)).toMatchObject({ inHand: before.inHand, pipeline: 256 });
+    const data = await loadData(db, orgId);
+    expect(data.pos.find((p) => p.id === 'PO-2040')).toBeUndefined();
+    const po = await svc.generatePO(db, admin, []);
+    await svc.receivePO(db, warehouse, po.id);
+    const inHand = (await material(db, orgId, 'Di Sodium Phosphate')).inHand;
+    await forbidden(svc.deletePO(db, warehouse, po.id));
+    await svc.deletePO(db, admin, po.id);
+    expect((await material(db, orgId, 'Di Sodium Phosphate')).inHand).toBe(inHand);
+    expect(buildModel(await loadData(db, orgId)).nextPoId).not.toBe(po.id);
+    await expect(svc.deletePO(db, admin, po.id)).rejects.toMatchObject({ code: 'not_found' });
+  });
+
   it('a batch gets its own number and date, deducts one batch of the recipe, and counts the plan down', async () => {
     const f = await firstForecast(FUDGE);
     const res = await svc.logBatch(db, production, { productId: f.productId, forecastId: f.id, batchNo: ' b-261021-01 ', date: '2026-10-21', actualKg: 488, units: 488, cases: 48 });

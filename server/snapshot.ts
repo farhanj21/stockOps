@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, inArray, isNull } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, isNull, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import type { Db } from '@/db';
 import * as t from '@/db/schema';
@@ -15,7 +15,7 @@ import { can, resolveRole, type Actor } from './actor';
 export async function loadData(db: Db, organizationId: string, people: { all: boolean; selfId?: string } = { all: true }): Promise<Data> {
   const org = organizationId;
   const receiver = alias(t.users, 'receiver');
-  const [ingredients, products, forecasts, pos, users, batches, customRoles] = await Promise.all([
+  const [ingredients, products, forecasts, pos, users, batches, customRoles, [poSeq]] = await Promise.all([
     db.select().from(t.ingredients).where(eq(t.ingredients.organizationId, org)).orderBy(asc(t.ingredients.position), asc(t.ingredients.name)),
     db.select().from(t.products).where(eq(t.products.organizationId, org)).orderBy(asc(t.products.position), asc(t.products.name)),
     db
@@ -43,6 +43,11 @@ export async function loadData(db: Db, organizationId: string, people: { all: bo
       .where(eq(t.productionBatches.organizationId, org))
       .orderBy(desc(t.productionBatches.producedOn), desc(t.productionBatches.createdAt)),
     db.select().from(t.customRoles).where(eq(t.customRoles.organizationId, org)).orderBy(asc(t.customRoles.createdAt), asc(t.customRoles.name)),
+    // Highest PO number ever raised, including deleted orders, so a number is never reused.
+    db
+      .select({ max: sql<number | null>`max(nullif(regexp_replace(${t.stockMovements.ref}, '[^0-9]', '', 'g'), '')::bigint)` })
+      .from(t.stockMovements)
+      .where(and(eq(t.stockMovements.organizationId, org), eq(t.stockMovements.reason, 'po_created'))),
   ]);
   const customById = new Map(customRoles.map((r) => [r.id, r]));
 
@@ -85,6 +90,7 @@ export async function loadData(db: Db, organizationId: string, people: { all: bo
       by: by ?? '—',
       lines: poLines.filter((l) => l.poId === po.id).map((l) => ({ ing: l.ingredientId, packs: l.packs, qty: l.qty })),
     })),
+    lastPoNo: Number(poSeq?.max) || 0,
     batches: batches.map(({ b, by }) => ({
       id: b.id,
       batchNo: b.batchNo,

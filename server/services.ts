@@ -865,3 +865,28 @@ export async function receivePO(db: Db, actor: Actor, code: string) {
     await tx.update(t.purchaseOrders).set({ status: 'Received', receivedOn: plantToday(), receivedBy: actor.userId }).where(eq(t.purchaseOrders.id, po.id));
   });
 }
+
+/**
+ * Delete a purchase order. An order still in transit is cancelled: its quantities come back out
+ * of pipeline. A received order only leaves the history; in-hand stock stays as it is, because
+ * the goods did arrive. Its number is never handed out again.
+ */
+export async function deletePO(db: Db, actor: Actor, code: string) {
+  await db.transaction(async (tx) => {
+    const [po] = await tx
+      .select()
+      .from(t.purchaseOrders)
+      .where(and(eq(t.purchaseOrders.code, code), eq(t.purchaseOrders.organizationId, actor.organizationId)))
+      .for('update');
+    if (!po) throw new AppError('That order no longer exists.', 'not_found');
+    requirePerm(actor, po.status === 'Open' ? 'receive' : 'setup');
+    if (po.status === 'Open') {
+      const lines = await tx.select().from(t.poLines).where(eq(t.poLines.poId, po.id));
+      for (const l of lines) {
+        const ing = await lockIngredient(tx, actor, l.ingredientId);
+        await writeStock(tx, actor, ing, 'pipeline', ing.pipeline - l.qty, 'adjust', code);
+      }
+    }
+    await tx.delete(t.purchaseOrders).where(eq(t.purchaseOrders.id, po.id));
+  });
+}

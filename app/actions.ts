@@ -367,3 +367,7 @@ export async function createPO(lines: { ingredientId: string; packs: number }[])
 export async function receivePO(id: string) {
   return act((db, actor) => svc.receivePO(db, actor, Id.parse(id)));
 }
+
+export async function deletePO(id: string) {
+  return act((db, actor) => svc.deletePO(db, actor, Id.parse(id)));
+}

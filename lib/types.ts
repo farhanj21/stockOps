@@ -104,6 +104,8 @@ export interface Data {
   recipes: Record<string, RecipeLine[]>;
   forecasts: Forecast[];
   pos: PurchaseOrder[];
+  /** Highest PO number ever used, deleted orders included (0 if unknown). */
+  lastPoNo?: number;
   users: User[];
   batches: Batch[];
   /** Built-in roles first, then the organization's custom roles. */
