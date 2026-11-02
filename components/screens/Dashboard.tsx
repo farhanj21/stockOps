@@ -8,6 +8,7 @@ import { ALERT_STYLE, SHOW_COST } from '@/lib/config';
 import { fmt, fmtDate, money, num, plural, qu } from '@/lib/format';
 import { useCurrentUser, useGo } from '@/lib/hooks';
 import { useModel } from '@/lib/model';
+import { isBuiltInRole, type Perms } from '@/lib/roles';
 import type { Role } from '@/lib/types';
 import { useUI } from '@/lib/ui';
 
@@ -43,9 +44,24 @@ const QUICK_ACTIONS: Record<Role, QuickAction[]> = {
   ],
 };
 
+/** Custom roles: the same kinds of shortcuts, picked from what the role is allowed to do. */
+function quickActionsFor(roleId: string, perms: Perms): QuickAction[] {
+  if (isBuiltInRole(roleId)) return QUICK_ACTIONS[roleId];
+  const list: QuickAction[] = [];
+  if (perms.plan) list.push({ title: 'Plan batches', sub: 'Forecast & preview', icon: 'calendar', to: 'plan' });
+  if (perms.stock) list.push({ title: 'Log stock count', sub: 'In-hand & pipeline', icon: 'clipboard', to: 'stock' });
+  if (perms.receive) list.push({ title: 'Receive delivery', sub: 'Orders in transit', icon: 'truck', to: 'orders' });
+  if (perms.plan) list.push({ title: 'Log a batch', sub: 'Batch no. · kg · cases', icon: 'check', iconStroke: 2.2, to: 'batch' });
+  if (perms.setup) list.push({ title: 'Recipes & par', sub: 'Setup', icon: 'sliders', to: 'setup' });
+  if (!perms.stock) list.push({ title: 'Check stock', sub: 'View only', icon: 'box', to: 'stock' });
+  list.push({ title: 'Purchase orders', sub: 'Review & generate', icon: 'receipt', to: 'orders' });
+  list.push({ title: 'Below-par items', sub: 'Filtered stock list', icon: 'alert', to: 'stockLow' });
+  return list.slice(0, 4);
+}
+
 export function Dashboard() {
   const m = useModel();
-  const { role, perms } = useCurrentUser();
+  const { roleId, perms } = useCurrentUser();
   const go = useGo();
   const { openMat, openProd } = useOpeners();
   const { greeting, dateLabel } = useGreeting();
@@ -177,7 +193,7 @@ export function Dashboard() {
               </h2>
             </div>
             <div className="actions">
-              {QUICK_ACTIONS[role].map((a, ix) => (
+              {quickActionsFor(roleId, perms).map((a, ix) => (
                 <button key={a.title} type="button" className={`action${ix === 0 ? ' dark' : ''}`} onClick={() => run(a.to)}>
                   <span className="action-ico">
                     <Icon name={a.icon} size={18} stroke={a.iconStroke ?? 2} />

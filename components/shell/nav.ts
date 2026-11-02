@@ -23,7 +23,7 @@ export function useNavItems(): NavItem[] {
     perms.plan && { tab: 'plan', label: 'Production', short: 'Produce', icon: 'calendar' },
     { tab: 'orders', label: 'Purchase orders', short: 'Orders', icon: 'truck', badge: { count: m.suggestions.length, tone: 'gold' } },
     perms.setup && { tab: 'setup', label: 'Setup', short: 'Setup', icon: 'sliders' },
-    perms.setup && { tab: 'team', label: 'Team', short: 'Team', icon: 'users' },
+    perms.team && { tab: 'team', label: 'Team', short: 'Team', icon: 'users' },
   ];
   return items.filter((x): x is NavItem => !!x);
 }

@@ -1,7 +1,18 @@
 /** A numeric field that may be blank while the user is mid-edit. */
 export type Num = number | '';
 
+import type { Perms } from './roles';
+
+/** The built-in roles. Organizations can add their own (see RoleDef). */
 export type Role = 'Admin' | 'Warehouse' | 'Production';
+
+/** A role people can be given: built-in (id = its name) or custom (id like `role_x1y2`). */
+export interface RoleDef {
+  id: string;
+  name: string;
+  builtIn: boolean;
+  perms: Perms;
+}
 export const MATERIAL_KINDS = ['ingredient', 'packaging', 'utility'] as const;
 export type MaterialKind = (typeof MATERIAL_KINDS)[number];
 
@@ -80,7 +91,10 @@ export interface User {
   name: string;
   username: string;
   email: string;
-  role: Role;
+  /** Built-in role name or custom role id. */
+  roleId: string;
+  /** Role name to show. */
+  role: string;
   isOwner: boolean;
 }
 
@@ -92,6 +106,8 @@ export interface Data {
   pos: PurchaseOrder[];
   users: User[];
   batches: Batch[];
+  /** Built-in roles first, then the organization's custom roles. */
+  roles: RoleDef[];
 }
 
 export interface Organization {

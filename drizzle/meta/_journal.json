@@ -29,6 +29,13 @@
       "when": 1792777392529,
       "tag": "0003_production_batches",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793604655176,
+      "tag": "0004_custom_roles",
+      "breakpoints": true
     }
   ]
 }

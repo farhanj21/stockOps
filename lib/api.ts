@@ -1,14 +1,17 @@
 /** Shapes exchanged between the browser and the server. */
-import type { Data, Organization, Role } from './types';
+import type { Perms } from './roles';
+import type { Data, Organization } from './types';
 
 export interface Me {
   userId: string;
   org: Organization;
   isOwner: boolean;
-  /** The role the app is acting as (an Admin previewing another role gets that role). */
-  role: Role;
-  /** The account's real role. */
-  baseRole: Role;
+  /** Role name to show. */
+  role: string;
+  /** Built-in role name or custom role id. */
+  roleId: string;
+  /** What this person may change (the server enforces the same). */
+  perms: Perms;
   /** Demo conveniences (sign-in shortcuts for the demo organization) are on. */
   demo: boolean;
   /** The owner can load the sample plant ("Load sample data"): always in development. */

@@ -8,19 +8,10 @@ import { Logo } from '@/components/Logo';
 import { initialsOf } from '@/lib/format';
 import { useCurrentUser } from '@/lib/hooks';
 import { generatePassword } from '@/lib/password-gen';
-import { ROLE_DESC, ROLES } from '@/lib/roles';
+import { NO_PERMS, PERM_INFO, PERM_KEYS, roleSummary, type Perms } from '@/lib/roles';
 import { useStore } from '@/lib/store';
-import type { Role, User } from '@/lib/types';
+import type { RoleDef, User } from '@/lib/types';
 import { confirmDialog, toast } from '@/lib/ui';
-
-const MATRIX: [string, boolean, boolean, boolean][] = [
-  ['Team accounts & organization', true, false, false],
-  ['Products, recipes, costs, mix %', true, false, false],
-  ['Materials, par levels & pack sizes', true, false, false],
-  ['Log physical stock & receive deliveries', true, true, false],
-  ['Forecasts & batches run', true, false, true],
-  ['Alerts & purchase orders', true, true, true],
-];
 
 /** Admins create and manage every account in the organization. */
 export function Team() {
@@ -71,40 +62,209 @@ export function Team() {
 
         <div className="col min0" style={{ gap: 22 }}>
           <Organization />
-          <section>
-            <div className="sec-head">
-              <h2 className="eyebrow" style={{ margin: 0 }}>
-                What each role can do
-              </h2>
-            </div>
-            <div className="card flat clip" style={{ fontSize: 13 }} role="table" aria-label="Access by role">
-              <div className="matrix-row matrix-head" role="row">
-                <span role="columnheader">Action</span>
-                <span role="columnheader">Admin</span>
-                <span role="columnheader" title="Warehouse">
-                  Whse
-                </span>
-                <span role="columnheader" title="Production">
-                  Prod
-                </span>
-              </div>
-              <div className="list">
-                {MATRIX.map(([action, ...allowed]) => (
-                  <div key={action} className="matrix-row" role="row">
-                    <span role="cell">{action}</span>
-                    {allowed.map((yes, ix) => (
-                      <span key={ix} role="cell" className={yes ? 'matrix-yes' : 'matrix-no'} aria-label={yes ? 'Yes' : 'No'}>
-                        {yes ? '✓' : '—'}
-                      </span>
-                    ))}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
+          <Roles />
         </div>
       </div>
     </div>
+  );
+}
+
+// ── Roles ───────────────────────────────────────────────────────────────────
+
+/** Built-in roles plus the organization's own, with what each may change. Custom roles can be edited and deleted. */
+function Roles() {
+  const roles = useStore((s) => s.data.roles);
+  const users = useStore((s) => s.data.users);
+  const send = useStore((s) => s.send);
+  const [editing, setEditing] = useState<string | 'new' | null>(null);
+  const people = (id: string) => users.filter((u) => u.roleId === id).length;
+  const custom = roles.filter((r) => !r.builtIn);
+
+  async function remove(r: RoleDef) {
+    const ok = await confirmDialog({
+      title: `Delete the ${r.name} role?`,
+      body: 'This cannot be undone. Nobody has this role, so no one loses access.',
+      confirmLabel: 'Delete role',
+      danger: true,
+    });
+    if (!ok) return;
+    const res = await send(() => api.deleteRole(r.id));
+    if (res) toast(`${res.name} role deleted.`);
+  }
+
+  return (
+    <section>
+      <div className="sec-head">
+        <h2 className="eyebrow" style={{ margin: 0 }}>
+          Roles
+        </h2>
+        {editing !== 'new' && (
+          <button type="button" className="btn-link" style={{ fontSize: 13 }} onClick={() => setEditing('new')}>
+            <Icon name="plus" size={14} stroke={2.2} />
+            New role
+          </button>
+        )}
+      </div>
+      {editing === 'new' && (
+        <div style={{ marginBottom: 12 }}>
+          <RoleForm onDone={() => setEditing(null)} />
+        </div>
+      )}
+      <RoleMatrix roles={roles} />
+      <div className="role-note">Everyone can also view every screen, export to Excel and raise purchase orders.</div>
+
+      {custom.length > 0 && (
+        <div className="card flat clip list" style={{ marginTop: 12 }}>
+          {custom.map((r) =>
+            editing === r.id ? (
+              <div key={r.id} style={{ padding: 12 }}>
+                <RoleForm role={r} onDone={() => setEditing(null)} />
+              </div>
+            ) : (
+              <div key={r.id} className="role-item">
+                <span className="min0" style={{ flex: 1 }}>
+                  <span style={{ fontSize: 14, fontWeight: 700 }}>{r.name}</span>
+                  <span className="subtle" style={{ fontSize: 12 }}>
+                    {' · '}
+                    {people(r.id) === 1 ? '1 person' : `${people(r.id)} people`}
+                  </span>
+                </span>
+                <button type="button" className="btn-link" style={{ fontSize: 13 }} onClick={() => setEditing(r.id)}>
+                  <Icon name="edit" size={14} /> Edit
+                </button>
+                <button
+                  type="button"
+                  className="btn-link danger"
+                  style={{ fontSize: 13 }}
+                  onClick={() =>
+                    people(r.id)
+                      ? toast(`Give the ${people(r.id) === 1 ? 'person' : `${people(r.id)} people`} with this role another role first.`)
+                      : remove(r)
+                  }
+                >
+                  <Icon name="trash" size={14} /> Delete
+                </button>
+              </div>
+            ),
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
+/** Short column headings for the built-in roles, as before; custom roles show their own name. */
+const SHORT: Record<string, string> = { Warehouse: 'Whse', Production: 'Prod' };
+
+/** Ticks per permission (rows) and role (columns). Scrolls sideways when there are many roles. */
+function RoleMatrix({ roles }: { roles: RoleDef[] }) {
+  const cols = { gridTemplateColumns: `minmax(150px, 1fr) repeat(${roles.length}, 60px)` };
+  return (
+    <div className="card flat role-matrix" style={{ fontSize: 13 }}>
+      <div role="table" aria-label="What each role can change" style={{ minWidth: 150 + roles.length * 66 }}>
+        <div className="matrix-row matrix-head" role="row" style={cols}>
+          <span role="columnheader">Can change</span>
+          {roles.map((r) => (
+            <span key={r.id} role="columnheader" className="matrix-col" title={r.name}>
+              {SHORT[r.id] ?? r.name}
+            </span>
+          ))}
+        </div>
+        <div className="list">
+          {PERM_KEYS.map((k) => (
+            <div key={k} className="matrix-row" role="row" style={cols}>
+              <span role="cell" title={PERM_INFO[k].desc}>
+                {PERM_INFO[k].label}
+              </span>
+              {roles.map((r) => (
+                <span key={r.id} role="cell" className={`matrix-col ${r.perms[k] ? 'matrix-yes' : 'matrix-no'}`} aria-label={r.perms[k] ? 'Yes' : 'No'}>
+                  {r.perms[k] ? '✓' : '—'}
+                </span>
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Create a role, or edit a custom one: a name and a tick per permission. */
+function RoleForm({ role, onDone }: { role?: RoleDef; onDone: () => void }) {
+  const submit = useStore((s) => s.submit);
+  const [name, setName] = useState(role?.name ?? '');
+  const [perms, setPerms] = useState<Perms>(role?.perms ?? NO_PERMS);
+  const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function save(e: FormEvent) {
+    e.preventDefault();
+    if (!name.trim()) return setErr('Give the role a name.');
+    setBusy(true);
+    const res = await submit(() => (role ? api.updateRole(role.id, { name, perms }) : api.createRole({ name, perms })));
+    setBusy(false);
+    if (!res.ok) return setErr(res.fieldErrors?.name ?? res.error);
+    toast(role ? `${res.value.name} role saved.` : `${res.value.name} role created. Pick it when adding a person or from anyone's role menu.`);
+    onDone();
+  }
+
+  return (
+    <form className="card pad col" style={{ gap: 12 }} onSubmit={save} noValidate>
+      <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--strong)' }}>{role ? `Edit ${role.name}` : 'New role'}</div>
+      <FormField id={`role-name-${role?.id ?? 'new'}`} label="Role name" error={err ?? undefined}>
+        <input
+          id={`role-name-${role?.id ?? 'new'}`}
+          className="input"
+          placeholder="e.g. Store keeper, Supervisor"
+          autoComplete="off"
+          autoFocus
+          maxLength={40}
+          value={name}
+          aria-invalid={!!err}
+          onChange={(e) => {
+            setName(e.target.value);
+            setErr(null);
+          }}
+        />
+      </FormField>
+      <div>
+        <div className="field-label">What this role can change</div>
+        <div className="col" style={{ gap: 6 }}>
+          {PERM_KEYS.map((k) => (
+            <button
+              key={k}
+              type="button"
+              role="checkbox"
+              aria-checked={perms[k]}
+              className="perm-toggle"
+              onClick={() => setPerms((p) => ({ ...p, [k]: !p[k] }))}
+            >
+              <span className={`check-box${perms[k] ? ' on' : ''}`}>{perms[k] && <Icon name="check" size={13} stroke={3} />}</span>
+              <span className="col" style={{ gap: 1 }}>
+                <span style={{ fontWeight: 700 }}>{PERM_INFO[k].label}</span>
+                <span className="muted" style={{ fontSize: 12 }}>
+                  {PERM_INFO[k].desc}
+                </span>
+              </span>
+            </button>
+          ))}
+        </div>
+        {perms.team && (
+          <div className="role-warn">
+            <Icon name="alert" size={14} />
+            Team &amp; roles lets people create roles and change anyone&apos;s role, so it is as powerful as Admin.
+          </div>
+        )}
+      </div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button type="submit" className="btn btn-primary" style={{ flex: 1, height: 48, fontSize: 14 }} disabled={busy}>
+          {busy ? 'Saving…' : role ? 'Save role' : 'Create role'}
+        </button>
+        <button type="button" className="btn btn-outline" style={{ height: 48 }} onClick={onDone}>
+          Cancel
+        </button>
+      </div>
+    </form>
   );
 }
 
@@ -112,7 +272,8 @@ type Errors = Partial<Record<'name' | 'username' | 'email' | 'password', string>
 
 function AddMember({ onCancel, onCreated }: { onCancel?: () => void; onCreated: (c: { name: string; username: string; password: string }) => void }) {
   const submit = useStore((s) => s.submit);
-  const [form, setForm] = useState({ name: '', username: '', email: '', role: 'Warehouse' as Role, password: generatePassword() });
+  const roles = useStore((s) => s.data.roles);
+  const [form, setForm] = useState({ name: '', username: '', email: '', roleId: 'Warehouse', password: generatePassword() });
   const [err, setErr] = useState<Errors>({});
   const [busy, setBusy] = useState(false);
   const [touchedUsername, setTouchedUsername] = useState(false);
@@ -189,12 +350,12 @@ function AddMember({ onCancel, onCreated }: { onCancel?: () => void; onCreated: 
           Role
         </div>
         <div className="col" style={{ gap: 8 }} role="radiogroup" aria-labelledby="tm-role">
-          {(['Warehouse', 'Production', 'Admin'] as Role[]).map((r) => (
-            <button key={r} type="button" role="radio" aria-checked={form.role === r} className="radio-card" style={{ borderRadius: 12 }} onClick={() => set('role', r)}>
+          {roles.map((r) => (
+            <button key={r.id} type="button" role="radio" aria-checked={form.roleId === r.id} className="radio-card" style={{ borderRadius: 12 }} onClick={() => set('roleId', r.id)}>
               <span className="radio-dot sm" />
               <span className="col" style={{ gap: 1 }}>
-                <span style={{ fontSize: 14, fontWeight: 700 }}>{r}</span>
-                <span className="row-sub">{ROLE_DESC[r]}</span>
+                <span style={{ fontSize: 14, fontWeight: 700 }}>{r.name}</span>
+                <span className="row-sub">{roleSummary(r)}</span>
               </span>
             </button>
           ))}
@@ -265,6 +426,7 @@ function Credentials({ name, username, password, onDone }: { name: string; usern
 function Member({ u }: { u: User }) {
   const { user: me } = useCurrentUser();
   const setMemberRole = useStore((s) => s.setMemberRole);
+  const roles = useStore((s) => s.data.roles);
   const send = useStore((s) => s.send);
   const submit = useStore((s) => s.submit);
   const [resetting, setResetting] = useState<string | null>(null);
@@ -289,15 +451,15 @@ function Member({ u }: { u: User }) {
         </div>
         <select
           className="role-select"
-          value={u.role}
+          value={u.roleId}
           disabled={locked}
           title={u.isOwner ? 'The owner is always an Admin' : u.id === me.id ? "You can't change your own role" : undefined}
-          onChange={(e) => setMemberRole(u.id, e.target.value as Role)}
+          onChange={(e) => setMemberRole(u.id, e.target.value)}
           aria-label={`Role for ${u.name}`}
         >
-          {ROLES.map((r) => (
-            <option key={r} value={r}>
-              {r}
+          {roles.map((r) => (
+            <option key={r.id} value={r.id}>
+              {r.name}
             </option>
           ))}
         </select>

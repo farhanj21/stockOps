@@ -46,6 +46,26 @@ export const organizations = pgTable('organizations', {
   createdAt: createdAt(),
 });
 
+/**
+ * Roles an Admin defines on top of the built-in Admin / Warehouse / Production, each with its own
+ * set of permissions. Everyone can view everything and raise purchase orders; these gate changes.
+ */
+export const customRoles = pgTable(
+  'custom_roles',
+  {
+    id: text('id').primaryKey(),
+    organizationId: orgId(),
+    name: text('name').notNull(),
+    canStock: boolean('can_stock').notNull().default(false),
+    canReceive: boolean('can_receive').notNull().default(false),
+    canPlan: boolean('can_plan').notNull().default(false),
+    canSetup: boolean('can_setup').notNull().default(false),
+    canTeam: boolean('can_team').notNull().default(false),
+    createdAt: createdAt(),
+  },
+  (t) => [unique('custom_roles_org_name').on(t.organizationId, t.name)],
+);
+
 export const users = pgTable(
   'users',
   {
@@ -57,6 +77,8 @@ export const users = pgTable(
     email: text('email').unique(),
     passwordHash: text('password_hash').notNull(),
     role: roleEnum('role').notNull(),
+    /** Set when the person has a custom role; it then decides their permissions instead of `role`. */
+    customRoleId: text('custom_role_id').references(() => customRoles.id, { onDelete: 'set null' }),
     /** The person who created the organization. Always an Admin; can't be removed or demoted. */
     isOwner: boolean('is_owner').notNull().default(false),
     active: boolean('active').notNull().default(true),

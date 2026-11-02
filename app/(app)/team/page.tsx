@@ -6,7 +6,7 @@ export const metadata: Metadata = { title: 'Team' };
 
 export default function TeamPage() {
   return (
-    <RequirePerm perm="setup">
+    <RequirePerm perm="team">
       <Team />
     </RequirePerm>
   );

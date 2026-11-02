@@ -14,6 +14,7 @@ import { num, qu, round } from '@/lib/format';
 import { planImport, type ImportRow } from '@/lib/import-plan';
 import { buildModel } from '@/lib/mrp';
 import { normBatchNo } from '@/lib/production';
+import { isBuiltInRole, ROLES, type Perms } from '@/lib/roles';
 import type { MaterialKind, Role } from '@/lib/types';
 import { can, plantToday, requirePerm, type Actor } from './actor';
 import { AppError, isUniqueViolation } from './errors';
@@ -111,7 +112,7 @@ export async function createOrganization(
 }
 
 export async function renameOrganization(db: Db, actor: Actor, name: string) {
-  requirePerm(actor, 'setup');
+  requirePerm(actor, 'team');
   await db.update(t.organizations).set({ name: name.trim() }).where(eq(t.organizations.id, actor.organizationId));
 }
 
@@ -121,7 +122,7 @@ const LOGO_RE = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+=*$/;
 
 /** Set the organization's logo (a data: URL), or remove it with null. */
 export async function setOrganizationLogo(db: Db, actor: Actor, logo: string | null) {
-  requirePerm(actor, 'setup');
+  requirePerm(actor, 'team');
   if (logo !== null && (logo.length > MAX_LOGO_CHARS || !LOGO_RE.test(logo))) {
     throw new AppError('Use a PNG, JPG or WebP image under 300 KB.', 'invalid');
   }
@@ -176,8 +177,23 @@ async function ownMember(tx: Db | Tx, actor: Actor, userId: string) {
   return u;
 }
 
-export async function createMember(db: Db, actor: Actor, input: { name: string; username: string; email: string | null; role: Role; password: string }) {
-  requirePerm(actor, 'setup');
+/**
+ * Turn a role id from the client (a built-in name or a custom role id) into what the users row stores.
+ * Custom-role users keep a least-privilege built-in role underneath, used only if the custom role disappears.
+ */
+async function roleColumns(tx: Db | Tx, actor: Actor, roleId: string): Promise<{ role: Role; customRoleId: string | null; name: string }> {
+  if (isBuiltInRole(roleId)) return { role: roleId, customRoleId: null, name: roleId };
+  const [r] = await tx
+    .select({ id: t.customRoles.id, name: t.customRoles.name })
+    .from(t.customRoles)
+    .where(and(eq(t.customRoles.id, roleId), eq(t.customRoles.organizationId, actor.organizationId)));
+  if (!r) throw new AppError('That role no longer exists. Pick another.', 'not_found');
+  return { role: 'Production', customRoleId: r.id, name: r.name };
+}
+
+export async function createMember(db: Db, actor: Actor, input: { name: string; username: string; email: string | null; roleId: string; password: string }) {
+  requirePerm(actor, 'team');
+  const role = await roleColumns(db, actor, input.roleId);
   const username = input.username.trim().toLowerCase();
   const email = input.email?.trim().toLowerCase() || null;
   await assertLoginFree(db, username, email);
@@ -189,30 +205,105 @@ export async function createMember(db: Db, actor: Actor, input: { name: string; 
       username,
       email,
       passwordHash: await hashPassword(input.password),
-      role: input.role,
+      role: role.role,
+      customRoleId: role.customRoleId,
       createdBy: actor.userId,
     });
   } catch (e) {
     if (isUniqueViolation(e)) await assertLoginFree(db, username, email);
     throw e;
   }
-  return { name: input.name.trim(), username, role: input.role };
+  return { name: input.name.trim(), username, role: role.name };
 }
 
-export async function setMemberRole(db: Db, actor: Actor, userId: string, role: Role) {
-  requirePerm(actor, 'setup');
+export async function setMemberRole(db: Db, actor: Actor, userId: string, roleId: string) {
+  requirePerm(actor, 'team');
   await db.transaction(async (tx) => {
     const u = await ownMember(tx, actor, userId);
-    if (u.isOwner && role !== 'Admin') throw new AppError('The organization owner is always an Admin.', 'conflict');
-    if (u.id === actor.userId && role !== 'Admin') throw new AppError("You can't take Admin away from yourself. Ask another Admin.", 'conflict');
+    if (u.isOwner && roleId !== 'Admin') throw new AppError('The organization owner is always an Admin.', 'conflict');
+    if (u.id === actor.userId && roleId !== actor.roleId) throw new AppError("You can't change your own role. Ask another Admin.", 'conflict');
+    const cols = await roleColumns(tx, actor, roleId);
     // Their open sessions pick the new role up on their next request.
-    await tx.update(t.users).set({ role }).where(eq(t.users.id, userId));
+    await tx.update(t.users).set({ role: cols.role, customRoleId: cols.customRoleId }).where(eq(t.users.id, userId));
+  });
+}
+
+// ── Custom roles ────────────────────────────────────────────────────────────
+
+const permColumns = (p: Perms) => ({ canStock: p.stock, canReceive: p.receive, canPlan: p.plan, canSetup: p.setup, canTeam: p.team });
+
+/** Role names are unique per organization (ignoring case) and can't reuse a built-in name. */
+async function assertRoleNameFree(tx: Db | Tx, actor: Actor, name: string, exceptId?: string) {
+  const msg = `There is already a role called "${name}".`;
+  if (ROLES.some((r) => r.toLowerCase() === name.toLowerCase())) throw new AppError(msg, 'conflict', { name: msg });
+  const [taken] = await tx
+    .select({ id: t.customRoles.id })
+    .from(t.customRoles)
+    .where(
+      and(
+        eq(t.customRoles.organizationId, actor.organizationId),
+        eq(sql`lower(${t.customRoles.name})`, name.toLowerCase()),
+        ...(exceptId ? [ne(t.customRoles.id, exceptId)] : []),
+      ),
+    );
+  if (taken) throw new AppError(msg, 'conflict', { name: msg });
+}
+
+async function ownRole(tx: Db | Tx, actor: Actor, roleId: string) {
+  const [r] = await tx
+    .select()
+    .from(t.customRoles)
+    .where(and(eq(t.customRoles.id, roleId), eq(t.customRoles.organizationId, actor.organizationId)));
+  if (!r) throw new AppError('That role no longer exists.', 'not_found');
+  return r;
+}
+
+export async function createRole(db: Db, actor: Actor, input: { name: string; perms: Perms }) {
+  requirePerm(actor, 'team');
+  const name = input.name.trim();
+  const id = newId('role');
+  await db.transaction(async (tx) => {
+    await assertRoleNameFree(tx, actor, name);
+    await tx.insert(t.customRoles).values({ id, organizationId: actor.organizationId, name, ...permColumns(input.perms) });
+  });
+  return { id, name };
+}
+
+export async function updateRole(db: Db, actor: Actor, roleId: string, input: { name: string; perms: Perms }) {
+  requirePerm(actor, 'team');
+  const name = input.name.trim();
+  await db.transaction(async (tx) => {
+    await ownRole(tx, actor, roleId);
+    await assertRoleNameFree(tx, actor, name, roleId);
+    // Don't let someone lock themselves out of this screen.
+    if (roleId === actor.roleId && !input.perms.team) {
+      throw new AppError('You have this role, so it has to keep Team & roles. Ask another Admin to change it.', 'conflict');
+    }
+    await tx.update(t.customRoles).set({ name, ...permColumns(input.perms) }).where(eq(t.customRoles.id, roleId));
+  });
+  return { name };
+}
+
+/** Only roles nobody has can be deleted, so no one is left without a role. */
+export async function deleteRole(db: Db, actor: Actor, roleId: string) {
+  requirePerm(actor, 'team');
+  return db.transaction(async (tx) => {
+    const r = await ownRole(tx, actor, roleId);
+    const [{ n }] = await tx
+      .select({ n: count() })
+      .from(t.users)
+      .where(and(eq(t.users.customRoleId, roleId), eq(t.users.active, true)));
+    if (n > 0) throw new AppError(`${n === 1 ? '1 person has' : `${n} people have`} the ${r.name} role. Give them another role first.`, 'conflict');
+    // Removed accounts may still point at it; they can't sign in, so let go of it.
+    await tx.update(t.users).set({ customRoleId: null }).where(eq(t.users.customRoleId, roleId));
+    await tx.delete(t.customRoles).where(eq(t.customRoles.id, roleId));
+    return { name: r.name };
   });
 }
 
 /** Change someone's display name or email. Only the owner edits the owner's details. */
 export async function updateMember(db: Db, actor: Actor, userId: string, input: { name: string; email: string | null }) {
-  requirePerm(actor, 'setup');
+  requirePerm(actor, 'team');
   const u = await ownMember(db, actor, userId);
   if (u.isOwner && !actor.isOwner) throw new AppError("Only the owner can change the owner's details.", 'forbidden');
   const name = input.name.trim();
@@ -234,7 +325,7 @@ export async function updateMember(db: Db, actor: Actor, userId: string, input: 
 }
 
 export async function resetMemberPassword(db: Db, actor: Actor, userId: string, password: string) {
-  requirePerm(actor, 'setup');
+  requirePerm(actor, 'team');
   const u = await ownMember(db, actor, userId);
   if (u.isOwner && !actor.isOwner) throw new AppError("Only the owner can reset the owner's password.", 'forbidden');
   await db.update(t.users).set({ passwordHash: await hashPassword(password) }).where(eq(t.users.id, userId));
@@ -244,7 +335,7 @@ export async function resetMemberPassword(db: Db, actor: Actor, userId: string, 
 
 /** Take someone off the team: they can't sign in any more; their history stays. */
 export async function removeMember(db: Db, actor: Actor, userId: string) {
-  requirePerm(actor, 'setup');
+  requirePerm(actor, 'team');
   const u = await ownMember(db, actor, userId);
   if (u.isOwner) throw new AppError("The organization owner can't be removed.", 'conflict');
   if (u.id === actor.userId) throw new AppError("You can't remove yourself.", 'conflict');

@@ -2,9 +2,9 @@
 
 import { useRouter } from 'next/navigation';
 import { useCallback, useSyncExternalStore } from 'react';
-import { PERMS } from './roles';
+import { NO_PERMS } from './roles';
 import { useStore } from './store';
-import type { Role, User } from './types';
+import type { User } from './types';
 import { useUI, type UIState } from './ui';
 
 export type Tab = 'home' | 'stock' | 'plan' | 'orders' | 'setup' | 'team';
@@ -27,9 +27,10 @@ export function tabOf(pathname: string): Tab {
 export function useCurrentUser() {
   const me = useStore((s) => s.me);
   const users = useStore((s) => s.data.users);
-  const role: Role = me?.role ?? 'Production';
-  const user: User = users.find((u) => u.id === me?.userId) ?? { id: me?.userId ?? '', name: '—', username: '', email: '', role, isOwner: false };
-  return { user, role, baseRole: me?.baseRole ?? role, isOwner: me?.isOwner ?? false, org: me?.org ?? null, demo: me?.demo ?? false, sampleData: me?.sampleData ?? false, perms: PERMS[role] };
+  const role = me?.role ?? '';
+  const roleId = me?.roleId ?? '';
+  const user: User = users.find((u) => u.id === me?.userId) ?? { id: me?.userId ?? '', name: '—', username: '', email: '', roleId, role, isOwner: false };
+  return { user, role, roleId, isOwner: me?.isOwner ?? false, org: me?.org ?? null, demo: me?.demo ?? false, sampleData: me?.sampleData ?? false, perms: me?.perms ?? NO_PERMS };
 }
 
 /** Matches the desktop breakpoint in the stylesheets. */

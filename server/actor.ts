@@ -1,4 +1,4 @@
-import { PERMS, type Perms } from '@/lib/roles';
+import { NO_PERMS, PERMS, type Perms } from '@/lib/roles';
 import type { Role } from '@/lib/types';
 import { AppError } from './errors';
 
@@ -8,10 +8,25 @@ export interface Actor {
   organizationId: string;
   name: string;
   isOwner: boolean;
-  /** Effective role: the account's role, or the role an Admin is previewing. */
-  role: Role;
-  baseRole: Role;
+  /** Role name, for messages ("The Packer role can't …"). */
+  role: string;
+  /** Built-in role name or custom role id. */
+  roleId: string;
+  perms: Perms;
   sessionId: string;
+}
+
+/** Resolve a user row's permissions: their custom role if they have one, otherwise the built-in role. */
+export function resolveRole(
+  builtIn: Role,
+  custom: { id: string; name: string; canStock: boolean; canReceive: boolean; canPlan: boolean; canSetup: boolean; canTeam: boolean } | null,
+): Pick<Actor, 'role' | 'roleId' | 'perms'> {
+  if (!custom) return { role: builtIn, roleId: builtIn, perms: PERMS[builtIn] ?? NO_PERMS };
+  return {
+    role: custom.name,
+    roleId: custom.id,
+    perms: { stock: custom.canStock, receive: custom.canReceive, plan: custom.canPlan, setup: custom.canSetup, team: custom.canTeam },
+  };
 }
 
 const ACTION_LABEL: Record<keyof Perms, string> = {
@@ -19,9 +34,10 @@ const ACTION_LABEL: Record<keyof Perms, string> = {
   plan: 'plan or log production',
   setup: 'change recipes, materials or users',
   receive: 'receive deliveries',
+  team: 'manage the team or roles',
 };
 
-export const can = (actor: Actor, perm: keyof Perms) => PERMS[actor.role][perm];
+export const can = (actor: Actor, perm: keyof Perms) => actor.perms[perm];
 
 export function requirePerm(actor: Actor, perm: keyof Perms) {
   if (!can(actor, perm)) throw new AppError(`The ${actor.role} role can't ${ACTION_LABEL[perm]}.`, 'forbidden');

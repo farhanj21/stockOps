@@ -2,7 +2,7 @@ import 'server-only';
 import type { ChatContent } from '@/lib/assistant';
 import { PAGES } from '@/lib/assistant';
 import { fmt, num } from '@/lib/format';
-import { PERMS, ROLE_DESC, ROLES } from '@/lib/roles';
+import { roleSummary } from '@/lib/roles';
 import type { Data } from '@/lib/types';
 import { plantToday, type Actor } from './actor';
 import { AppError } from './errors';
@@ -98,7 +98,7 @@ const SETUP_TOOLS = [
         name: { type: 'string', description: 'Full name.' },
         username: { type: 'string', description: '3–32 characters: lowercase letters, numbers, dot, dash or underscore. Suggest one from the name.' },
         email: { type: 'string', description: 'Optional.' },
-        role: { type: 'string', enum: ROLES },
+        role: { type: 'string', description: 'Exact name of one of the roles listed under "Roles".' },
       },
       required: ['name', 'username', 'role'],
     },
@@ -106,7 +106,7 @@ const SETUP_TOOLS = [
 ];
 
 function toolsFor(actor: Actor) {
-  return [NAVIGATE, ...(PERMS[actor.role].setup ? SETUP_TOOLS : [])];
+  return [NAVIGATE, ...SETUP_TOOLS.filter((tool) => (tool.name === 'add_team_member' ? actor.perms.team : actor.perms.setup))];
 }
 
 // ── Prompt ──────────────────────────────────────────────────────────────────
@@ -122,13 +122,10 @@ Screens:
 - Production → Reports: monthly and yearly kg, units, cases, wastage and average cost per kg for each product, plus a month-by-month table for the year.
 - Purchase orders: suggested orders (shortfall against plans or par, rounded up to whole supplier packs). Raise a PO (adds to pipeline); "Receive" moves it from pipeline into in-hand.
 - Setup (Admin): Recipes tab (products: batch kg, units per batch, units per case, recipe lines; ingredients entered as % of batch weight, packaging as a count per batch; the formula should total 100%) and Materials tab (name, type, unit, pack type, pack size, cost Rs/unit, par level; also a spreadsheet import).
-- Team (Admin): add people with a username and a temporary password to hand over; change roles, reset passwords, remove people. There is no public sign-up.
+- Team (Admin): add people with a username and a temporary password to hand over; change roles, reset passwords, remove people. Admins can also create custom roles with their own name and permissions (count stock, receive deliveries, production, setup, team & roles). There is no public sign-up.
 - Account menu (your name: bottom of sidebar on desktop, top-right on phones): change password, install app, sign out.
 
 Numbers: total available = in-hand + pipeline; free stock = total − what committed plans need; "can produce now" = smallest (stock ÷ qty per batch) across the recipe, in whole batches; suggested order = larger of plan shortfall or par shortfall, rounded up to whole packs.
-
-Roles:
-${ROLES.map((r) => `- ${r}: ${ROLE_DESC[r]}`).join('\n')}
 
 A typical first-time setup: 1) add materials (or import the stock spreadsheet) on Setup → Materials, 2) add products and their recipes on Setup → Recipes, 3) enter current stock counts on Stock, 4) add the team on Team, 5) forecast batches on Production plan and raise POs.
 `.trim();
@@ -153,12 +150,14 @@ function summarize(data: Data) {
     prods.join('\n') || '(none yet)',
     `Planned production: ${data.forecasts.map((f) => `${f.batches} × ${prodName(f.productId)} on ${f.date}`).join('; ') || 'none'}`,
     `Open purchase orders: ${data.pos.filter((p) => p.status === 'Open').map((p) => p.id).join(', ') || 'none'}`,
+    'Roles (name: what it can do; everyone can view everything and raise POs):',
+    data.roles.map((r) => `- ${r.name}: ${roleSummary(r)}`).join('\n'),
     `Team: ${data.users.map((u) => `${u.name} (@${u.username}, ${u.role}${u.isOwner ? ', owner' : ''})`).join('; ')}`,
   ].join('\n');
 }
 
 function systemPrompt(actor: Actor, orgName: string, data: Data) {
-  const canSetup = PERMS[actor.role].setup;
+  const canSetup = actor.perms.setup;
   return `You are the StockOps assistant inside the StockOps app, helping ${actor.name} at "${orgName}". Their role is ${actor.role}${actor.isOwner ? ' (organization owner)' : ''}. Today is ${plantToday()}.
 
 Help people understand what to do in the app and do setup work for them. Users are plant staff, often not technical and often on a phone: answer briefly in plain language, short steps, no jargon. Reply in the language the person writes in.

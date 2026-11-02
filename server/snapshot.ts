@@ -4,8 +4,9 @@ import type { Db } from '@/db';
 import * as t from '@/db/schema';
 import { demoMode, sampleDataEnabled } from '@/db/seed';
 import type { Snapshot } from '@/lib/api';
+import { BUILT_IN_ROLES } from '@/lib/roles';
 import type { Data, RecipeLine } from '@/lib/types';
-import { can, type Actor } from './actor';
+import { can, resolveRole, type Actor } from './actor';
 
 /**
  * Everything one organization's app shows, in the shape the client works with.
@@ -14,7 +15,7 @@ import { can, type Actor } from './actor';
 export async function loadData(db: Db, organizationId: string, people: { all: boolean; selfId?: string } = { all: true }): Promise<Data> {
   const org = organizationId;
   const receiver = alias(t.users, 'receiver');
-  const [ingredients, products, forecasts, pos, users, batches] = await Promise.all([
+  const [ingredients, products, forecasts, pos, users, batches, customRoles] = await Promise.all([
     db.select().from(t.ingredients).where(eq(t.ingredients.organizationId, org)).orderBy(asc(t.ingredients.position), asc(t.ingredients.name)),
     db.select().from(t.products).where(eq(t.products.organizationId, org)).orderBy(asc(t.products.position), asc(t.products.name)),
     db
@@ -41,7 +42,9 @@ export async function loadData(db: Db, organizationId: string, people: { all: bo
       .leftJoin(t.users, eq(t.productionBatches.createdBy, t.users.id))
       .where(eq(t.productionBatches.organizationId, org))
       .orderBy(desc(t.productionBatches.producedOn), desc(t.productionBatches.createdAt)),
+    db.select().from(t.customRoles).where(eq(t.customRoles.organizationId, org)).orderBy(asc(t.customRoles.createdAt), asc(t.customRoles.name)),
   ]);
+  const customById = new Map(customRoles.map((r) => [r.id, r]));
 
   const productIds = products.map((p) => p.id);
   const poIds = pos.map(({ po }) => po.id);
@@ -96,13 +99,20 @@ export async function loadData(db: Db, organizationId: string, people: { all: bo
       notes: b.notes ?? '',
       by: by ?? '—',
     })),
-    users: users.map((u) => ({ id: u.id, name: u.name, username: u.username, email: u.email ?? '', role: u.role, isOwner: u.isOwner })),
+    users: users.map((u) => {
+      const r = resolveRole(u.role, (u.customRoleId && customById.get(u.customRoleId)) || null);
+      return { id: u.id, name: u.name, username: u.username, email: u.email ?? '', roleId: r.roleId, role: r.role, isOwner: u.isOwner };
+    }),
+    roles: [
+      ...BUILT_IN_ROLES,
+      ...customRoles.map((r) => ({ id: r.id, name: r.name, builtIn: false, perms: resolveRole('Production', r).perms })),
+    ],
   };
 }
 
 export async function loadSnapshot(db: Db, actor: Actor): Promise<Snapshot> {
   const [data, [org]] = await Promise.all([
-    loadData(db, actor.organizationId, { all: can(actor, 'setup'), selfId: actor.userId }),
+    loadData(db, actor.organizationId, { all: can(actor, 'team'), selfId: actor.userId }),
     db
       .select({ id: t.organizations.id, name: t.organizations.name, logoUpdatedAt: t.organizations.logoUpdatedAt })
       .from(t.organizations)
@@ -112,6 +122,6 @@ export async function loadSnapshot(db: Db, actor: Actor): Promise<Snapshot> {
   const logoUrl = org.logoUpdatedAt ? `/api/org-logo?v=${org.logoUpdatedAt.getTime()}` : null;
   return {
     data,
-    me: { userId: actor.userId, org: { id: org.id, name: org.name, logoUrl }, isOwner: actor.isOwner, role: actor.role, baseRole: actor.baseRole, demo: demoMode(), sampleData: sampleDataEnabled(), assistant: !!process.env.GEMINI_API_KEY },
+    me: { userId: actor.userId, org: { id: org.id, name: org.name, logoUrl }, isOwner: actor.isOwner, role: actor.role, roleId: actor.roleId, perms: actor.perms, demo: demoMode(), sampleData: sampleDataEnabled(), assistant: !!process.env.GEMINI_API_KEY },
   };
 }

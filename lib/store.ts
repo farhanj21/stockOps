@@ -13,7 +13,7 @@ import * as api from '@/app/actions';
 import type { ActionResult, ImportUndo, Me, Snapshot } from './api';
 import { num, round } from './format';
 import type { ImportRow } from './import-plan';
-import type { Data, Ingredient, Num, Role } from './types';
+import type { Data, Ingredient, Num } from './types';
 import { toast } from './ui';
 
 type Status = 'loading' | 'ready' | 'signed-out' | 'offline';
@@ -50,7 +50,7 @@ interface StoreState {
   /** Typed product name; saved after a short pause. */
   renameProduct: (productId: string, name: string) => void;
 
-  setMemberRole: (userId: string, role: Role) => void;
+  setMemberRole: (userId: string, roleId: string) => void;
 
   addForecast: (f: { productId: string; batches: number; date: string }) => Promise<boolean>;
   removeForecast: (id: string) => Promise<Undo | null>;
@@ -59,7 +59,7 @@ interface StoreState {
   receivePO: (id: string) => Promise<boolean>;
 }
 
-const EMPTY: Data = { ingredients: [], products: [], recipes: {}, forecasts: [], pos: [], users: [], batches: [] };
+const EMPTY: Data = { ingredients: [], products: [], recipes: {}, forecasts: [], pos: [], users: [], batches: [], roles: [] };
 const SAVE_DELAY_MS = 500;
 
 export const useStore = create<StoreState>()((set, get) => {
@@ -232,9 +232,12 @@ export const useStore = create<StoreState>()((set, get) => {
       sendLater(`batch|${productId}`, num(v) > 0 ? v : '', (n) => api.setBatchKg(productId, n));
     },
 
-    setMemberRole: (userId, role) => {
-      edit((d) => ({ users: d.users.map((u) => (u.id === userId ? { ...u, role } : u)) }));
-      void send(() => api.setMemberRole(userId, role));
+    setMemberRole: (userId, roleId) => {
+      edit((d) => {
+        const role = d.roles.find((r) => r.id === roleId)?.name ?? roleId;
+        return { users: d.users.map((u) => (u.id === userId ? { ...u, roleId, role } : u)) };
+      });
+      void send(() => api.setMemberRole(userId, roleId));
     },
 
     addForecast: async (f) => (await send(() => api.addForecast(f))) !== null,

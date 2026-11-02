@@ -97,14 +97,14 @@ describe('organizations', () => {
 
 describe('team accounts', () => {
   it('admins create accounts that can sign in straight away', async () => {
-    const res = await svc.createMember(db, admin, { name: 'Lena Fischer', username: 'LFischer', email: null, role: 'Production', password: 'temp-pass-1' });
+    const res = await svc.createMember(db, admin, { name: 'Lena Fischer', username: 'LFischer', email: null, roleId: 'Production', password: 'temp-pass-1' });
     expect(res).toEqual({ name: 'Lena Fischer', username: 'lfischer', role: 'Production' });
     const u = await svc.authenticate(db, 'lfischer', 'temp-pass-1');
     expect(u).toMatchObject({ organizationId: orgId, role: 'Production', isOwner: false, createdBy: admin.userId });
   });
 
   it('only admins manage the team', async () => {
-    const input = { name: 'X', username: 'xxx', email: null, role: 'Admin' as const, password: '12345678' };
+    const input = { name: 'X', username: 'xxx', email: null, roleId: 'Admin', password: '12345678' };
     await forbidden(svc.createMember(db, warehouse, input));
     await forbidden(svc.createMember(db, production, input));
     await forbidden(svc.setMemberRole(db, warehouse, warehouse.userId, 'Admin'));
@@ -113,7 +113,7 @@ describe('team accounts', () => {
   });
 
   it('protects the owner and stops admins locking themselves out', async () => {
-    const other = await svc.createMember(db, admin, { name: 'Second Admin', username: 'admin2', email: null, role: 'Admin', password: '12345678' });
+    const other = await svc.createMember(db, admin, { name: 'Second Admin', username: 'admin2', email: null, roleId: 'Admin', password: '12345678' });
     const admin2 = await actorFor(db, other.username);
     await expect(svc.setMemberRole(db, admin2, admin.userId, 'Warehouse')).rejects.toMatchObject({ code: 'conflict' });
     await expect(svc.removeMember(db, admin2, admin.userId)).rejects.toMatchObject({ code: 'conflict' });
@@ -134,7 +134,7 @@ describe('team accounts', () => {
     await svc.removeMember(db, admin, production.userId);
     await expect(svc.authenticate(db, 'pnair', PASSWORD)).rejects.toThrow('Incorrect username or password.');
     // The username is free again and their plans keep their name.
-    await svc.createMember(db, admin, { name: 'Priya N', username: 'pnair', email: null, role: 'Production', password: '12345678' });
+    await svc.createMember(db, admin, { name: 'Priya N', username: 'pnair', email: null, roleId: 'Production', password: '12345678' });
     expect((await loadData(db, orgId)).forecasts[0].by).toBe('Priya Nair');
   });
 
@@ -152,7 +152,7 @@ describe('team accounts', () => {
     await svc.updateMember(db, admin, warehouse.userId, { name: 'Mateo Silva', email: null });
 
     await forbidden(svc.updateMember(db, warehouse, production.userId, { name: 'X', email: null }));
-    const other = await svc.createMember(db, admin, { name: 'Second Admin', username: 'admin2', email: null, role: 'Admin', password: '12345678' });
+    const other = await svc.createMember(db, admin, { name: 'Second Admin', username: 'admin2', email: null, roleId: 'Admin', password: '12345678' });
     await forbidden(svc.updateMember(db, await actorFor(db, other.username), admin.userId, { name: 'Not the owner', email: null }));
   });
 
@@ -167,6 +167,71 @@ describe('team accounts', () => {
     expect((await svc.authenticate(db, 'msilva@plant1.co', PASSWORD)).id).toBe(warehouse.userId);
     await expect(svc.authenticate(db, 'areyes', 'wrong')).rejects.toThrow('Incorrect username or password.');
     await expect(svc.authenticate(db, 'nobody', PASSWORD)).rejects.toThrow('Incorrect username or password.');
+  });
+});
+
+describe('custom roles', () => {
+  const NONE = { stock: false, receive: false, plan: false, setup: false, team: false };
+
+  it('admins create a role, give it to someone, and its permissions apply', async () => {
+    const { id } = await svc.createRole(db, admin, { name: 'Store keeper', perms: { ...NONE, stock: true, receive: true } });
+    const res = await svc.createMember(db, admin, { name: 'Sam Store', username: 'sam', email: null, roleId: id, password: '12345678' });
+    expect(res.role).toBe('Store keeper');
+
+    const sam = await actorFor(db, 'sam');
+    expect(sam).toMatchObject({ role: 'Store keeper', roleId: id, perms: { stock: true, receive: true, plan: false, setup: false, team: false } });
+    const sugar = await material(db, orgId, SUGAR);
+    await svc.stepStock(db, sam, sugar.id, 'inHand', 1);
+    await forbidden(svc.updateMaterial(db, sam, sugar.id, { par: 1 }));
+    await forbidden(svc.createRole(db, sam, { name: 'Boss', perms: { ...NONE, team: true } }));
+
+    const snap = await loadSnapshot(db, admin);
+    expect(snap.data.roles.map((r) => r.name)).toEqual(['Admin', 'Warehouse', 'Production', 'Store keeper']);
+    expect(snap.data.users.find((u) => u.username === 'sam')).toMatchObject({ roleId: id, role: 'Store keeper' });
+    expect((await loadSnapshot(db, sam)).me).toMatchObject({ role: 'Store keeper', perms: { stock: true, team: false } });
+
+    // Editing the role changes what its people can do on their next request.
+    await svc.updateRole(db, admin, id, { name: 'Stores', perms: { ...NONE, plan: true } });
+    expect(await actorFor(db, 'sam')).toMatchObject({ role: 'Stores', perms: { stock: false, plan: true } });
+
+    // Back to a built-in role.
+    await svc.setMemberRole(db, admin, sam.userId, 'Warehouse');
+    expect(await actorFor(db, 'sam')).toMatchObject({ role: 'Warehouse', roleId: 'Warehouse', perms: { stock: true } });
+  });
+
+  it('role names are unique, including the built-in ones', async () => {
+    await svc.createRole(db, admin, { name: 'Supervisor', perms: NONE });
+    await expect(svc.createRole(db, admin, { name: 'supervisor', perms: NONE })).rejects.toMatchObject({ code: 'conflict' });
+    await expect(svc.createRole(db, admin, { name: 'admin', perms: NONE })).rejects.toMatchObject({ code: 'conflict' });
+  });
+
+  it('a role in use cannot be deleted', async () => {
+    const { id } = await svc.createRole(db, admin, { name: 'Packer', perms: NONE });
+    await svc.setMemberRole(db, admin, warehouse.userId, id);
+    await expect(svc.deleteRole(db, admin, id)).rejects.toMatchObject({ code: 'conflict' });
+    await svc.setMemberRole(db, admin, warehouse.userId, 'Warehouse');
+    await svc.deleteRole(db, admin, id);
+    expect((await loadSnapshot(db, admin)).data.roles.some((r) => r.id === id)).toBe(false);
+  });
+
+  it('people with Team & roles cannot lock themselves out', async () => {
+    const { id } = await svc.createRole(db, admin, { name: 'Office', perms: { ...NONE, team: true } });
+    await svc.setMemberRole(db, admin, warehouse.userId, id);
+    const office = await actorFor(db, 'msilva');
+    await expect(svc.updateRole(db, office, id, { name: 'Office', perms: NONE })).rejects.toMatchObject({ code: 'conflict' });
+    await expect(svc.setMemberRole(db, office, office.userId, 'Production')).rejects.toMatchObject({ code: 'conflict' });
+    // Setup is separate from Team: this role can manage people but not recipes.
+    await forbidden(svc.updateMaterial(db, office, (await material(db, orgId, SUGAR)).id, { par: 1 }));
+    await svc.setMemberRole(db, office, production.userId, 'Warehouse');
+  });
+
+  it("roles from another organization can't be used", async () => {
+    const other = await svc.createOrganization(db, { orgName: 'Other', name: 'Olga', email: 'olga@example.com', username: 'olga', password: '12345678', sample: false });
+    const olga = await actorFor(db, 'olga');
+    expect(olga.userId).toBe(other.userId);
+    const { id } = await svc.createRole(db, olga, { name: 'Theirs', perms: NONE });
+    await expect(svc.setMemberRole(db, admin, warehouse.userId, id)).rejects.toMatchObject({ code: 'not_found' });
+    await expect(svc.deleteRole(db, admin, id)).rejects.toMatchObject({ code: 'not_found' });
   });
 });
 
@@ -401,7 +466,7 @@ describe('spreadsheet import', () => {
 describe('sample data', () => {
   it('the owner can swap everything for the sample plant; the team stays', async () => {
     await svc.generatePO(db, admin, []);
-    await svc.createMember(db, admin, { name: 'Sam', username: 'sam', email: null, role: 'Warehouse', password: '12345678' });
+    await svc.createMember(db, admin, { name: 'Sam', username: 'sam', email: null, roleId: 'Warehouse', password: '12345678' });
     await forbidden(svc.replaceWithSample(db, warehouse));
     await svc.replaceWithSample(db, admin);
     const d = await loadData(db, orgId);

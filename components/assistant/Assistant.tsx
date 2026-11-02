@@ -9,7 +9,7 @@ import { fmt, num, round } from '@/lib/format';
 import { useCurrentUser, useGo, type Tab } from '@/lib/hooks';
 import { generatePassword } from '@/lib/password-gen';
 import { useStore } from '@/lib/store';
-import type { Data, Role } from '@/lib/types';
+import type { Data } from '@/lib/types';
 import { toast } from '@/lib/ui';
 
 /**
@@ -90,7 +90,7 @@ export function Assistant() {
           go(page);
           k[keyOf(ci, pi)] = { status: 'done', summary: `Opened ${PAGES[page]}`, response: { ok: true } };
         } else k[keyOf(ci, pi)] = { status: 'failed', error: 'Unknown screen', response: { ok: false, error: 'Unknown page' } };
-      } else if (isWrite(p.functionCall.name) && perms.setup) k[keyOf(ci, pi)] = { status: 'pending' };
+      } else if (isWrite(p.functionCall.name) && (p.functionCall.name === 'add_team_member' ? perms.team : perms.setup)) k[keyOf(ci, pi)] = { status: 'pending' };
       else k[keyOf(ci, pi)] = { status: 'failed', error: "Your role can't do that.", response: { ok: false, error: `The ${role} role can't do this.` } };
     });
     commit(all, k);
@@ -393,7 +393,9 @@ async function runTool(fc: FunctionCall, data: Data): Promise<{ summary: string;
     case 'add_team_member': {
       const password = generatePassword();
       const username = str(a.username).toLowerCase();
-      await must(() => api.createMember({ name: str(a.name), username, email: str(a.email), role: str(a.role) as Role, password }));
+      const role = data.roles.find((r) => r.name.toLowerCase() === str(a.role).trim().toLowerCase());
+      if (!role) throw new Error(`There is no role called "${str(a.role)}". Roles: ${data.roles.map((r) => r.name).join(', ')}.`);
+      await must(() => api.createMember({ name: str(a.name), username, email: str(a.email), roleId: role.id, password }));
       return {
         summary: `Created ${str(a.name)}'s account`,
         credentials: { username, password },

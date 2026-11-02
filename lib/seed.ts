@@ -1,4 +1,5 @@
 import { round } from './format';
+import { BUILT_IN_ROLES } from './roles';
 import type { Data, RecipeLine } from './types';
 
 /** Recipe from a batch weight and % mix lines, plus fixed per-batch packaging counts. */
@@ -66,11 +67,12 @@ export function seed(): Data {
     ],
     // Batches already made (Aug–Oct 2026), for the production reports. Material cost is filled in when loaded.
     batches: sampleBatches(),
+    roles: BUILT_IN_ROLES,
     users: [
-      { id: 'u1', name: 'Ana Reyes', username: 'areyes', email: 'areyes@plant1.co', role: 'Admin', isOwner: true },
-      { id: 'u2', name: 'Marco Silva', username: 'msilva', email: 'msilva@plant1.co', role: 'Warehouse', isOwner: false },
-      { id: 'u3', name: 'Priya Nair', username: 'pnair', email: 'pnair@plant1.co', role: 'Production', isOwner: false },
-      { id: 'u4', name: 'Tom Okafor', username: 'tokafor', email: 'tokafor@plant1.co', role: 'Warehouse', isOwner: false },
+      { id: 'u1', name: 'Ana Reyes', username: 'areyes', email: 'areyes@plant1.co', roleId: 'Admin', role: 'Admin', isOwner: true },
+      { id: 'u2', name: 'Marco Silva', username: 'msilva', email: 'msilva@plant1.co', roleId: 'Warehouse', role: 'Warehouse', isOwner: false },
+      { id: 'u3', name: 'Priya Nair', username: 'pnair', email: 'pnair@plant1.co', roleId: 'Production', role: 'Production', isOwner: false },
+      { id: 'u4', name: 'Tom Okafor', username: 'tokafor', email: 'tokafor@plant1.co', roleId: 'Warehouse', role: 'Warehouse', isOwner: false },
     ],
   };
 }

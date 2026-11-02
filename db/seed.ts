@@ -1,4 +1,5 @@
 import { and, eq, inArray } from 'drizzle-orm';
+import type { Role } from '@/lib/types';
 import { seed as sampleData } from '@/lib/seed';
 import { hashPassword } from '@/server/password';
 import { newId } from './ids';
@@ -145,7 +146,7 @@ export async function createDemoOrganization(db: Db, password = DEMO_PASSWORD) {
         username: u.username,
         email: u.email,
         passwordHash,
-        role: u.role,
+        role: u.roleId as Role,
         isOwner: u.isOwner,
       })),
     );

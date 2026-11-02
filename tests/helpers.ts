@@ -3,7 +3,8 @@ import { openPglite, type Db } from '@/db';
 import * as t from '@/db/schema';
 import { createDemoOrganization } from '@/db/seed';
 import type { Role } from '@/lib/types';
-import type { Actor } from '@/server/actor';
+import { PERMS } from '@/lib/roles';
+import { resolveRole, type Actor } from '@/server/actor';
 
 export const PASSWORD = 'test-pass-123';
 
@@ -16,11 +17,15 @@ export async function freshDb() {
 
 /** Acting user for a demo account username (areyes = owner/Admin, msilva = Warehouse, pnair = Production). */
 export async function actorFor(db: Db, username: string): Promise<Actor> {
-  const [u] = await db.select().from(t.users).where(eq(t.users.username, username));
-  return { userId: u.id, organizationId: u.organizationId, name: u.name, isOwner: u.isOwner, role: u.role, baseRole: u.role, sessionId: 'test' };
+  const [{ u, custom }] = await db
+    .select({ u: t.users, custom: t.customRoles })
+    .from(t.users)
+    .leftJoin(t.customRoles, eq(t.users.customRoleId, t.customRoles.id))
+    .where(eq(t.users.username, username));
+  return { userId: u.id, organizationId: u.organizationId, name: u.name, isOwner: u.isOwner, ...resolveRole(u.role, custom), sessionId: 'test' };
 }
 
-export const as = (a: Actor, role: Role): Actor => ({ ...a, role });
+export const as = (a: Actor, role: Role): Actor => ({ ...a, role, roleId: role, perms: PERMS[role] });
 
 /** A material of the actor's organization, by name. */
 export async function material(db: Db, orgId: string, name: string) {

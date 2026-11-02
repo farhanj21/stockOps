@@ -10,7 +10,7 @@ import { getDb, type Db } from '@/db';
 import type { ActionResult, ImportUndo, Snapshot } from '@/lib/api';
 import { EMAIL_RE } from '@/lib/format';
 import { MATERIAL_KINDS } from '@/lib/types';
-import { ROLES } from '@/lib/roles';
+import type { Perms } from '@/lib/roles';
 import type { Actor } from '@/server/actor';
 import { AppError } from '@/server/errors';
 import * as svc from '@/server/services';
@@ -24,7 +24,10 @@ const Id = z.string().min(1).max(120);
 const Qty = z.number().finite().min(0).max(1e9);
 const Count = z.number().int().min(0).max(1e6);
 const Field = z.enum(['inHand', 'pipeline']);
-const RoleZ = z.enum(ROLES as [string, ...string[]]).transform((r) => r as (typeof ROLES)[number]);
+/** A built-in role name or a custom role id; the service checks it belongs to the organization. */
+const RoleId = z.string().min(1, 'Pick a role.').max(120);
+const RoleName = z.string().trim().min(1, 'Give the role a name.').max(40, 'Keep the name under 40 characters.');
+const PermsZ = z.object({ stock: z.boolean(), receive: z.boolean(), plan: z.boolean(), setup: z.boolean(), team: z.boolean() });
 const Name = z.string().trim().min(1, 'This field is required.').max(120);
 const Email = z.string().trim().toLowerCase().regex(EMAIL_RE, 'Enter a valid email address.').max(200);
 const Username = z
@@ -265,16 +268,34 @@ export async function setBatchKg(productId: string, kg: number) {
 
 // ── Team ────────────────────────────────────────────────────────────────────
 
-export async function createMember(form: { name: string; username: string; email: string; role: string; password: string }) {
+export async function createMember(form: { name: string; username: string; email: string; roleId: string; password: string }) {
   const parsed = z
-    .object({ name: Name, username: Username, email: z.union([z.literal(''), Email]), role: RoleZ, password: Password })
+    .object({ name: Name, username: Username, email: z.union([z.literal(''), Email]), roleId: RoleId, password: Password })
     .safeParse(form);
   if (!parsed.success) return fieldFail(parsed.error);
   return act((db, actor) => svc.createMember(db, actor, { ...parsed.data, email: parsed.data.email || null }));
 }
 
-export async function setMemberRole(userId: string, role: string) {
-  return act((db, actor) => svc.setMemberRole(db, actor, Id.parse(userId), RoleZ.parse(role)));
+export async function setMemberRole(userId: string, roleId: string) {
+  return act((db, actor) => svc.setMemberRole(db, actor, Id.parse(userId), RoleId.parse(roleId)));
+}
+
+// ── Roles ───────────────────────────────────────────────────────────────────
+
+export async function createRole(form: { name: string; perms: Perms }) {
+  const parsed = z.object({ name: RoleName, perms: PermsZ }).safeParse(form);
+  if (!parsed.success) return fieldFail(parsed.error);
+  return act((db, actor) => svc.createRole(db, actor, parsed.data));
+}
+
+export async function updateRole(id: string, form: { name: string; perms: Perms }) {
+  const parsed = z.object({ name: RoleName, perms: PermsZ }).safeParse(form);
+  if (!parsed.success) return fieldFail(parsed.error);
+  return act((db, actor) => svc.updateRole(db, actor, Id.parse(id), parsed.data));
+}
+
+export async function deleteRole(id: string) {
+  return act((db, actor) => svc.deleteRole(db, actor, Id.parse(id)));
 }
 
 export async function updateMember(userId: string, form: { name: string; email: string }) {

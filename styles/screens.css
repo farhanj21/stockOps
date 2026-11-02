@@ -718,6 +718,65 @@
   color: var(--line-2);
 }
 
+/* Roles on the Team screen */
+.role-note {
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.role-matrix {
+  overflow-x: auto;
+}
+.matrix-col {
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.role-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+}
+.perm-toggle {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--hover);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.45;
+  text-align: left;
+  cursor: pointer;
+}
+.perm-toggle .check-box {
+  flex: none;
+  margin-top: 1px;
+}
+.role-warn {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--warn-bg);
+  color: var(--warn);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.role-warn svg {
+  flex: none;
+  margin-top: 1px;
+}
+
 /* ── Setup editing, team, onboarding ─────────────────────────────────── */
 
 .grid3 {
