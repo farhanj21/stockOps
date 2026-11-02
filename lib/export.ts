@@ -1,0 +1,132 @@
+import { num, round, today } from './format';
+import { batchMetrics, type ProductionTotals } from './production';
+import type { Model } from './mrp';
+import type { Batch, PurchaseOrder } from './types';
+
+/**
+ * Excel exports. Every sheet is a plain list of rows (one object per row, keys are the column
+ * headers) so it opens cleanly in Excel / Google Sheets and numbers stay numbers.
+ */
+
+type Row = Record<string, string | number>;
+export interface ExportSheet {
+  name: string;
+  rows: Row[];
+}
+
+const loadXlsx = () => import('xlsx');
+
+/** Build the workbook in the browser and hand it to the person as a download. */
+export async function downloadWorkbook(file: string, sheets: ExportSheet[]) {
+  const XLSX = await loadXlsx();
+  const wb = XLSX.utils.book_new();
+  for (const s of sheets) {
+    // An empty sheet still gets its headers so it's clear what it would hold.
+    const ws = s.rows.length ? XLSX.utils.json_to_sheet(s.rows) : XLSX.utils.aoa_to_sheet([['No rows']]);
+    if (s.rows.length) ws['!cols'] = Object.keys(s.rows[0]).map((k) => ({ wch: Math.min(40, Math.max(10, k.length + 2, ...s.rows.map((r) => String(r[k] ?? '').length + 1))) }));
+    // Excel sheet names: max 31 chars, no : \ / ? * [ ]
+    XLSX.utils.book_append_sheet(wb, ws, s.name.replace(/[:\\/?*[\]]/g, ' ').slice(0, 31));
+  }
+  XLSX.writeFile(wb, `StockOps-${file}-${today()}.xlsx`);
+}
+
+const r2 = (n: number) => Math.round(n * 100) / 100;
+const kindLabel = (k: string) => (k === 'packaging' ? 'Packaging' : k === 'utility' ? 'Utility' : 'Ingredient');
+
+// ── Stock & materials ───────────────────────────────────────────────────────
+
+/** Current stock position per material, including what plans need and the gap to par. */
+export function stockRows(m: Model, only?: (id: string) => boolean): Row[] {
+  return m.ings
+    .filter((i) => !only || only(i.id))
+    .map((i) => {
+      const total = m.total(i);
+      return {
+        Material: i.name,
+        Type: kindLabel(i.kind),
+        Unit: i.unit,
+        'Pack size': num(i.pack),
+        Pack: i.packName,
+        'In-hand': round(num(i.inHand)),
+        Pipeline: round(num(i.pipeline)),
+        Total: round(total),
+        'Par level': round(num(i.par)),
+        'Short of par': round(m.shortOf(i)),
+        Status: m.isLow(i) ? 'Below par' : 'At par',
+        'Allocated to plans': round(m.allocOf(i)),
+        'Free after plans': round(m.free(i)),
+        'Cost per unit (Rs)': r2(num(i.cost)),
+        'Stock value (Rs)': r2(total * num(i.cost)),
+      };
+    });
+}
+
+// ── Purchase orders ─────────────────────────────────────────────────────────
+
+/** PO items don't store a price, so value is at today's material prices. */
+export const poValue = (m: Model, po: PurchaseOrder) => po.lines.reduce((a, l) => a + l.qty * num(m.byId[l.ing]?.cost), 0);
+
+/** One row per item ordered, with the order's own details repeated on each row so it filters and sorts cleanly. */
+export function poItemRows(m: Model, pos: PurchaseOrder[]): Row[] {
+  return pos.flatMap((po) =>
+    po.lines.map((l) => {
+      const i = m.byId[l.ing];
+      return {
+        'PO no.': po.id,
+        Status: po.status === 'Open' ? 'In transit' : 'Received',
+        'Order date': po.date,
+        'Ordered by': po.by,
+        'Received date': po.received ?? '',
+        'Received by': po.receivedBy ?? '',
+        Item: i?.name ?? 'Deleted material',
+        Type: i ? kindLabel(i.kind) : '',
+        'Packs ordered': l.packs,
+        'Pack size': i ? num(i.pack) : '',
+        'Pack type': i?.packName ?? '',
+        Quantity: round(l.qty),
+        Unit: i?.unit ?? '',
+        'Price per unit (Rs, current)': i ? r2(num(i.cost)) : '',
+        'Value (Rs, current prices)': r2(l.qty * num(i?.cost)),
+      };
+    }),
+  );
+}
+
+export const poSheets = (m: Model, pos: PurchaseOrder[]): ExportSheet[] => [{ name: 'Purchase orders', rows: poItemRows(m, pos) }];
+
+// ── Production ──────────────────────────────────────────────────────────────
+
+export function batchRows(m: Model, batches: Batch[]): Row[] {
+  return batches.map((b) => {
+    const x = batchMetrics(b);
+    return {
+      'Batch no.': b.batchNo,
+      Date: b.date,
+      Product: m.prodById[b.productId]?.name ?? '',
+      'Planned kg': round(b.plannedKg),
+      'Kg made': round(b.actualKg),
+      'Wastage kg': round(x.wastageKg),
+      'Wastage %': r2(x.wastagePct),
+      Units: b.units,
+      Cases: b.cases,
+      'Material cost (Rs)': r2(b.materialCost),
+      'Cost per kg (Rs)': r2(x.costPerKg),
+      'Logged by': b.by,
+      Notes: b.notes,
+    };
+  });
+}
+
+/** A totals table from the reports screen (by product, or month by month). */
+export function totalsRows(first: string, rows: { label: string; t: ProductionTotals }[], total: { label: string; t: ProductionTotals }): Row[] {
+  return [...rows, total].map(({ label, t }) => ({
+    [first]: label,
+    Batches: t.batches,
+    'Kg made': round(t.actualKg),
+    Units: t.units,
+    Cases: t.cases,
+    'Wastage kg': round(t.wastageKg),
+    'Wastage %': r2(t.wastagePct),
+    'Avg cost per kg (Rs)': r2(t.costPerKg),
+  }));
+}

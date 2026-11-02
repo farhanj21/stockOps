@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Icon } from '@/components/Icon';
 import { SHOW_COST } from '@/lib/config';
+import { downloadWorkbook, poSheets } from '@/lib/export';
 import { fmt, fmtDate, inputVal, money, num, plural, qu } from '@/lib/format';
 import { useCurrentUser } from '@/lib/hooks';
 import { useModel } from '@/lib/model';
@@ -59,7 +60,7 @@ export function Orders() {
     setBusy(null);
     if (!po) return;
     setUI({ poExcluded: {}, poPacks: {}, poExtra: [] });
-    toast(`${po.id} created · ${plural(po.lines, 'line')} added to pipeline.`);
+    toast(`${po.id} created · ${plural(po.lines, 'item')} added to pipeline.`);
   }
 
   async function receive(id: string) {
@@ -91,7 +92,7 @@ export function Orders() {
             <div className="card clip">
               <div className="po-intro">
                 {m.suggestions.length
-                  ? 'Suggested lines cover plans and par levels. Change the number of packs, remove what you don\'t need with ×, or add any other material.'
+                  ? 'Suggested items cover plans and par levels. Change the number of packs, remove what you don\'t need with ×, or add any other material.'
                   : 'Stock covers every plan and par level, so nothing is suggested. You can still order any material below.'}
               </div>
               <div className="list">
@@ -128,7 +129,7 @@ export function Orders() {
             </div>
             <div className="commit-summary tnum">
               <span>
-                {plural(toOrder.length, 'line')} to order
+                {plural(toOrder.length, 'item')} to order
               </span>
               {SHOW_COST && <span style={{ color: 'var(--strong)' }}>{money(poCost)}</span>}
             </div>
@@ -150,9 +151,10 @@ export function Orders() {
               {m.openPOs.map((po) => (
                 <div key={po.id} className="card pad">
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                    <span className="serif" style={{ fontSize: 19, color: 'var(--strong)' }}>
+                    <button type="button" className="btn-link serif" style={{ fontSize: 19, color: 'var(--strong)' }} onClick={() => openPo(po.id)} aria-label={`${po.id}, view details`}>
                       {po.id}
-                    </span>
+                      <Icon name="chevronRight" size={14} color="var(--subtle)" />
+                    </button>
                     <span className="pill xs info">In transit</span>
                   </div>
                   <div className="muted" style={{ marginTop: 2, fontSize: 12 }}>
@@ -191,30 +193,110 @@ export function Orders() {
             )}
           </section>
 
-          <section>
-            <div className="sec-head">
-              <h2 className="eyebrow" style={{ margin: 0 }}>
-                Received
-              </h2>
-            </div>
-            <div className="card flat clip list">
-              {m.receivedPOs.map((po) => (
-                <div key={po.id} className="row compact">
-                  <span className="row-main">
-                    <span className="row-title">{po.id}</span>
-                    <span className="row-sub">
-                      {plural(po.lines.length, 'line')} · received {fmtDate(po.received)}
-                    </span>
-                  </span>
-                  <span className="pill xs ok">Received</span>
-                </div>
-              ))}
-              {!m.receivedPOs.length && <div className="empty-inline">No deliveries received yet.</div>}
-            </div>
-          </section>
+          <ReceivedHistory />
         </div>
       </div>
     </div>
+  );
+}
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const monthName = (ym: string) => `${MONTHS[Number(ym.slice(5, 7)) - 1]} ${ym.slice(0, 4)}`;
+const PAGE = 8;
+
+const openPo = (id: string) => useUI.getState().openSheet('po', id);
+
+/** Every delivery received, newest first: search by PO number or material, filter by month, open for detail, export. */
+function ReceivedHistory() {
+  const m = useModel();
+  const [q, setQ] = useState('');
+  const [month, setMonth] = useState('');
+  const [limit, setLimit] = useState(PAGE);
+
+  const all = m.receivedPOs
+    .slice()
+    .sort((a, b) => String(b.received ?? b.date).localeCompare(String(a.received ?? a.date)) || b.id.localeCompare(a.id));
+  const months = [...new Set(all.map((po) => (po.received ?? po.date).slice(0, 7)))];
+  const needle = q.trim().toLowerCase();
+  const rows = all.filter(
+    (po) =>
+      (!month || (po.received ?? po.date).startsWith(month)) &&
+      (!needle || po.id.toLowerCase().includes(needle) || po.lines.some((l) => m.byId[l.ing]?.name.toLowerCase().includes(needle))),
+  );
+  const shownRows = rows.slice(0, limit);
+
+  const exportRows = () => {
+    const label = month ? `received-POs-${month}` : 'received-POs';
+    downloadWorkbook(label, poSheets(m, rows)).catch(() => toast("Couldn't build the export."));
+  };
+
+  return (
+    <section>
+      <div className="sec-head">
+        <h2 className="eyebrow" style={{ margin: 0 }}>
+          Received
+        </h2>
+        {all.length > 0 && (
+          <button type="button" className="btn-link" style={{ fontSize: 13 }} onClick={exportRows}>
+            <Icon name="download" size={14} />
+            Export{q || month ? ' filtered' : ''}
+          </button>
+        )}
+      </div>
+      {all.length > 3 && (
+        <div className="report-bar" style={{ marginBottom: 10 }}>
+          <input
+            className="input"
+            type="search"
+            placeholder="PO no. or material"
+            aria-label="Search received orders"
+            value={q}
+            onChange={(e) => {
+              setQ(e.target.value);
+              setLimit(PAGE);
+            }}
+          />
+          <select
+            className="input"
+            aria-label="Month received"
+            value={month}
+            onChange={(e) => {
+              setMonth(e.target.value);
+              setLimit(PAGE);
+            }}
+          >
+            <option value="">All months</option>
+            {months.map((x) => (
+              <option key={x} value={x}>
+                {monthName(x)}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+      <div className="card flat clip list">
+        {shownRows.map((po) => (
+          <button key={po.id} type="button" className="row compact" onClick={() => openPo(po.id)} aria-label={`${po.id}, view details`}>
+            <span className="row-main">
+              <span className="row-title">{po.id}</span>
+              <span className="row-sub">
+                {plural(po.lines.length, 'item')} · received {fmtDate(po.received)}
+                {po.receivedBy ? ` by ${po.receivedBy}` : ''}
+              </span>
+            </span>
+            <span className="pill xs ok">Received</span>
+            <Icon name="chevronRight" size={14} color="var(--subtle)" />
+          </button>
+        ))}
+        {!all.length && <div className="empty-inline">No deliveries received yet.</div>}
+        {all.length > 0 && !rows.length && <div className="empty-inline">No received orders match.</div>}
+      </div>
+      {rows.length > shownRows.length && (
+        <button type="button" className="btn btn-outline" style={{ width: '100%', marginTop: 10 }} onClick={() => setLimit((n) => n + PAGE * 3)}>
+          Show more · {rows.length - shownRows.length} older
+        </button>
+      )}
+    </section>
   );
 }
 

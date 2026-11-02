@@ -69,6 +69,8 @@ export interface PurchaseOrder {
   date: string;
   status: 'Open' | 'Received';
   received?: string;
+  /** Who marked it received. */
+  receivedBy?: string;
   by: string;
   lines: PoLine[];
 }

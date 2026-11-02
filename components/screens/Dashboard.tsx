@@ -98,14 +98,14 @@ export function Dashboard() {
             <span className="kpi-v" style={{ color: 'var(--warn)' }}>
               {m.suggestions.length}
             </span>
-            <span className="kpi-m">{SHOW_COST ? `${money(suggestCost)} est. at pack sizes` : 'lines ready to order'}</span>
+            <span className="kpi-m">{SHOW_COST ? `${money(suggestCost)} est. at pack sizes` : 'items ready to order'}</span>
           </button>
           <button type="button" className="kpi" onClick={() => go('orders')}>
             <span className="kpi-k">In transit</span>
             <span className="kpi-v" style={{ color: 'var(--info)' }}>
               {m.openPOs.length}
             </span>
-            <span className="kpi-m">{m.openPOs.length ? `${openLines} lines on order` : 'nothing on order'}</span>
+            <span className="kpi-m">{m.openPOs.length ? `${plural(openLines, 'item')} on order` : 'nothing on order'}</span>
           </button>
           <button type="button" className="kpi dark" onClick={() => perms.plan && go('plan')}>
             <span className="kpi-k">Committed batches</span>
@@ -268,7 +268,7 @@ export function Dashboard() {
                         Placed {fmtDate(po.date)} · {po.by}
                       </span>
                     </span>
-                    <span className="pill xs info">{plural(po.lines.length, 'line')}</span>
+                    <span className="pill xs info">{plural(po.lines.length, 'item')}</span>
                   </div>
                 ))}
                 {!m.openPOs.length && <div className="empty-inline">No orders in transit.</div>}

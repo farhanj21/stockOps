@@ -130,7 +130,7 @@ export function buildModel(d: Data) {
   );
 
   const openPOs = d.pos.filter((p) => p.status === 'Open');
-  const receivedPOs = d.pos.filter((p) => p.status === 'Received').slice(0, 4);
+  const receivedPOs = d.pos.filter((p) => p.status === 'Received');
   const nextPoId = 'PO-' + (Math.max(2039, ...d.pos.map((p) => parseInt(String(p.id).replace(/\D/g, ''), 10) || 0)) + 1);
 
   return {

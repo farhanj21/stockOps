@@ -3,11 +3,12 @@
 import { useState } from 'react';
 import { Icon } from '@/components/Icon';
 import { SHOW_COST } from '@/lib/config';
+import { batchRows, downloadWorkbook, totalsRows } from '@/lib/export';
 import { fmt, fmtDate, money, plural, qu } from '@/lib/format';
 import { useModel } from '@/lib/model';
 import { batchMetrics, byMonth, byProduct, inPeriod, periodsWithData, totals, type ProductionTotals } from '@/lib/production';
 import type { Batch } from '@/lib/types';
-import { useUI } from '@/lib/ui';
+import { toast, useUI } from '@/lib/ui';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const monthName = (ym: string) => `${MONTHS[Number(ym.slice(5, 7)) - 1]} ${ym.slice(0, 4)}`;
@@ -66,7 +67,19 @@ export function BatchRecords() {
             </option>
           ))}
         </select>
-        <button type="button" className="btn btn-primary" onClick={() => openBatch()}>
+        <button
+          type="button"
+          className="btn btn-outline"
+          disabled={!rows.length}
+          onClick={() =>
+            downloadWorkbook(month ? `batches-${month}` : 'batches', [{ name: 'Batches', rows: batchRows(m, rows) }]).catch(() =>
+              toast("Couldn't build the export."),
+            )
+          }
+        >
+          <Icon name="download" size={16} /> Export
+        </button>
+        <button type="button" className="btn btn-primary" style={{ marginLeft: 0 }} onClick={() => openBatch()}>
           <Icon name="plus" size={16} stroke={2.2} /> Log a batch
         </button>
       </div>
@@ -212,6 +225,33 @@ export function ProductionReports() {
             </option>
           ))}
         </select>
+        <button
+          type="button"
+          className="btn btn-outline"
+          onClick={() =>
+            downloadWorkbook(`production-report-${period}`, [
+              {
+                name: `By product ${label}`,
+                rows: totalsRows(
+                  'Product',
+                  rows.map((r) => ({ label: r.product.name, t: r })),
+                  { label: 'Total', t },
+                ),
+              },
+              {
+                name: `Month by month ${year}`,
+                rows: totalsRows(
+                  'Month',
+                  trend.map((r) => ({ label: monthName(r.month), t: r })),
+                  { label: `Year ${year}`, t: trendTotal },
+                ),
+              },
+              { name: `Batches ${label}`, rows: batchRows(m, inIt) },
+            ]).catch(() => toast("Couldn't build the export."))
+          }
+        >
+          <Icon name="download" size={16} /> Export report
+        </button>
       </div>
 
       <div className="kpi-grid tnum">

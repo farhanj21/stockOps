@@ -1,4 +1,5 @@
 import { and, asc, desc, eq, gt, inArray, isNull } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import type { Db } from '@/db';
 import * as t from '@/db/schema';
 import { demoMode, sampleDataEnabled } from '@/db/seed';
@@ -12,6 +13,7 @@ import { can, type Actor } from './actor';
  */
 export async function loadData(db: Db, organizationId: string, people: { all: boolean; selfId?: string } = { all: true }): Promise<Data> {
   const org = organizationId;
+  const receiver = alias(t.users, 'receiver');
   const [ingredients, products, forecasts, pos, users, batches] = await Promise.all([
     db.select().from(t.ingredients).where(eq(t.ingredients.organizationId, org)).orderBy(asc(t.ingredients.position), asc(t.ingredients.name)),
     db.select().from(t.products).where(eq(t.products.organizationId, org)).orderBy(asc(t.products.position), asc(t.products.name)),
@@ -22,9 +24,10 @@ export async function loadData(db: Db, organizationId: string, people: { all: bo
       .where(and(eq(t.forecasts.organizationId, org), isNull(t.forecasts.deletedAt), gt(t.forecasts.batches, 0)))
       .orderBy(asc(t.forecasts.targetDate), asc(t.forecasts.createdAt)),
     db
-      .select({ po: t.purchaseOrders, by: t.users.name })
+      .select({ po: t.purchaseOrders, by: t.users.name, receivedBy: receiver.name })
       .from(t.purchaseOrders)
       .leftJoin(t.users, eq(t.purchaseOrders.createdBy, t.users.id))
+      .leftJoin(receiver, eq(t.purchaseOrders.receivedBy, receiver.id))
       .where(eq(t.purchaseOrders.organizationId, org))
       .orderBy(desc(t.purchaseOrders.placedOn), desc(t.purchaseOrders.createdAt)),
     db
@@ -70,11 +73,12 @@ export async function loadData(db: Db, organizationId: string, people: { all: bo
     recipes,
     forecasts: forecasts.map(({ f, by }) => ({ id: f.id, productId: f.productId, batches: f.batches, date: f.targetDate, by: by ?? '—' })),
     // People see the PO code (PO-2041); it is unique within the organization, so it doubles as the id.
-    pos: pos.map(({ po, by }) => ({
+    pos: pos.map(({ po, by, receivedBy }) => ({
       id: po.code,
       date: po.placedOn,
       status: po.status,
       received: po.receivedOn ?? undefined,
+      receivedBy: receivedBy ?? undefined,
       by: by ?? '—',
       lines: poLines.filter((l) => l.poId === po.id).map((l) => ({ ing: l.ingredientId, packs: l.packs, qty: l.qty })),
     })),

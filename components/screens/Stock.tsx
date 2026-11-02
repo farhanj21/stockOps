@@ -4,12 +4,13 @@ import type { ChangeEvent } from 'react';
 import { Icon } from '@/components/Icon';
 import { useStockSummary } from '@/components/shell/AppShell';
 import { useOpeners } from '@/components/sheets/openers';
+import { downloadWorkbook, stockRows } from '@/lib/export';
 import { cap1, fmt, inputVal, num, qu } from '@/lib/format';
 import { useCurrentUser } from '@/lib/hooks';
 import { useModel } from '@/lib/model';
 import { useStore } from '@/lib/store';
 import type { Ingredient } from '@/lib/types';
-import { useUI, type StockFilter } from '@/lib/ui';
+import { toast, useUI, type StockFilter } from '@/lib/ui';
 
 type Field = 'inHand' | 'pipeline';
 
@@ -48,6 +49,13 @@ export function Stock() {
   const setField = (id: string, field: Field) => (e: ChangeEvent<HTMLInputElement>) =>
     update(id, { [field]: inputVal(e.target.value) });
 
+  const exportStock = () => {
+    const ids = new Set(rows.map((r) => r.i.id));
+    downloadWorkbook(filter === 'all' ? 'stock' : `stock-${filter}`, [{ name: 'Stock', rows: stockRows(m, (id) => ids.has(id)) }]).catch(() =>
+      toast("Couldn't build the export."),
+    );
+  };
+
   const openImport = () => {
     setUI({ imp: { stage: 'pick' } });
     openSheet('import');
@@ -63,6 +71,9 @@ export function Stock() {
           </h1>
           <div className="page-sub">{summary}</div>
         </div>
+        <button type="button" className="btn btn-outline" style={{ flex: 'none', padding: '0 12px' }} onClick={exportStock} aria-label="Export stock to Excel" disabled={!rows.length}>
+          <Icon name="download" size={16} />
+        </button>
         {perms.stock && (
           <button type="button" className="btn btn-outline" style={{ flex: 'none', padding: '0 14px' }} onClick={openImport}>
             <Icon name="upload" size={16} />
@@ -79,6 +90,10 @@ export function Stock() {
             </button>
           ))}
         </div>
+        <button type="button" className="btn btn-outline w-only" style={{ flex: 'none', padding: '0 14px' }} onClick={exportStock} disabled={!rows.length}>
+          <Icon name="download" size={16} />
+          Export
+        </button>
         {perms.stock && (
           <button type="button" className="btn btn-outline w-only" style={{ flex: 'none', padding: '0 14px' }} onClick={openImport}>
             <Icon name="upload" size={16} />

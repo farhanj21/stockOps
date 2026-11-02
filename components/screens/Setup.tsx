@@ -4,7 +4,8 @@ import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type Keyb
 import * as api from '@/app/actions';
 import { FormField } from '@/components/FormField';
 import { Icon } from '@/components/Icon';
-import { cap1, fmt, inputVal, money, num, plural, qu, round } from '@/lib/format';
+import { cap1, fmt, inputVal, money, num, plural, qu, round, today } from '@/lib/format';
+import { downloadTemplate } from '@/lib/importer';
 import { useModel } from '@/lib/model';
 import { useStore } from '@/lib/store';
 import type { MaterialKind } from '@/lib/types';
@@ -532,6 +533,16 @@ function Materials() {
             <Icon name="upload" size={16} />
             Import Excel
           </button>
+          {materials.length > 0 && (
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={() => downloadTemplate(materials, today()).catch(() => toast("Couldn't build the export."))}
+            >
+              <Icon name="download" size={16} />
+              Export Excel
+            </button>
+          )}
         </div>
       </div>
 
