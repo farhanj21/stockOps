@@ -4,9 +4,9 @@ import { Icon, type IconName } from '@/components/Icon';
 import { useGreeting } from '@/components/shell/AppShell';
 import { SearchBox, SearchResultsPage } from '@/components/shell/Search';
 import { useOpeners } from '@/components/sheets/openers';
-import { ALERT_STYLE, SHOW_COST } from '@/lib/config';
+import { ALERT_STYLE } from '@/lib/config';
 import { fmt, fmtDate, money, num, plural, qu } from '@/lib/format';
-import { useCurrentUser, useGo } from '@/lib/hooks';
+import { useCurrentUser, useGo, useShowCost } from '@/lib/hooks';
 import { useModel } from '@/lib/model';
 import { isBuiltInRole, type Perms } from '@/lib/roles';
 import type { Role } from '@/lib/types';
@@ -60,6 +60,7 @@ function quickActionsFor(roleId: string, perms: Perms): QuickAction[] {
 }
 
 export function Dashboard() {
+  const SHOW_COST = useShowCost();
   const m = useModel();
   const { roleId, perms } = useCurrentUser();
   const go = useGo();

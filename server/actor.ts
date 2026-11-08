@@ -19,13 +19,13 @@ export interface Actor {
 /** Resolve a user row's permissions: their custom role if they have one, otherwise the built-in role. */
 export function resolveRole(
   builtIn: Role,
-  custom: { id: string; name: string; canStock: boolean; canReceive: boolean; canPlan: boolean; canSetup: boolean; canTeam: boolean } | null,
+  custom: { id: string; name: string; canStock: boolean; canReceive: boolean; canPlan: boolean; canSetup: boolean; canTeam: boolean; canCosts: boolean } | null,
 ): Pick<Actor, 'role' | 'roleId' | 'perms'> {
   if (!custom) return { role: builtIn, roleId: builtIn, perms: PERMS[builtIn] ?? NO_PERMS };
   return {
     role: custom.name,
     roleId: custom.id,
-    perms: { stock: custom.canStock, receive: custom.canReceive, plan: custom.canPlan, setup: custom.canSetup, team: custom.canTeam },
+    perms: { stock: custom.canStock, receive: custom.canReceive, plan: custom.canPlan, setup: custom.canSetup, team: custom.canTeam, costs: custom.canCosts },
   };
 }
 
@@ -35,6 +35,7 @@ const ACTION_LABEL: Record<keyof Perms, string> = {
   setup: 'change recipes, materials or users',
   receive: 'receive deliveries',
   team: 'manage the team or roles',
+  costs: 'see costs',
 };
 
 export const can = (actor: Actor, perm: keyof Perms) => actor.perms[perm];

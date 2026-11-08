@@ -1,7 +1,7 @@
 'use client';
 
 import { fmt, money, num, plural, qu } from '@/lib/format';
-import { useCurrentUser, useGo } from '@/lib/hooks';
+import { useCurrentUser, useGo, useShowCost } from '@/lib/hooks';
 import { useModel } from '@/lib/model';
 import { Cells, SheetHeader } from './Sheet';
 import { useOpeners } from './openers';
@@ -9,6 +9,7 @@ import { useOpeners } from './openers';
 export function ProductSheet({ id }: { id: string }) {
   const m = useModel();
   const { perms } = useCurrentUser();
+  const showCost = useShowCost();
   const go = useGo();
   const { openMat } = useOpeners();
   const p = m.prodById[id];
@@ -46,7 +47,7 @@ export function ProductSheet({ id }: { id: string }) {
             ['Units / batch', fmt(num(p.upb))],
             ['Units / case', fmt(num(p.upc))],
             ['Cases / batch', fmt(m.perCase(p))],
-            ['Material cost / batch', money(m.batchCost(p))],
+            ...(showCost ? [['Material cost / batch', money(m.batchCost(p))] as [string, string]] : []),
           ]}
         />
         <div>

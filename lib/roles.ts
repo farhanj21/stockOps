@@ -16,9 +16,11 @@ export interface Perms {
   setup: boolean;
   /** Team accounts, roles, organization name and logo. */
   team: boolean;
+  /** See material costs (batch cost, cost per kg, cost per case). */
+  costs: boolean;
 }
 
-export const PERM_KEYS: (keyof Perms)[] = ['stock', 'receive', 'plan', 'setup', 'team'];
+export const PERM_KEYS: (keyof Perms)[] = ['stock', 'receive', 'plan', 'setup', 'team', 'costs'];
 
 /** Plain-language labels for the role editor and the "what each role can do" list. */
 export const PERM_INFO: Record<keyof Perms, { label: string; desc: string }> = {
@@ -27,14 +29,15 @@ export const PERM_INFO: Record<keyof Perms, { label: string; desc: string }> = {
   plan: { label: 'Production', desc: 'Plan batches and log batches made' },
   setup: { label: 'Setup', desc: 'Products, recipes, materials, costs and par levels' },
   team: { label: 'Team & roles', desc: 'Add or remove people, change roles, organization name and logo' },
+  costs: { label: 'See costs', desc: 'View material cost of batches, cost per kg and cost per case' },
 };
 
-export const NO_PERMS: Perms = { stock: false, receive: false, plan: false, setup: false, team: false };
+export const NO_PERMS: Perms = { stock: false, receive: false, plan: false, setup: false, team: false, costs: false };
 
 export const PERMS: Record<Role, Perms> = {
-  Admin: { stock: true, receive: true, plan: true, setup: true, team: true },
-  Warehouse: { stock: true, receive: true, plan: false, setup: false, team: false },
-  Production: { stock: false, receive: false, plan: true, setup: false, team: false },
+  Admin: { stock: true, receive: true, plan: true, setup: true, team: true, costs: true },
+  Warehouse: { stock: true, receive: true, plan: false, setup: false, team: false, costs: false },
+  Production: { stock: false, receive: false, plan: true, setup: false, team: false, costs: false },
 };
 
 export const isBuiltInRole = (id: string): id is Role => (ROLES as string[]).includes(id);

@@ -2,16 +2,16 @@
 
 import { useState } from 'react';
 import { Icon } from '@/components/Icon';
-import { SHOW_COST } from '@/lib/config';
 import { downloadWorkbook, poSheets } from '@/lib/export';
 import { fmt, fmtDate, inputVal, money, num, plural, qu } from '@/lib/format';
-import { useCurrentUser } from '@/lib/hooks';
+import { useCurrentUser, useShowCost } from '@/lib/hooks';
 import { useModel } from '@/lib/model';
 import { useStore } from '@/lib/store';
 import type { Ingredient, Num, PoLine } from '@/lib/types';
 import { toast, useUI } from '@/lib/ui';
 
 export function Orders() {
+  const SHOW_COST = useShowCost();
   const m = useModel();
   const { perms } = useCurrentUser();
   const [busy, setBusy] = useState<string | null>(null);
@@ -317,6 +317,7 @@ const REASON: Record<DraftLine['reason'], [string, string]> = {
 
 /** One line of the draft order: tick, pack count (− n +), and what that comes to. */
 function PoDraftRow({ line, onPacks, onRemove }: { line: DraftLine; onPacks: (v: Num) => void; onRemove: () => void }) {
+  const SHOW_COST = useShowCost();
   const { i } = line;
   const packs = Math.max(0, Math.floor(num(line.packs)));
   const qty = packs * num(i.pack);

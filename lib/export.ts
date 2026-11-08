@@ -1,4 +1,6 @@
+import { SHOW_COST } from './config';
 import { num, round, today } from './format';
+import { useStore } from './store';
 import { batchMetrics, type ProductionTotals } from './production';
 import type { Model } from './mrp';
 import type { Batch, PurchaseOrder } from './types';
@@ -20,6 +22,9 @@ const loadXlsx = () => import('xlsx');
 export async function downloadWorkbook(file: string, sheets: ExportSheet[]) {
   const XLSX = await loadXlsx();
   const wb = XLSX.utils.book_new();
+  // Rs columns only go to people whose role has "See costs".
+  const costs = SHOW_COST && (useStore.getState().me?.perms.costs ?? false);
+  if (!costs) sheets = sheets.map((s) => ({ ...s, rows: s.rows.map((r) => Object.fromEntries(Object.entries(r).filter(([k]) => !k.includes('(Rs')))) }));
   for (const s of sheets) {
     // An empty sheet still gets its headers so it's clear what it would hold.
     const ws = s.rows.length ? XLSX.utils.json_to_sheet(s.rows) : XLSX.utils.aoa_to_sheet([['No rows']]);
@@ -110,6 +115,7 @@ export function batchRows(m: Model, batches: Batch[]): Row[] {
       Units: b.units,
       Cases: b.cases,
       'Material cost (Rs)': r2(b.materialCost),
+      'Wastage cost (Rs)': r2(x.wastageCost),
       'Cost per kg (Rs)': r2(x.costPerKg),
       'Logged by': b.by,
       Notes: b.notes,
@@ -127,6 +133,8 @@ export function totalsRows(first: string, rows: { label: string; t: ProductionTo
     Cases: t.cases,
     'Wastage kg': round(t.wastageKg),
     'Wastage %': r2(t.wastagePct),
+    'Material cost (Rs)': r2(t.materialCost),
+    'Wastage cost (Rs)': r2(t.wastageCost),
     'Avg cost per kg (Rs)': r2(t.costPerKg),
   }));
 }

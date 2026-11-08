@@ -36,6 +36,13 @@
       "when": 1793604655176,
       "tag": "0004_custom_roles",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794147170967,
+      "tag": "0005_role_costs",
+      "breakpoints": true
     }
   ]
 }

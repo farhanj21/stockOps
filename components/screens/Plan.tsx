@@ -2,9 +2,8 @@
 
 import { useState } from 'react';
 import { Icon } from '@/components/Icon';
-import { SHOW_COST } from '@/lib/config';
 import { daysFromToday, fmt, fmtDate, inputVal, money, num, plural, qu } from '@/lib/format';
-import { useCurrentUser, useGo } from '@/lib/hooks';
+import { useCurrentUser, useGo, useShowCost } from '@/lib/hooks';
 import { packTxt, useModel } from '@/lib/model';
 import { useStore } from '@/lib/store';
 import { toast, useUI, type PlanTab } from '@/lib/ui';
@@ -70,6 +69,7 @@ function NoProducts() {
 }
 
 function Planner() {
+  const SHOW_COST = useShowCost();
   const m = useModel();
   const go = useGo();
   const [busy, setBusy] = useState(false);

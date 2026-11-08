@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from 'react';
 import { logBatch, updateBatch } from '@/app/actions';
 import { FormField } from '@/components/FormField';
-import { SHOW_COST } from '@/lib/config';
+import { useShowCost } from '@/lib/hooks';
 import { fmt, fmtDate, money, num, plural, qu, today } from '@/lib/format';
 import { useModel } from '@/lib/model';
 import { batchMetrics, suggestBatchNo } from '@/lib/production';
@@ -23,6 +23,7 @@ export function BatchSheet({ batchId }: { batchId?: string }) {
 }
 
 function BatchForm({ editingId }: { editingId?: string }) {
+  const SHOW_COST = useShowCost();
   const m = useModel();
   const submit = useStore((s) => s.submit);
   const ui = useUI();

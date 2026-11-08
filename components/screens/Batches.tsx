@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Icon } from '@/components/Icon';
-import { SHOW_COST } from '@/lib/config';
+import { useShowCost } from '@/lib/hooks';
 import { batchRows, downloadWorkbook, totalsRows } from '@/lib/export';
 import { fmt, fmtDate, money, plural, qu } from '@/lib/format';
 import { useModel } from '@/lib/model';
@@ -40,6 +40,7 @@ function NoBatches({ filtered }: { filtered?: boolean }) {
 
 /** Every batch made, newest first, filterable by product and month. */
 export function BatchRecords() {
+  const SHOW_COST = useShowCost();
   const m = useModel();
   const [product, setProduct] = useState('');
   const [month, setMonth] = useState('');
@@ -155,6 +156,7 @@ export function BatchRecords() {
 }
 
 function BatchCard({ b }: { b: Batch }) {
+  const SHOW_COST = useShowCost();
   const m = useModel();
   const x = batchMetrics(b);
   return (
@@ -185,6 +187,7 @@ function BatchCard({ b }: { b: Batch }) {
 
 /** Monthly and yearly production per product: kg, units, cases, wastage and average cost per kg. */
 export function ProductionReports() {
+  const SHOW_COST = useShowCost();
   const m = useModel();
   const all = m.data.batches;
   const { months, years } = periodsWithData(all);
@@ -263,6 +266,8 @@ export function ProductionReports() {
         {SHOW_COST && <Kpi k="Avg cost / kg" v={money(t.costPerKg)} />}
       </div>
 
+      {SHOW_COST && <WastageSummary label={label} t={t} rows={rows} batches={inIt} />}
+
       <section>
         <div className="sec-head">
           <h2 className="eyebrow" style={{ margin: 0 }}>
@@ -301,6 +306,92 @@ export function ProductionReports() {
   );
 }
 
+/**
+ * Where the money went: material spent, how much of it was lost as wastage, and the products
+ * and batches that lost the most. Only shown to roles with "See costs".
+ */
+function WastageSummary({
+  label,
+  t,
+  rows,
+  batches,
+}: {
+  label: string;
+  t: ProductionTotals;
+  rows: (ProductionTotals & { product: { id: string; name: string } })[];
+  batches: Batch[];
+}) {
+  const m = useModel();
+  const idealPerKg = t.plannedKg > 0 ? t.materialCost / t.plannedKg : 0;
+  const lossByProduct = rows.filter((r) => r.wastageCost > 0).sort((a, b) => b.wastageCost - a.wastageCost).slice(0, 5);
+  const worstBatches = batches
+    .map((b) => ({ b, x: batchMetrics(b) }))
+    .filter(({ x }) => x.wastageKg > 0)
+    .sort((a, b) => b.x.wastageCost - a.x.wastageCost)
+    .slice(0, 5);
+
+  return (
+    <section className="card pad col" style={{ gap: 14 }}>
+      <div>
+        <h2 className="eyebrow" style={{ margin: 0 }}>
+          Wastage &amp; cost · {label}
+        </h2>
+        <div className="subtle" style={{ fontSize: 12, marginTop: 4 }}>
+          Wastage is the recipe&apos;s batch weight minus the kg actually made. Its cost is the share of each batch&apos;s material cost that was lost.
+        </div>
+      </div>
+
+      <div className="kpi-grid tnum">
+        <Kpi k="Material used" v={money(t.materialCost)} />
+        <Kpi k="Lost to wastage" v={money(t.wastageCost)} />
+        <Kpi k="Kg wasted" v={`${qu(t.wastageKg, 'kg')} · ${pct(t.wastagePct)}`} />
+        <Kpi k="Cost / kg, no wastage" v={money(idealPerKg)} />
+        <Kpi k="Cost / kg, actual" v={money(t.costPerKg)} />
+        <Kpi k="Extra cost / kg" v={money(Math.max(0, t.costPerKg - idealPerKg))} />
+      </div>
+
+      {lossByProduct.length > 0 && (
+        <div>
+          <div className="field-label sm">Biggest losses by product</div>
+          <div className="list">
+            {lossByProduct.map((r) => (
+              <div key={r.product.id} className="row" style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '8px 0' }}>
+                <span className="row-title">{r.product.name}</span>
+                <span className="tnum muted" style={{ fontSize: 13 }}>
+                  {qu(r.wastageKg, 'kg')} · {pct(r.wastagePct)} · <strong style={{ color: 'var(--danger)' }}>{money(r.wastageCost)}</strong>
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {worstBatches.length > 0 && (
+        <div>
+          <div className="field-label sm">Batches that lost the most</div>
+          <div className="list">
+            {worstBatches.map(({ b, x }) => (
+              <button key={b.id} type="button" className="row" style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '8px 0', width: '100%' }} onClick={() => openBatch(b.id)}>
+                <span className="row-main" style={{ textAlign: 'left' }}>
+                  <span className="row-title">{b.batchNo}</span>
+                  <span className="row-sub">
+                    {m.prodById[b.productId]?.name ?? '—'} · {fmtDate(b.date)}
+                  </span>
+                </span>
+                <span className="tnum muted" style={{ fontSize: 13 }}>
+                  {qu(x.wastageKg, 'kg')} · {pct(x.wastagePct)} · <strong style={{ color: 'var(--danger)' }}>{money(x.wastageCost)}</strong>
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {t.wastageKg <= 0 && <div className="muted" style={{ fontSize: 13 }}>No wastage recorded in this period.</div>}
+    </section>
+  );
+}
+
 function Kpi({ k, v }: { k: string; v: string }) {
   return (
     <div className="cell">
@@ -321,6 +412,7 @@ function TotalsTable({
   total: ProductionTotals;
   totalLabel?: string;
 }) {
+  const SHOW_COST = useShowCost();
   const dash = (n: number, s: string) => (n ? s : '—');
   return (
     <div className="card clip report-wrap">

@@ -1,0 +1,1 @@
+ALTER TABLE "custom_roles" ADD COLUMN "can_costs" boolean DEFAULT false NOT NULL;

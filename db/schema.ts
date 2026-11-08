@@ -61,6 +61,7 @@ export const customRoles = pgTable(
     canPlan: boolean('can_plan').notNull().default(false),
     canSetup: boolean('can_setup').notNull().default(false),
     canTeam: boolean('can_team').notNull().default(false),
+    canCosts: boolean('can_costs').notNull().default(false),
     createdAt: createdAt(),
   },
   (t) => [unique('custom_roles_org_name').on(t.organizationId, t.name)],

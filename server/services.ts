@@ -230,7 +230,7 @@ export async function setMemberRole(db: Db, actor: Actor, userId: string, roleId
 
 // ── Custom roles ────────────────────────────────────────────────────────────
 
-const permColumns = (p: Perms) => ({ canStock: p.stock, canReceive: p.receive, canPlan: p.plan, canSetup: p.setup, canTeam: p.team });
+const permColumns = (p: Perms) => ({ canStock: p.stock, canReceive: p.receive, canPlan: p.plan, canSetup: p.setup, canTeam: p.team, canCosts: p.costs });
 
 /** Role names are unique per organization (ignoring case) and can't reuse a built-in name. */
 async function assertRoleNameFree(tx: Db | Tx, actor: Actor, name: string, exceptId?: string) {

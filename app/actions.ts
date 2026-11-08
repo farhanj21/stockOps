@@ -27,7 +27,7 @@ const Field = z.enum(['inHand', 'pipeline']);
 /** A built-in role name or a custom role id; the service checks it belongs to the organization. */
 const RoleId = z.string().min(1, 'Pick a role.').max(120);
 const RoleName = z.string().trim().min(1, 'Give the role a name.').max(40, 'Keep the name under 40 characters.');
-const PermsZ = z.object({ stock: z.boolean(), receive: z.boolean(), plan: z.boolean(), setup: z.boolean(), team: z.boolean() });
+const PermsZ = z.object({ stock: z.boolean(), receive: z.boolean(), plan: z.boolean(), setup: z.boolean(), team: z.boolean(), costs: z.boolean() });
 const Name = z.string().trim().min(1, 'This field is required.').max(120);
 const Email = z.string().trim().toLowerCase().regex(EMAIL_RE, 'Enter a valid email address.').max(200);
 const Username = z

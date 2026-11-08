@@ -2,10 +2,9 @@
 
 import { useState } from 'react';
 import { Icon } from '@/components/Icon';
-import { SHOW_COST } from '@/lib/config';
 import { poValue } from '@/lib/export';
 import { fmt, fmtDate, money, num, plural, qu } from '@/lib/format';
-import { useCurrentUser } from '@/lib/hooks';
+import { useCurrentUser, useShowCost } from '@/lib/hooks';
 import { useModel } from '@/lib/model';
 import { useStore } from '@/lib/store';
 import { confirmDialog, toast, useUI } from '@/lib/ui';
@@ -14,6 +13,7 @@ import { useOpeners } from './openers';
 
 /** Full detail of one purchase order, open or already received. */
 export function PoSheet({ id }: { id: string }) {
+  const SHOW_COST = useShowCost();
   const m = useModel();
   const { openMat } = useOpeners();
   const { perms } = useCurrentUser();

@@ -271,13 +271,14 @@
   background: var(--fill);
 }
 .step-input {
-  width: 76px;
+  width: 120px;
   flex: none;
   height: 44px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  text-align: center;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+  text-align: right;
   font: inherit;
   font-size: 18px;
   font-weight: 700;
@@ -314,7 +315,7 @@
 }
 .st-stepper {
   display: grid;
-  grid-template-columns: 40px minmax(0, 1fr) 40px;
+  grid-template-columns: minmax(0, 1fr);
   align-items: center;
   height: 40px;
   border: 1px solid var(--line);
@@ -347,8 +348,9 @@
   height: 100%;
   padding: 0;
   border: 0;
+  padding: 0 12px;
   background: transparent;
-  text-align: center;
+  text-align: right;
   font: inherit;
   font-size: 14px;
   font-weight: 700;
@@ -786,6 +788,16 @@
 }
 @media (max-width: 520px) {
   .grid3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.grid4 {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+@media (max-width: 720px) {
+  .grid4 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

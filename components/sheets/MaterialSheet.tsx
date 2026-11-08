@@ -1,7 +1,7 @@
 'use client';
 
 import { money, num, plural, qu } from '@/lib/format';
-import { useCurrentUser, useGo } from '@/lib/hooks';
+import { useCurrentUser, useGo, useShowCost } from '@/lib/hooks';
 import { useModel } from '@/lib/model';
 import { Cells, SheetHeader } from './Sheet';
 import { useOpeners } from './openers';
@@ -9,6 +9,7 @@ import { useOpeners } from './openers';
 export function MaterialSheet({ id }: { id: string }) {
   const m = useModel();
   const { perms } = useCurrentUser();
+  const showCost = useShowCost();
   const go = useGo();
   const { openProd } = useOpeners();
   const i = m.byId[id];
@@ -45,8 +46,12 @@ export function MaterialSheet({ id }: { id: string }) {
             ['Pack size', `${qu(num(i.pack), i.unit)} ${i.packName}`],
             ['Allocated to plans', qu(m.allocOf(i), i.unit)],
             ['Free after plans', qu(m.free(i), i.unit)],
-            ['Cost / ' + i.unit, money(num(i.cost))],
-            ['Stock value', money(t * num(i.cost))],
+            ...(showCost
+              ? ([
+                  ['Cost / ' + i.unit, money(num(i.cost))],
+                  ['Stock value', money(t * num(i.cost))],
+                ] as [string, string][])
+              : []),
           ]}
         />
         <div>

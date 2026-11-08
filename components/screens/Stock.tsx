@@ -5,7 +5,7 @@ import { Icon } from '@/components/Icon';
 import { useStockSummary } from '@/components/shell/AppShell';
 import { useOpeners } from '@/components/sheets/openers';
 import { downloadWorkbook, stockRows } from '@/lib/export';
-import { cap1, fmt, inputVal, num, qu } from '@/lib/format';
+import { cap1, inputVal, num, qu } from '@/lib/format';
 import { useCurrentUser } from '@/lib/hooks';
 import { useModel } from '@/lib/model';
 import { useStore } from '@/lib/store';
@@ -20,7 +20,6 @@ export function Stock() {
   const filter = useUI((s) => s.stockFilter);
   const setUI = useUI((s) => s.set);
   const openSheet = useUI((s) => s.openSheet);
-  const step = useStore((s) => s.stepIngredient);
   const update = useStore((s) => s.updateIngredient);
   const { openMat } = useOpeners();
   const summary = useStockSummary();
@@ -123,7 +122,7 @@ export function Stock() {
               <button type="button" className="stock-name" onClick={() => openMat(i.id)}>
                 <span className="row-title">{i.name}</span>
                 <span className="subtle" style={{ fontSize: 12 }}>
-                  − / + adds or removes one {qu(num(i.pack), i.unit)} {i.packName}
+                  {cap1(i.packName)} · {qu(num(i.pack), i.unit)}
                 </span>
               </button>
               {low ? <span className="pill danger">−{qu(m.shortOf(i), i.unit)}</span> : <span className="pill ok">At par</span>}
@@ -138,14 +137,6 @@ export function Stock() {
                         {field === 'inHand' ? `${i.unit} on site` : 'ordered, not received'}
                       </span>
                     </span>
-                    <button
-                      type="button"
-                      className="step-btn"
-                      aria-label={`Remove one ${i.packName} from ${field === 'inHand' ? 'in-hand' : 'pipeline'}`}
-                      onClick={() => step(i.id, field, -1)}
-                    >
-                      −{fmt(num(i.pack))}
-                    </button>
                     <input
                       type="number"
                       inputMode="decimal"
@@ -155,14 +146,7 @@ export function Stock() {
                       onChange={setField(i.id, field)}
                       aria-label={`${i.name} ${field === 'inHand' ? 'in-hand' : 'pipeline'} quantity`}
                     />
-                    <button
-                      type="button"
-                      className="step-btn"
-                      aria-label={`Add one ${i.packName} to ${field === 'inHand' ? 'in-hand' : 'pipeline'}`}
-                      onClick={() => step(i.id, field, 1)}
-                    >
-                      +{fmt(num(i.pack))}
-                    </button>
+                    <span className="subtle" style={{ fontSize: 12, width: 28 }}>{i.unit}</span>
                   </div>
                 ))}
               </div>
@@ -217,13 +201,6 @@ export function Stock() {
                   {(['inHand', 'pipeline'] as const).map((field) =>
                     perms.stock ? (
                       <div key={field} className="st-stepper" role="cell">
-                        <button
-                          type="button"
-                          aria-label={`Remove one ${i.packName} from ${field === 'inHand' ? 'in-hand' : 'pipeline'}`}
-                          onClick={() => step(i.id, field, -1)}
-                        >
-                          −{fmt(num(i.pack))}
-                        </button>
                         <input
                           type="number"
                           inputMode="decimal"
@@ -232,13 +209,6 @@ export function Stock() {
                           onChange={setField(i.id, field)}
                           aria-label={`${i.name} ${field === 'inHand' ? 'in-hand' : 'pipeline'} quantity`}
                         />
-                        <button
-                          type="button"
-                          aria-label={`Add one ${i.packName} to ${field === 'inHand' ? 'in-hand' : 'pipeline'}`}
-                          onClick={() => step(i.id, field, 1)}
-                        >
-                          +{fmt(num(i.pack))}
-                        </button>
                       </div>
                     ) : (
                       <span key={field} className="tnum" style={{ fontSize: 14, fontWeight: 600 }} role="cell">

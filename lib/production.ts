@@ -4,6 +4,7 @@
  * - Wastage = the recipe's batch weight − the kg actually produced.
  * - Cost per kg (after wastage) = the batch's material cost ÷ the kg actually produced,
  *   so losses push the real cost per kg up.
+ * - Wastage cost = the batch's material cost × the share of its weight that was lost.
  * - Period averages are weighted by kg: total material cost ÷ total kg produced.
  */
 import type { Batch, Product } from './types';
@@ -13,6 +14,7 @@ export function batchMetrics(b: Pick<Batch, 'plannedKg' | 'actualKg' | 'material
   return {
     wastageKg,
     wastagePct: b.plannedKg > 0 ? (wastageKg / b.plannedKg) * 100 : 0,
+    wastageCost: b.plannedKg > 0 ? (b.materialCost * wastageKg) / b.plannedKg : 0,
     costPerKg: b.actualKg > 0 ? b.materialCost / b.actualKg : 0,
     /** What a kg would cost with no losses, for comparison. */
     standardCostPerKg: b.plannedKg > 0 ? b.materialCost / b.plannedKg : 0,
@@ -42,6 +44,8 @@ export interface ProductionTotals {
   units: number;
   cases: number;
   materialCost: number;
+  /** Rs of material lost to wastage (material cost × share of weight lost, summed per batch). */
+  wastageCost: number;
   /** Weighted: total material cost ÷ total kg produced. */
   costPerKg: number;
 }
@@ -55,8 +59,9 @@ export function totals(batches: Batch[]): ProductionTotals {
       units: a.units + b.units,
       cases: a.cases + b.cases,
       materialCost: a.materialCost + b.materialCost,
+      wastageCost: a.wastageCost + batchMetrics(b).wastageCost,
     }),
-    { batches: 0, plannedKg: 0, actualKg: 0, units: 0, cases: 0, materialCost: 0 },
+    { batches: 0, plannedKg: 0, actualKg: 0, units: 0, cases: 0, materialCost: 0, wastageCost: 0 },
   );
   const wastageKg = t.plannedKg - t.actualKg;
   return {
