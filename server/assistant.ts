@@ -2,7 +2,7 @@ import 'server-only';
 import type { ChatContent } from '@/lib/assistant';
 import { PAGES } from '@/lib/assistant';
 import { fmt, num } from '@/lib/format';
-import { roleSummary } from '@/lib/roles';
+import { isAdminRole, roleSummary } from '@/lib/roles';
 import type { Data } from '@/lib/types';
 import { plantToday, type Actor } from './actor';
 import { AppError } from './errors';
@@ -105,8 +105,15 @@ const SETUP_TOOLS = [
   },
 ];
 
+/** Which proposal tools a person may use; products and recipes are Admin-only. */
+function canUseTool(actor: Pick<Actor, 'perms' | 'roleId'>, name: string) {
+  if (name === 'add_team_member') return actor.perms.team;
+  if (name === 'create_product' || name === 'add_recipe_lines') return actor.perms.setup && isAdminRole(actor.roleId);
+  return actor.perms.setup;
+}
+
 function toolsFor(actor: Actor) {
-  return [NAVIGATE, ...SETUP_TOOLS.filter((tool) => (tool.name === 'add_team_member' ? actor.perms.team : actor.perms.setup))];
+  return [NAVIGATE, ...SETUP_TOOLS.filter((tool) => canUseTool(actor, tool.name))];
 }
 
 // ── Prompt ──────────────────────────────────────────────────────────────────
@@ -158,6 +165,7 @@ function summarize(data: Data) {
 
 function systemPrompt(actor: Actor, orgName: string, data: Data) {
   const canSetup = actor.perms.setup;
+  const canRecipes = canSetup && isAdminRole(actor.roleId);
   return `You are the StockOps assistant inside the StockOps app, helping ${actor.name} at "${orgName}". Their role is ${actor.role}${actor.isOwner ? ' (organization owner)' : ''}. Today is ${plantToday()}.
 
 Help people understand what to do in the app and do setup work for them. Users are plant staff, often not technical and often on a phone: answer briefly in plain language, short steps, no jargon. Reply in the language the person writes in.
@@ -167,7 +175,7 @@ Scope (strict): only help with StockOps, meaning how to use its screens, the org
 ${GUIDE}
 
 How to act:
-- Use the tools to make changes instead of describing every click. ${canSetup ? 'You can add materials, products with recipes, recipe lines and team members.' : `This person's role can't change setup or team; explain what they can do and that an Admin handles recipes, materials and accounts.`}
+- Use the tools to make changes instead of describing every click. ${canRecipes ? 'You can add materials, products with recipes, recipe lines and team members.' : canSetup ? "You can add materials and team members. Products, recipes, batch size and units are Admin-only; tell them an Admin makes those changes." : `This person's role can't change setup or team; explain what they can do and that an Admin handles recipes, materials and accounts.`}
 - Every change tool only proposes the change: the person sees a card and taps Confirm. Don't claim something is saved until the tool result says so. If they cancel, ask what to change.
 - Ask for missing essentials (e.g. pack size, batch weight, units per batch, role) before proposing, but suggest sensible defaults so they can just say yes. Use existing material ids exactly; never invent ids.
 - If a recipe needs materials that don't exist yet, propose those materials first, wait for their ids, then propose the product.

@@ -1,4 +1,4 @@
-import { NO_PERMS, PERMS, type Perms } from '@/lib/roles';
+import { isAdminRole, NO_PERMS, PERMS, type Perms } from '@/lib/roles';
 import type { Role } from '@/lib/types';
 import { AppError } from './errors';
 
@@ -42,6 +42,11 @@ export const can = (actor: Actor, perm: keyof Perms) => actor.perms[perm];
 
 export function requirePerm(actor: Actor, perm: keyof Perms) {
   if (!can(actor, perm)) throw new AppError(`The ${actor.role} role can't ${ACTION_LABEL[perm]}.`, 'forbidden');
+}
+
+/** A product's recipe and specs (batch size, units per batch, units per case) are part of the formula, so only the built-in Admin role changes them. */
+export function requireAdmin(actor: Actor) {
+  if (!isAdminRole(actor.roleId)) throw new AppError(`Only an Admin can change recipes, batch size or units. The ${actor.role} role can't.`, 'forbidden');
 }
 
 /** Plant-local calendar date (YYYY-MM-DD). Set PLANT_TIMEZONE, e.g. Asia/Karachi, when the server runs in UTC. */

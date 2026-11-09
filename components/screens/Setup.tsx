@@ -5,9 +5,10 @@ import * as api from '@/app/actions';
 import { FormField } from '@/components/FormField';
 import { Icon } from '@/components/Icon';
 import { cap1, fmt, inputVal, money, num, plural, qu, round, today } from '@/lib/format';
-import { useShowCost } from '@/lib/hooks';
+import { useCurrentUser, useShowCost } from '@/lib/hooks';
 import { downloadTemplate } from '@/lib/importer';
 import { useModel } from '@/lib/model';
+import { isAdminRole } from '@/lib/roles';
 import { useStore } from '@/lib/store';
 import type { MaterialKind } from '@/lib/types';
 import { confirmDialog, toast, useUI, type SetupTab } from '@/lib/ui';
@@ -53,6 +54,11 @@ export function Setup() {
 
 // ── Products & recipes ──────────────────────────────────────────────────────
 
+/** Recipes and product specs are Admin-only; other roles with Setup see them read-only (the server enforces the same). */
+function useCanEditRecipes() {
+  return isAdminRole(useCurrentUser().roleId);
+}
+
 /** How complete a product's recipe is: mix lines should add up to 100% of the batch weight. */
 function useRecipeStatus() {
   const m = useModel();
@@ -79,9 +85,10 @@ function Recipes() {
   const status = useRecipeStatus();
   const [adding, setAdding] = useState(false);
   const [view, setView] = useState<'list' | 'detail'>('list');
+  const canEdit = useCanEditRecipes();
   const products = m.data.products;
   const selected = m.prodById[setupProduct] ?? products[0];
-  const creating = adding || !products.length;
+  const creating = canEdit && (adding || !products.length);
 
   const select = (id: string) => {
     setUI({ setupProduct: id });
@@ -97,18 +104,20 @@ function Recipes() {
             <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--strong)' }}>Products</div>
             <div className="row-sub">{products.length ? `${products.length} in this plant` : 'None yet'}</div>
           </div>
-          <button
-            type="button"
-            className="btn btn-primary"
-            style={{ height: 38, padding: '0 12px' }}
-            onClick={() => {
-              setAdding(true);
-              setView('detail');
-            }}
-          >
-            <Icon name="plus" size={15} stroke={2.4} />
-            New
-          </button>
+          {canEdit && (
+            <button
+              type="button"
+              className="btn btn-primary"
+              style={{ height: 38, padding: '0 12px' }}
+              onClick={() => {
+                setAdding(true);
+                setView('detail');
+              }}
+            >
+              <Icon name="plus" size={15} stroke={2.4} />
+              New
+            </button>
+          )}
         </div>
         <div className="prod-items">
           {products.map((p) => {
@@ -129,7 +138,7 @@ function Recipes() {
           })}
           {!products.length && (
             <div className="empty-inline">
-              A product is something you make in batches. Add one, then build its recipe from your materials.
+              {canEdit ? 'A product is something you make in batches. Add one, then build its recipe from your materials.' : 'No products yet. An Admin adds products and their recipes.'}
             </div>
           )}
         </div>
@@ -171,6 +180,7 @@ function ProductDetail({ id, onBack }: { id: string; onBack: () => void }) {
   const setBatchKg = useStore((s) => s.setBatchKg);
   const send = useStore((s) => s.send);
   const setUI = useUI((s) => s.set);
+  const canEdit = useCanEditRecipes();
   const sp = m.prodById[id];
   const bkg = Math.max(num(sp.batchKg), 1e-9);
   const batchCost = m.batchCost(sp);
@@ -220,7 +230,7 @@ function ProductDetail({ id, onBack }: { id: string; onBack: () => void }) {
               Batch size
             </label>
             <div className="input-shell" style={{ height: 46 }}>
-              <input id="bkg" placeholder="Enter kg" type="number" inputMode="decimal" style={{ fontWeight: 600 }} value={sp.batchKg} onChange={(e) => setBatchKg(sp.id, inputVal(e.target.value))} />
+              <input id="bkg" placeholder="Enter kg" type="number" inputMode="decimal" style={{ fontWeight: 600 }} readOnly={!canEdit} value={sp.batchKg} onChange={(e) => setBatchKg(sp.id, inputVal(e.target.value))} />
               <span className="subtle" style={{ paddingRight: 14, fontSize: 12 }}>
                 kg
               </span>
@@ -230,55 +240,64 @@ function ProductDetail({ id, onBack }: { id: string; onBack: () => void }) {
             <label htmlFor="unitg" className="field-label sm">
               Unit weight
             </label>
-            <UnitWeightInput batchKg={num(sp.batchKg)} upb={num(sp.upb)} onUpb={(v) => setProductField(sp.id, 'upb', v)} />
+            <UnitWeightInput readOnly={!canEdit} batchKg={num(sp.batchKg)} upb={num(sp.upb)} onUpb={(v) => setProductField(sp.id, 'upb', v)} />
           </div>
           <div>
             <label htmlFor="upb" className="field-label sm">
               Units per batch
             </label>
-            <input id="upb" placeholder="Enter units" type="number" inputMode="numeric" className="input h46" value={sp.upb} onChange={(e) => setProductField(sp.id, 'upb', inputVal(e.target.value, true))} />
+            <input id="upb" placeholder="Enter units" type="number" inputMode="numeric" className="input h46" readOnly={!canEdit} value={sp.upb} onChange={(e) => setProductField(sp.id, 'upb', inputVal(e.target.value, true))} />
           </div>
           <div>
             <label htmlFor="upc" className="field-label sm">
               Units per case
             </label>
-            <input id="upc" placeholder="Enter units" type="number" inputMode="numeric" className="input h46" value={sp.upc} onChange={(e) => setProductField(sp.id, 'upc', inputVal(e.target.value, true))} />
+            <input id="upc" placeholder="Enter units" type="number" inputMode="numeric" className="input h46" readOnly={!canEdit} value={sp.upc} onChange={(e) => setProductField(sp.id, 'upc', inputVal(e.target.value, true))} />
           </div>
         </div>
-        <div className="subtle" style={{ marginTop: 8, fontSize: 12 }}>
-          Changing the batch size scales every ingredient so the recipe percentages stay the same. Packaging stays per batch.
-        </div>
+        {canEdit ? (
+          <div className="subtle" style={{ marginTop: 8, fontSize: 12 }}>
+            Changing the batch size scales every ingredient so the recipe percentages stay the same. Packaging stays per batch.
+          </div>
+        ) : (
+          <div className="readonly-note" style={{ marginTop: 12 }}>
+            <Icon name="lock" size={14} />
+            Batch size, unit weight, units and the recipe are locked. Only an Admin can change them.
+          </div>
+        )}
       </div>
 
-      <RecipeTable productId={sp.id} />
+      <RecipeTable productId={sp.id} canEdit={canEdit} />
 
-      <div className="danger-zone">
-        <div className="min0">
-          <div style={{ fontSize: 14, fontWeight: 700 }}>Delete this product</div>
-          <div className="row-sub">Its recipe, committed plans and production history go with it.</div>
+      {canEdit && (
+        <div className="danger-zone">
+          <div className="min0">
+            <div style={{ fontSize: 14, fontWeight: 700 }}>Delete this product</div>
+            <div className="row-sub">Its recipe, committed plans and production history go with it.</div>
+          </div>
+          <button
+            type="button"
+            className="btn btn-outline danger-btn"
+            onClick={async () => {
+              const ok = await confirmDialog({
+                title: `Delete ${sp.name}?`,
+                body: "Its recipe, committed plans and production history are deleted too. This can't be undone.",
+                confirmLabel: 'Delete product',
+                danger: true,
+              });
+              if (!ok) return;
+              const res = await send(() => api.deleteProduct(sp.id));
+              if (res) {
+                setUI({ setupProduct: '' });
+                onBack();
+                toast(`${res.name} deleted.`);
+              }
+            }}
+          >
+            <Icon name="trash" size={15} /> Delete
+          </button>
         </div>
-        <button
-          type="button"
-          className="btn btn-outline danger-btn"
-          onClick={async () => {
-            const ok = await confirmDialog({
-              title: `Delete ${sp.name}?`,
-              body: "Its recipe, committed plans and production history are deleted too. This can't be undone.",
-              confirmLabel: 'Delete product',
-              danger: true,
-            });
-            if (!ok) return;
-            const res = await send(() => api.deleteProduct(sp.id));
-            if (res) {
-              setUI({ setupProduct: '' });
-              onBack();
-              toast(`${res.name} deleted.`);
-            }
-          }}
-        >
-          <Icon name="trash" size={15} /> Delete
-        </button>
-      </div>
+      )}
     </div>
   );
 }
@@ -320,7 +339,7 @@ function TitleInput({ id, value, onChange }: { id: string; value: string; onChan
   );
 }
 
-function RecipeTable({ productId }: { productId: string }) {
+function RecipeTable({ productId, canEdit }: { productId: string; canEdit: boolean }) {
   const m = useModel();
   const setRecipeQty = useStore((s) => s.setRecipeQty);
   const send = useStore((s) => s.send);
@@ -359,6 +378,7 @@ function RecipeTable({ productId }: { productId: string }) {
                   inputMode="decimal"
                   value={mix && r.qty !== '' ? round((num(r.qty) / bkg) * 100) : r.qty}
                   placeholder={mix ? '%' : 'Qty'}
+                  readOnly={!canEdit}
                   onChange={(e) => {
                     const v = inputVal(e.target.value);
                     setRecipeQty(sp.id, r.ing, v === '' ? '' : mix ? round((v * bkg) / 100) : v);
@@ -370,15 +390,19 @@ function RecipeTable({ productId }: { productId: string }) {
               <span className="muted tnum" style={{ textAlign: 'right', fontSize: 13 }}>
                 {qu(num(r.qty), i.unit)}
               </span>
-              <button type="button" className="row-remove" aria-label={`Remove ${i.name} from recipe`} onClick={() => void send(() => api.removeRecipeLine(sp.id, r.ing))}>
-                <Icon name="x" size={14} stroke={2.2} />
-              </button>
+              {canEdit ? (
+                <button type="button" className="row-remove" aria-label={`Remove ${i.name} from recipe`} onClick={() => void send(() => api.removeRecipeLine(sp.id, r.ing))}>
+                  <Icon name="x" size={14} stroke={2.2} />
+                </button>
+              ) : (
+                <span />
+              )}
             </div>
           );
         })}
-        {!bom.length && <div className="empty-inline">No materials in this recipe yet. Pick the first one below.</div>}
+        {!bom.length && <div className="empty-inline">{canEdit ? 'No materials in this recipe yet. Pick the first one below.' : 'No materials in this recipe yet.'}</div>}
       </div>
-      <AddRecipeLine productId={sp.id} />
+      {canEdit && <AddRecipeLine productId={sp.id} />}
       {bom.length > 0 && (
         <div className="bom-total tnum">
           <span>Formula total</span>
@@ -445,7 +469,7 @@ function AddRecipeLine({ productId }: { productId: string }) {
 const unitsFromWeight = (batchKg: number, grams: number) => (batchKg > 0 && grams > 0 ? Math.round((batchKg * 1000) / grams) : 0);
 const weightFromUnits = (batchKg: number, upb: number) => (batchKg > 0 && upb > 0 ? String(Math.round(((batchKg * 1000) / upb) * 10) / 10) : '');
 
-function UnitWeightInput({ batchKg, upb, onUpb }: { batchKg: number; upb: number; onUpb: (upb: number) => void }) {
+function UnitWeightInput({ batchKg, upb, onUpb, readOnly }: { batchKg: number; upb: number; onUpb: (upb: number) => void; readOnly?: boolean }) {
   const [draft, setDraft] = useState(() => weightFromUnits(batchKg, upb));
   const [seen, setSeen] = useState({ batchKg, upb });
   // Batch size or units per batch changed elsewhere → show the newly derived weight.
@@ -461,6 +485,7 @@ function UnitWeightInput({ batchKg, upb, onUpb }: { batchKg: number; upb: number
         type="number"
         inputMode="decimal"
         style={{ fontWeight: 600 }}
+        readOnly={readOnly}
         value={draft}
         onChange={(e) => {
           setDraft(e.target.value);

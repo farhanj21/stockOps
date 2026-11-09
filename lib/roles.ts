@@ -40,6 +40,9 @@ export const PERMS: Record<Role, Perms> = {
   Production: { stock: false, receive: false, plan: true, setup: false, team: false, costs: false },
 };
 
+/** Recipes and product specs (batch size, unit weight, units per batch/case) are Admin-only, even for custom roles with Setup. */
+export const isAdminRole = (roleId: string) => roleId === 'Admin';
+
 export const isBuiltInRole = (id: string): id is Role => (ROLES as string[]).includes(id);
 
 /** Built-in roles in the same shape as custom ones; their id is their name. */

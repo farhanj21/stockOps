@@ -8,6 +8,7 @@ import { PAGES, WRITE_TOOLS, type AssistantReply, type ChatContent, type ChatPar
 import { fmt, num, round } from '@/lib/format';
 import { useCurrentUser, useGo, type Tab } from '@/lib/hooks';
 import { generatePassword } from '@/lib/password-gen';
+import { isAdminRole } from '@/lib/roles';
 import { useStore } from '@/lib/store';
 import type { Data } from '@/lib/types';
 import { toast } from '@/lib/ui';
@@ -32,7 +33,9 @@ const isWrite = (name: string) => (WRITE_TOOLS as readonly string[]).includes(na
 
 export function Assistant() {
   const me = useStore((s) => s.me);
-  const { role, perms, user } = useCurrentUser();
+  const { role, roleId, perms, user } = useCurrentUser();
+  const canPropose = (name: string) =>
+    name === 'add_team_member' ? perms.team : name === 'create_product' || name === 'add_recipe_lines' ? perms.setup && isAdminRole(roleId) : perms.setup;
   const go = useGo();
   const [open, setOpen] = useState(false);
   const [contents, setContents] = useState<ChatContent[]>([]);
@@ -90,7 +93,7 @@ export function Assistant() {
           go(page);
           k[keyOf(ci, pi)] = { status: 'done', summary: `Opened ${PAGES[page]}`, response: { ok: true } };
         } else k[keyOf(ci, pi)] = { status: 'failed', error: 'Unknown screen', response: { ok: false, error: 'Unknown page' } };
-      } else if (isWrite(p.functionCall.name) && (p.functionCall.name === 'add_team_member' ? perms.team : perms.setup)) k[keyOf(ci, pi)] = { status: 'pending' };
+      } else if (isWrite(p.functionCall.name) && canPropose(p.functionCall.name)) k[keyOf(ci, pi)] = { status: 'pending' };
       else k[keyOf(ci, pi)] = { status: 'failed', error: "Your role can't do that.", response: { ok: false, error: `The ${role} role can't do this.` } };
     });
     commit(all, k);

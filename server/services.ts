@@ -16,7 +16,7 @@ import { buildModel } from '@/lib/mrp';
 import { normBatchNo } from '@/lib/production';
 import { isBuiltInRole, ROLES, type Perms } from '@/lib/roles';
 import type { MaterialKind, Role } from '@/lib/types';
-import { can, plantToday, requirePerm, type Actor } from './actor';
+import { can, plantToday, requireAdmin, requirePerm, type Actor } from './actor';
 import { AppError, isUniqueViolation } from './errors';
 import { hashPassword, verifyPassword } from './password';
 import { loadData } from './snapshot';
@@ -526,6 +526,7 @@ export async function revertImport(db: Db, actor: Actor, undo: ImportUndo) {
 
 export async function addProduct(db: Db, actor: Actor, input: { name: string; batchKg: number; upb: number; upc: number }) {
   requirePerm(actor, 'setup');
+  requireAdmin(actor);
   if (input.batchKg <= 0) throw new AppError('Batch size must be more than 0 kg.', 'invalid', { batchKg: 'Must be more than 0.' });
   const [{ max }] = await db
     .select({ max: sql<number>`coalesce(max(${t.products.position}), -1)` })
@@ -563,6 +564,7 @@ export async function renameProduct(db: Db, actor: Actor, id: string, name: stri
 /** Deletes the product with its recipe, plans and run history. */
 export async function deleteProduct(db: Db, actor: Actor, id: string) {
   requirePerm(actor, 'setup');
+  requireAdmin(actor);
   const p = await ownProduct(db, actor, id);
   await db.delete(t.products).where(eq(t.products.id, p.id));
   return { name: p.name };
@@ -570,6 +572,7 @@ export async function deleteProduct(db: Db, actor: Actor, id: string) {
 
 export async function addRecipeLine(db: Db, actor: Actor, productId: string, ingredientId: string, qty: number) {
   requirePerm(actor, 'setup');
+  requireAdmin(actor);
   await db.transaction(async (tx) => {
     await ownProduct(tx, actor, productId);
     await lockIngredient(tx, actor, ingredientId);
@@ -588,12 +591,14 @@ export async function addRecipeLine(db: Db, actor: Actor, productId: string, ing
 
 export async function removeRecipeLine(db: Db, actor: Actor, productId: string, ingredientId: string) {
   requirePerm(actor, 'setup');
+  requireAdmin(actor);
   await ownProduct(db, actor, productId);
   await db.delete(t.recipeLines).where(and(eq(t.recipeLines.productId, productId), eq(t.recipeLines.ingredientId, ingredientId)));
 }
 
 export async function setRecipeQty(db: Db, actor: Actor, productId: string, ingredientId: string, qty: number) {
   requirePerm(actor, 'setup');
+  requireAdmin(actor);
   await ownProduct(db, actor, productId);
   const res = await db
     .update(t.recipeLines)
@@ -605,6 +610,7 @@ export async function setRecipeQty(db: Db, actor: Actor, productId: string, ingr
 
 export async function setProductCounts(db: Db, actor: Actor, productId: string, field: 'upb' | 'upc', value: number) {
   requirePerm(actor, 'setup');
+  requireAdmin(actor);
   const res = await db
     .update(t.products)
     .set(field === 'upb' ? { unitsPerBatch: value } : { unitsPerCase: value })
@@ -616,6 +622,7 @@ export async function setProductCounts(db: Db, actor: Actor, productId: string, 
 /** New batch weight; every mix line (not packaging) scales so the recipe percentages stay the same. */
 export async function setBatchKg(db: Db, actor: Actor, productId: string, kg: number) {
   requirePerm(actor, 'setup');
+  requireAdmin(actor);
   if (kg <= 0) throw new AppError('Batch size must be more than 0 kg.');
   await db.transaction(async (tx) => {
     const p = await ownProduct(tx, actor, productId, true);

@@ -1590,3 +1590,16 @@ button.back-link {
   color: inherit;
   cursor: pointer;
 }
+
+/* Locked recipe fields (non-Admin): read-only, visibly not editable. */
+input.input[readonly],
+.input-shell:has(input[readonly]),
+.unit-input:has(input[readonly]) {
+  background: var(--bg);
+  border-style: dashed;
+  cursor: default;
+}
+.input-shell input[readonly],
+.unit-input input[readonly] {
+  cursor: default;
+}

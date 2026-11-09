@@ -295,6 +295,20 @@ describe('role permissions (blueprint §3)', () => {
     }
   });
 
+  it('a custom role with Setup edits materials but not recipes or batch specs', async () => {
+    const sugar = await material(db, orgId, SUGAR);
+    const fudge = await product(db, orgId, FUDGE);
+    const setupRole: Actor = { ...admin, role: 'Supervisor', roleId: 'rol_custom', perms: { ...admin.perms, team: false } };
+    await svc.updateMaterial(db, setupRole, sugar.id, { par: 1 });
+    await forbidden(svc.setBatchKg(db, setupRole, fudge.id, 600));
+    await forbidden(svc.setProductCounts(db, setupRole, fudge.id, 'upb', 10));
+    await forbidden(svc.setProductCounts(db, setupRole, fudge.id, 'upc', 5));
+    await forbidden(svc.setRecipeQty(db, setupRole, fudge.id, sugar.id, 1));
+    await forbidden(svc.removeRecipeLine(db, setupRole, fudge.id, sugar.id));
+    await forbidden(svc.addProduct(db, setupRole, { name: 'X', batchKg: 1, upb: 1, upc: 1 }));
+    await forbidden(svc.deleteProduct(db, setupRole, fudge.id));
+  });
+
   it('only Admin and Production forecast and log runs', async () => {
     const fudge = await product(db, orgId, FUDGE);
     await forbidden(svc.addForecast(db, warehouse, { productId: fudge.id, batches: 1, date: '2026-11-01' }));
