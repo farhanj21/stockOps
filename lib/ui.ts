@@ -7,7 +7,7 @@ import type { Num } from './types';
 export type { ImportRow } from './import-plan';
 
 export type SheetType = 'material' | 'product' | 'batch' | 'import' | 'po';
-export type PlanTab = 'plan' | 'batches' | 'reports';
+export type PlanTab = 'plan' | 'batches' | 'calc' | 'reports';
 export type StockFilter = 'all' | 'low' | 'ingredient' | 'packaging';
 export type SetupTab = 'recipes' | 'materials';
 

@@ -171,7 +171,7 @@ describe('team accounts', () => {
 });
 
 describe('custom roles', () => {
-  const NONE = { stock: false, receive: false, plan: false, setup: false, team: false, costs: false };
+  const NONE = { stock: false, receive: false, plan: false, setup: false, team: false, costs: false, calc: false };
 
   it('admins create a role, give it to someone, and its permissions apply', async () => {
     const { id } = await svc.createRole(db, admin, { name: 'Store keeper', perms: { ...NONE, stock: true, receive: true } });

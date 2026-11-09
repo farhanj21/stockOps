@@ -18,9 +18,11 @@ export interface Perms {
   team: boolean;
   /** See material costs (batch cost, cost per kg, cost per case). */
   costs: boolean;
+  /** Batch calculator: scale a product's recipe to any batch size and export it. */
+  calc: boolean;
 }
 
-export const PERM_KEYS: (keyof Perms)[] = ['stock', 'receive', 'plan', 'setup', 'team', 'costs'];
+export const PERM_KEYS: (keyof Perms)[] = ['stock', 'receive', 'plan', 'setup', 'team', 'costs', 'calc'];
 
 /** Plain-language labels for the role editor and the "what each role can do" list. */
 export const PERM_INFO: Record<keyof Perms, { label: string; desc: string }> = {
@@ -30,14 +32,15 @@ export const PERM_INFO: Record<keyof Perms, { label: string; desc: string }> = {
   setup: { label: 'Setup', desc: 'Products, recipes, materials, costs and par levels' },
   team: { label: 'Team & roles', desc: 'Add or remove people, change roles, organization name and logo' },
   costs: { label: 'See costs', desc: 'View material cost of batches, cost per kg and cost per case' },
+  calc: { label: 'Batch calculator', desc: "Work out each material's quantity for any batch size, and export it" },
 };
 
-export const NO_PERMS: Perms = { stock: false, receive: false, plan: false, setup: false, team: false, costs: false };
+export const NO_PERMS: Perms = { stock: false, receive: false, plan: false, setup: false, team: false, costs: false, calc: false };
 
 export const PERMS: Record<Role, Perms> = {
-  Admin: { stock: true, receive: true, plan: true, setup: true, team: true, costs: true },
-  Warehouse: { stock: true, receive: true, plan: false, setup: false, team: false, costs: false },
-  Production: { stock: false, receive: false, plan: true, setup: false, team: false, costs: false },
+  Admin: { stock: true, receive: true, plan: true, setup: true, team: true, costs: true, calc: true },
+  Warehouse: { stock: true, receive: true, plan: false, setup: false, team: false, costs: false, calc: false },
+  Production: { stock: false, receive: false, plan: true, setup: false, team: false, costs: false, calc: true },
 };
 
 /** Recipes and product specs (batch size, unit weight, units per batch/case) are Admin-only, even for custom roles with Setup. */

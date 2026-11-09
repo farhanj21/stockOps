@@ -7,19 +7,25 @@ import { useCurrentUser, useGo, useShowCost } from '@/lib/hooks';
 import { packTxt, useModel } from '@/lib/model';
 import { useStore } from '@/lib/store';
 import { toast, useUI, type PlanTab } from '@/lib/ui';
+import { BatchCalculator } from './BatchCalculator';
 import { BatchRecords, ProductionReports } from './Batches';
 
 const TABS: [PlanTab, string][] = [
   ['plan', 'Plan'],
   ['batches', 'Batches'],
+  ['calc', 'Calculator'],
   ['reports', 'Reports'],
 ];
 
 /** Production: plan batches, record each batch made, and see monthly / yearly totals. */
 export function Plan() {
   const hasProducts = useModel().data.products.length > 0;
-  const tab = useUI((s) => s.planTab);
+  const { perms } = useCurrentUser();
+  const picked = useUI((s) => s.planTab);
   const setUI = useUI((s) => s.set);
+  // The calculator shows recipe quantities, so it's only for roles with "Batch calculator".
+  const tabs = TABS.filter(([k]) => k !== 'calc' || perms.calc);
+  const tab = picked === 'calc' && !perms.calc ? 'plan' : picked;
   if (!hasProducts) return <NoProducts />;
   return (
     <div className="col" style={{ gap: 18 }}>
@@ -30,7 +36,7 @@ export function Plan() {
         <div className="page-sub">Plan batches, record each batch made, and see monthly and yearly totals.</div>
       </div>
       <div className="tabs" role="tablist" aria-label="Production sections">
-        {TABS.map(([k, label]) => (
+        {tabs.map(([k, label]) => (
           <button
             key={k}
             type="button"
@@ -46,7 +52,7 @@ export function Plan() {
         ))}
       </div>
       <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`}>
-        {tab === 'batches' ? <BatchRecords /> : tab === 'reports' ? <ProductionReports /> : <Planner />}
+        {tab === 'batches' ? <BatchRecords /> : tab === 'calc' ? <BatchCalculator /> : tab === 'reports' ? <ProductionReports /> : <Planner />}
       </div>
     </div>
   );

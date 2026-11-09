@@ -1,0 +1,1 @@
+ALTER TABLE "custom_roles" ADD COLUMN "can_calc" boolean DEFAULT false NOT NULL;
