@@ -1,6 +1,7 @@
 import { round } from './format';
 import { BUILT_IN_ROLES } from './roles';
 import type { Data, RecipeLine } from './types';
+import { producedKg } from './production';
 
 /** Recipe from a batch weight and % mix lines, plus fixed per-batch packaging counts. */
 function pctBom(kg: number, pcts: [string, number][], packs: [string, number][] = []): RecipeLine[] {
@@ -97,12 +98,13 @@ function sampleBatches(): Data['batches'] {
     ['2026-10-13', 'coating', 978, 195],
     ['2026-10-20', 'compound', 989, 989],
   ];
-  const planned: Record<string, [number, number]> = { fudge: [500, 10], coating: [1000, 4], compound: [1000, 10] };
+  // batch kg, units per batch, units per case
+  const planned: Record<string, [number, number, number]> = { fudge: [500, 500, 10], coating: [1000, 200, 4], compound: [1000, 1000, 10] };
   const perDay = new Map<string, number>();
-  return runs.map(([date, productId, actualKg, units], ix) => {
+  return runs.map(([date, productId, , units], ix) => {
     const n = (perDay.get(date) ?? 0) + 1;
     perDay.set(date, n);
-    const [plannedKg, upc] = planned[productId];
+    const [plannedKg, plannedUnits, upc] = planned[productId];
     return {
       id: `b${ix + 1}`,
       batchNo: `B-${date.slice(2).replace(/-/g, '')}-${String(n).padStart(2, '0')}`,
@@ -110,7 +112,9 @@ function sampleBatches(): Data['batches'] {
       productId,
       forecastId: null,
       plannedKg,
-      actualKg,
+      plannedUnits,
+      upc,
+      actualKg: producedKg(plannedKg, plannedUnits, units),
       units,
       cases: Math.floor(units / upc),
       materialCost: 0,

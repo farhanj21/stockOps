@@ -115,6 +115,7 @@ export function BatchRecords() {
                   <th className="num">Wastage</th>
                   <th className="num">Units</th>
                   <th className="num">Cases</th>
+                  {SHOW_COST && <th className="num">Cost / batch</th>}
                   {SHOW_COST && <th className="num">Cost / kg</th>}
                   <th>Logged by</th>
                   <th aria-label="Edit" />
@@ -132,10 +133,12 @@ export function BatchRecords() {
                       <td>{m.prodById[b.productId]?.name ?? '—'}</td>
                       <td className="num">{qu(b.actualKg, 'kg')}</td>
                       <td className={`num${x.wastageKg > 0 ? ' warn-text' : ''}`}>
+                        {b.plannedUnits ? `${fmt(x.wastageUnits)} units · ` : ''}
                         {qu(x.wastageKg, 'kg')} <span className="subtle">({pct(x.wastagePct)})</span>
                       </td>
                       <td className="num">{fmt(b.units)}</td>
                       <td className="num">{fmt(b.cases)}</td>
+                      {SHOW_COST && <td className="num">{money(b.materialCost)}</td>}
                       {SHOW_COST && <td className="num">{money(x.costPerKg)}</td>}
                       <td className="muted">{b.by}</td>
                       <td>
@@ -175,9 +178,15 @@ function BatchCard({ b }: { b: Batch }) {
       </div>
       <div className="tnum" style={{ fontSize: 12, marginTop: 2 }}>
         <span className={x.wastageKg > 0 ? 'warn-text' : 'subtle'}>
-          Wastage {qu(x.wastageKg, 'kg')} ({pct(x.wastagePct)})
+          Wastage {b.plannedUnits ? `${fmt(x.wastageUnits)} units · ` : ''}
+          {qu(x.wastageKg, 'kg')} ({pct(x.wastagePct)})
         </span>
-        {SHOW_COST && <span className="subtle"> · {money(x.costPerKg)}/kg</span>}
+        {SHOW_COST && (
+          <span className="subtle">
+            {' '}
+            · {money(b.materialCost)}/batch · {money(x.costPerKg)}/kg
+          </span>
+        )}
       </div>
     </button>
   );

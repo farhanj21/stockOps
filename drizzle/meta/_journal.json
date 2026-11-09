@@ -43,6 +43,13 @@
       "when": 1794147170967,
       "tag": "0005_role_costs",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794206379523,
+      "tag": "0006_batch_units",
+      "breakpoints": true
     }
   ]
 }

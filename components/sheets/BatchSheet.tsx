@@ -6,7 +6,7 @@ import { FormField } from '@/components/FormField';
 import { useShowCost } from '@/lib/hooks';
 import { fmt, fmtDate, money, num, plural, qu, today } from '@/lib/format';
 import { useModel } from '@/lib/model';
-import { batchMetrics, suggestBatchNo } from '@/lib/production';
+import { batchMetrics, looseUnitsOf, producedKg, suggestBatchNo, totalUnits } from '@/lib/production';
 import { useStore } from '@/lib/store';
 import { toast, useUI } from '@/lib/ui';
 import { SheetHeader } from './Sheet';
@@ -36,16 +36,19 @@ function BatchForm({ editingId }: { editingId?: string }) {
   const [forecastId, setForecastId] = useState<string>(editing?.forecastId ?? startForecast?.id ?? '');
   const p = m.prodById[productId];
   const startDate = editing?.date ?? today();
+  // A full batch as the recipe says, split into full cases + loose units.
+  const fullBatch = (x: typeof p | undefined) => {
+    const upc = Math.max(1, num(x?.upc));
+    const cases = Math.floor(num(x?.upb) / upc);
+    return { cases: String(cases), loose: String(num(x?.upb) - cases * upc) };
+  };
   const [f, setF] = useState({
     batchNo: editing?.batchNo ?? suggestBatchNo(m.data.batches, startDate),
     date: startDate,
-    actualKg: String(editing?.actualKg ?? num(p?.batchKg)),
-    units: String(editing?.units ?? num(p?.upb)),
-    cases: String(editing?.cases ?? Math.floor(num(p?.upb) / Math.max(1, num(p?.upc)))),
+    ...(editing ? { cases: String(editing.cases), loose: String(looseUnitsOf({ ...editing, upc: editing.upc || num(p?.upc) })) } : fullBatch(p)),
     notes: editing?.notes ?? '',
   });
   const [numberTouched, setNumberTouched] = useState(!!editing);
-  const [casesTouched, setCasesTouched] = useState(!!editing);
   const [err, setErr] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
 
@@ -72,18 +75,18 @@ function BatchForm({ editingId }: { editingId?: string }) {
     setForecastId('');
     ui.set({ batchProduct: id });
     // Fresh defaults for the new product (the person can still change them).
-    setF((x) => ({
-      ...x,
-      actualKg: String(num(np.batchKg)),
-      units: String(num(np.upb)),
-      cases: casesTouched ? x.cases : String(Math.floor(num(np.upb) / Math.max(1, num(np.upc)))),
-    }));
+    setF((x) => ({ ...x, ...fullBatch(np) }));
   };
 
   const plans = m.forecastsSorted.filter((x) => x.productId === productId);
+  // The recipe figures this batch is measured against: as logged, or the product's current ones for a new batch.
   const plannedKg = editing?.plannedKg ?? num(p?.batchKg);
+  const plannedUnits = editing?.plannedUnits || num(p?.upb);
+  const upc = Math.max(1, editing?.upc || num(p?.upc));
+  const units = totalUnits(Math.floor(num(f.cases)), Math.floor(num(f.loose)), upc);
+  const actualKg = producedKg(plannedKg, plannedUnits, units);
   const materialCost = editing?.materialCost ?? (p ? m.batchCost(p) : 0);
-  const metrics = batchMetrics({ plannedKg, actualKg: num(f.actualKg), materialCost });
+  const metrics = batchMetrics({ plannedKg, actualKg, materialCost, plannedUnits, units });
 
   const deductions = editing
     ? []
@@ -100,15 +103,17 @@ function BatchForm({ editingId }: { editingId?: string }) {
     e.preventDefault();
     const next: Record<string, string> = {};
     if (!f.batchNo.trim()) next.batchNo = 'Enter a batch number.';
-    if (!(num(f.actualKg) > 0)) next.actualKg = 'Must be more than 0.';
+    if (num(f.cases) < 0) next.cases = "Can't be negative.";
+    if (num(f.loose) < 0) next.loose = "Can't be negative.";
+    if (!next.cases && !next.loose && !(units > 0)) next.cases = 'Enter what was produced.';
+    if (!(plannedUnits > 0)) next.cases = 'Set units per batch for this product in Setup first.';
     if (!f.date) next.date = 'Pick the production date.';
     if (Object.keys(next).length) return setErr(next);
     const fields = {
       batchNo: f.batchNo,
       date: f.date,
-      actualKg: num(f.actualKg),
-      units: Math.max(0, Math.floor(num(f.units))),
       cases: Math.max(0, Math.floor(num(f.cases))),
+      looseUnits: Math.max(0, Math.floor(num(f.loose))),
       notes: f.notes,
     };
     setBusy(true);
@@ -186,58 +191,40 @@ function BatchForm({ editingId }: { editingId?: string }) {
         </div>
         {!editing && !numberTouched && <div className="subtle" style={{ marginTop: -8, fontSize: 12 }}>Suggested number. Change it to match your batch sheet if needed.</div>}
 
-        <div className="grid3 keep3">
-          <FormField id="bt-kg" label="Kg produced" error={err.actualKg}>
-            <input id="bt-kg" className="input tnum" type="number" inputMode="decimal" value={f.actualKg} aria-invalid={!!err.actualKg} onChange={(e) => set('actualKg', e.target.value)} />
+        <div className="grid2" style={{ gap: 10 }}>
+          <FormField id="bt-cases" label={`Full cases (${fmt(upc)} units each)`} error={err.cases}>
+            <input id="bt-cases" className="input tnum" type="number" inputMode="numeric" min={0} value={f.cases} aria-invalid={!!err.cases} onChange={(e) => set('cases', e.target.value)} />
           </FormField>
-          <FormField id="bt-units" label="Units" error={err.units}>
-            <input
-              id="bt-units"
-              className="input tnum"
-              type="number"
-              inputMode="numeric"
-              value={f.units}
-              onChange={(e) => {
-                set('units', e.target.value);
-                if (!casesTouched && p) setF((x) => ({ ...x, units: e.target.value, cases: String(Math.floor(num(e.target.value) / Math.max(1, num(p.upc)))) }));
-              }}
-            />
+          <FormField id="bt-loose" label="Loose units" error={err.loose}>
+            <input id="bt-loose" className="input tnum" type="number" inputMode="numeric" min={0} value={f.loose} aria-invalid={!!err.loose} onChange={(e) => set('loose', e.target.value)} />
           </FormField>
-          <FormField id="bt-cases" label="Cases" error={err.cases}>
-            <input
-              id="bt-cases"
-              className="input tnum"
-              type="number"
-              inputMode="numeric"
-              value={f.cases}
-              onChange={(e) => {
-                setCasesTouched(true);
-                set('cases', e.target.value);
-              }}
-            />
-          </FormField>
+        </div>
+        <div className="subtle tnum" style={{ marginTop: -8, fontSize: 12 }}>
+          = {fmt(units)} units · {qu(actualKg, 'kg')} produced ({plannedUnits > 0 ? `${fmt(Math.round((plannedKg * 1000 * 10) / plannedUnits) / 10)} g` : '—'} per unit)
         </div>
 
         <div className="batch-preview tnum">
           <div className="cell">
-            <div className="cell-k">Recipe weight</div>
-            <div className="cell-v sm">{qu(plannedKg, 'kg')}</div>
+            <div className="cell-k">Recipe output</div>
+            <div className="cell-v sm">
+              {fmt(plannedUnits)} units · {qu(plannedKg, 'kg')}
+            </div>
           </div>
           <div className="cell">
             <div className="cell-k">Wastage</div>
             <div className={`cell-v sm${metrics.wastageKg > 0 ? ' warn-text' : ''}`}>
-              {qu(Math.abs(metrics.wastageKg), 'kg')} {metrics.wastageKg < 0 ? 'gain' : ''} ({fmt(Math.abs(metrics.wastagePct))}%)
+              {fmt(Math.abs(metrics.wastageUnits))} units · {qu(Math.abs(metrics.wastageKg), 'kg')} {metrics.wastageKg < 0 ? 'over' : ''} ({fmt(Math.round(Math.abs(metrics.wastagePct) * 10) / 10)}%)
             </div>
           </div>
           {SHOW_COST && (
             <>
               <div className="cell">
-                <div className="cell-k">Material cost</div>
+                <div className="cell-k">Cost / batch</div>
                 <div className="cell-v sm">{money(materialCost)}</div>
               </div>
               <div className="cell">
                 <div className="cell-k">Cost / kg after wastage</div>
-                <div className="cell-v sm">{num(f.actualKg) > 0 ? money(metrics.costPerKg) : '—'}</div>
+                <div className="cell-v sm">{actualKg > 0 ? money(metrics.costPerKg) : '—'}</div>
               </div>
             </>
           )}

@@ -98,6 +98,8 @@ export async function loadData(db: Db, organizationId: string, people: { all: bo
       productId: b.productId,
       forecastId: b.forecastId,
       plannedKg: b.plannedKg,
+      plannedUnits: b.plannedUnits ?? 0,
+      upc: b.unitsPerCase ?? 0,
       actualKg: b.actualKg,
       units: b.units,
       cases: b.cases,

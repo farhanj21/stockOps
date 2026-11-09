@@ -96,6 +96,8 @@ export async function insertSampleContent(db: Db | Tx, organizationId: string, a
         producedOn: b.date,
         productId: prodId.get(b.productId)!,
         plannedKg: b.plannedKg,
+        plannedUnits: b.plannedUnits || null,
+        unitsPerCase: b.upc || null,
         actualKg: b.actualKg,
         units: b.units,
         cases: b.cases,

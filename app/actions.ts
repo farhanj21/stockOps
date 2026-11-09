@@ -333,21 +333,20 @@ export async function restoreForecast(id: string) {
 const BatchFields = z.object({
   batchNo: z.string().trim().min(1, 'Enter a batch number.').max(40, 'Keep it under 40 characters.'),
   date: IsoDate,
-  actualKg: z.number().finite().gt(0, 'Must be more than 0.').max(1e7),
-  units: z.number().int('Whole units only.').min(0).max(1e8),
-  cases: z.number().int('Whole cases only.').min(0).max(1e8),
+  cases: z.number().int('Whole cases only.').min(0, "Can't be negative.").max(1e8),
+  looseUnits: z.number().int('Whole units only.').min(0, "Can't be negative.").max(1e8),
   notes: z.string().max(500).optional(),
 });
 
 /** Production records one batch made; deducts one batch of the recipe from in-hand stock. */
-export async function logBatch(form: { productId: string; forecastId?: string | null; batchNo: string; date: string; actualKg: number; units: number; cases: number; notes?: string }) {
+export async function logBatch(form: { productId: string; forecastId?: string | null; batchNo: string; date: string; cases: number; looseUnits: number; notes?: string }) {
   const parsed = BatchFields.extend({ productId: Id, forecastId: Id.nullable().optional() }).safeParse(form);
   if (!parsed.success) return fieldFail(parsed.error);
   return act((db, actor) => svc.logBatch(db, actor, parsed.data));
 }
 
 /** Correct a batch record; stock isn't touched. */
-export async function updateBatch(id: string, form: { batchNo: string; date: string; actualKg: number; units: number; cases: number; notes?: string }) {
+export async function updateBatch(id: string, form: { batchNo: string; date: string; cases: number; looseUnits: number; notes?: string }) {
   const parsed = BatchFields.safeParse(form);
   if (!parsed.success) return fieldFail(parsed.error);
   return act((db, actor) => svc.updateBatch(db, actor, Id.parse(id), parsed.data));

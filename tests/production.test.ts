@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { batchMetrics, byMonth, byProduct, inPeriod, periodsWithData, suggestBatchNo, totals } from '@/lib/production';
+import { batchMetrics, byMonth, looseUnitsOf, producedKg, totalUnits, byProduct, inPeriod, periodsWithData, suggestBatchNo, totals } from '@/lib/production';
 import type { Batch } from '@/lib/types';
 
 const b = (over: Partial<Batch>): Batch => ({
@@ -9,6 +9,8 @@ const b = (over: Partial<Batch>): Batch => ({
   productId: 'p1',
   forecastId: null,
   plannedKg: 500,
+  plannedUnits: 500,
+  upc: 10,
   actualKg: 500,
   units: 500,
   cases: 50,
@@ -63,5 +65,19 @@ describe('production records maths', () => {
     expect(months[9]).toMatchObject({ month: '2026-10', batches: 1 });
     expect(months[0].batches).toBe(0);
     expect(periodsWithData(batches)).toEqual({ months: ['2026-10', '2026-09', '2025-12'], years: ['2026', '2025'] });
+  });
+});
+
+describe('cases + loose units', () => {
+  it('works out units, kg produced and unit wastage', () => {
+    const units = totalUnits(48, 8, 10);
+    expect(units).toBe(488);
+    expect(producedKg(500, 500, units)).toBe(488);
+    expect(producedKg(1000, 200, 196)).toBe(980);
+    expect(producedKg(500, 0, 10)).toBe(0);
+    expect(looseUnitsOf({ units: 488, cases: 48, upc: 10 })).toBe(8);
+    const x = batchMetrics({ plannedKg: 500, actualKg: 488, materialCost: 1000, plannedUnits: 500, units: 488 });
+    expect(x.wastageUnits).toBe(12);
+    expect(x.wastagePct).toBeCloseTo(2.4);
   });
 });

@@ -13,7 +13,7 @@ import type { ImportUndo } from '@/lib/api';
 import { num, qu, round } from '@/lib/format';
 import { planImport, type ImportRow } from '@/lib/import-plan';
 import { buildModel } from '@/lib/mrp';
-import { normBatchNo } from '@/lib/production';
+import { normBatchNo, producedKg, totalUnits } from '@/lib/production';
 import { isBuiltInRole, ROLES, type Perms } from '@/lib/roles';
 import type { MaterialKind, Role } from '@/lib/types';
 import { can, plantToday, requireAdmin, requirePerm, type Actor } from './actor';
@@ -688,15 +688,23 @@ export interface BatchInput {
   batchNo: string;
   /** YYYY-MM-DD the batch was made. */
   date: string;
-  actualKg: number;
-  units: number;
+  /** Full cases packed. */
   cases: number;
+  /** Units left over that didn't fill a case. */
+  looseUnits: number;
   notes?: string;
 }
 
-function checkBatchFigures(input: BatchInput) {
+function checkBatchDate(input: BatchInput) {
   if (input.date > plantToday()) throw new AppError("The production date can't be in the future.", 'invalid', { date: "Can't be in the future." });
-  if (!(input.actualKg > 0)) throw new AppError('Enter the kg actually produced.', 'invalid', { actualKg: 'Must be more than 0.' });
+}
+
+/** Units and kg produced from cases + loose units, using the recipe figures the batch was made with. */
+function batchOutput(input: BatchInput, spec: { plannedKg: number; plannedUnits: number; upc: number }) {
+  if (!(spec.plannedUnits > 0)) throw new AppError('Set units per batch for this product in Setup first.', 'conflict');
+  const units = totalUnits(input.cases, input.looseUnits, spec.upc);
+  if (!(units > 0)) throw new AppError('Enter the cases or units actually produced.', 'invalid', { cases: 'Enter what was produced.' });
+  return { units, cases: input.cases, actualKg: producedKg(spec.plannedKg, spec.plannedUnits, units) };
 }
 
 async function assertBatchNoFree(tx: Db | Tx, actor: Actor, batchNo: string, exceptId?: string) {
@@ -720,11 +728,12 @@ async function assertBatchNoFree(tx: Db | Tx, actor: Actor, batchNo: string, exc
  */
 export async function logBatch(db: Db, actor: Actor, input: BatchInput & { productId: string; forecastId?: string | null }) {
   requirePerm(actor, 'plan');
-  checkBatchFigures(input);
+  checkBatchDate(input);
   const batchNo = normBatchNo(input.batchNo);
   try {
     return await db.transaction(async (tx) => {
       const p = await ownProduct(tx, actor, input.productId);
+      const out = batchOutput(input, { plannedKg: p.batchKg, plannedUnits: p.unitsPerBatch, upc: p.unitsPerCase });
       await assertBatchNoFree(tx, actor, batchNo);
       if (input.forecastId) {
         const f = await ownForecast(tx, actor, input.forecastId, true);
@@ -751,9 +760,9 @@ export async function logBatch(db: Db, actor: Actor, input: BatchInput & { produ
         productId: p.id,
         forecastId: input.forecastId ?? null,
         plannedKg: p.batchKg,
-        actualKg: round(input.actualKg),
-        units: input.units,
-        cases: input.cases,
+        plannedUnits: p.unitsPerBatch,
+        unitsPerCase: p.unitsPerCase,
+        ...out,
         materialCost: Math.round(materialCost * 100) / 100,
         notes: input.notes?.trim() || null,
         createdBy: actor.userId,
@@ -766,10 +775,10 @@ export async function logBatch(db: Db, actor: Actor, input: BatchInput & { produ
   }
 }
 
-/** Correct a batch record (number, date, kg, units, cases, notes). Stock isn't touched. */
+/** Correct a batch record (number, date, cases, loose units, notes). Stock isn't touched. */
 export async function updateBatch(db: Db, actor: Actor, id: string, input: BatchInput) {
   requirePerm(actor, 'plan');
-  checkBatchFigures(input);
+  checkBatchDate(input);
   const batchNo = normBatchNo(input.batchNo);
   try {
     return await db.transaction(async (tx) => {
@@ -780,9 +789,15 @@ export async function updateBatch(db: Db, actor: Actor, id: string, input: Batch
         .for('update');
       if (!b) throw new AppError('That batch no longer exists.', 'not_found');
       await assertBatchNoFree(tx, actor, batchNo, id);
+      // Very old records didn't keep the recipe's units; fall back to the product's current figures.
+      const spec =
+        b.plannedUnits && b.unitsPerCase
+          ? { plannedUnits: b.plannedUnits, upc: b.unitsPerCase }
+          : await ownProduct(tx, actor, b.productId).then((p) => ({ plannedUnits: p.unitsPerBatch, upc: p.unitsPerCase }));
+      const out = batchOutput(input, { plannedKg: b.plannedKg, ...spec });
       await tx
         .update(t.productionBatches)
-        .set({ batchNo, producedOn: input.date, actualKg: round(input.actualKg), units: input.units, cases: input.cases, notes: input.notes?.trim() || null, updatedAt: new Date() })
+        .set({ batchNo, producedOn: input.date, ...out, plannedUnits: spec.plannedUnits, unitsPerCase: spec.upc, notes: input.notes?.trim() || null, updatedAt: new Date() })
         .where(eq(t.productionBatches.id, id));
       return { batchNo };
     });

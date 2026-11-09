@@ -1,7 +1,8 @@
 /**
  * Production records maths, shared by the server and the screens.
  *
- * - Wastage = the recipe's batch weight − the kg actually produced.
+ * - Production enters full cases + loose units; kg produced = units × unit weight (batch kg ÷ units per batch).
+ * - Wastage = the recipe's batch weight − the kg actually produced (the same share as units short).
  * - Cost per kg (after wastage) = the batch's material cost ÷ the kg actually produced,
  *   so losses push the real cost per kg up.
  * - Wastage cost = the batch's material cost × the share of its weight that was lost.
@@ -9,10 +10,24 @@
  */
 import type { Batch, Product } from './types';
 
-export function batchMetrics(b: Pick<Batch, 'plannedKg' | 'actualKg' | 'materialCost'>) {
+/** Kg produced from the units made: units × unit weight, where unit weight = batch kg ÷ units per batch. */
+export function producedKg(plannedKg: number, plannedUnits: number, units: number) {
+  if (!(plannedUnits > 0)) return 0;
+  return Math.round(((plannedKg * units) / plannedUnits) * 1000) / 1000;
+}
+
+/** Full cases × units per case + loose units. */
+export const totalUnits = (cases: number, looseUnits: number, upc: number) => cases * Math.max(1, upc) + looseUnits;
+
+/** Loose units on top of full cases (for showing a stored record back in the form). */
+export const looseUnitsOf = (b: Pick<Batch, 'units' | 'cases' | 'upc'>) => Math.max(0, b.units - b.cases * Math.max(1, b.upc));
+
+export function batchMetrics(b: Pick<Batch, 'plannedKg' | 'actualKg' | 'materialCost'> & Partial<Pick<Batch, 'plannedUnits' | 'units'>>) {
   const wastageKg = b.plannedKg - b.actualKg;
   return {
     wastageKg,
+    /** Units short of the recipe's units per batch (0 when unknown on old records). */
+    wastageUnits: b.plannedUnits ? b.plannedUnits - (b.units ?? 0) : 0,
     wastagePct: b.plannedKg > 0 ? (wastageKg / b.plannedKg) * 100 : 0,
     wastageCost: b.plannedKg > 0 ? (b.materialCost * wastageKg) / b.plannedKg : 0,
     costPerKg: b.actualKg > 0 ? b.materialCost / b.actualKg : 0,

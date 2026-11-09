@@ -364,26 +364,26 @@ describe('stock, orders and production', () => {
 
   it('a batch gets its own number and date, deducts one batch of the recipe, and counts the plan down', async () => {
     const f = await firstForecast(FUDGE);
-    const res = await svc.logBatch(db, production, { productId: f.productId, forecastId: f.id, batchNo: ' b-261021-01 ', date: '2026-10-21', actualKg: 488, units: 488, cases: 48 });
+    const res = await svc.logBatch(db, production, { productId: f.productId, forecastId: f.id, batchNo: ' b-261021-01 ', date: '2026-10-21', cases: 48, looseUnits: 8 });
     expect(res).toEqual({ batchNo: 'B-261021-01', product: FUDGE });
     expect((await material(db, orgId, SUGAR)).inHand).toBe(2243 - 140);
     const [after] = await db.select().from(t.forecasts).where(eq(t.forecasts.id, f.id));
     expect(after.batches).toBe(3);
     const [b] = await db.select().from(t.productionBatches).where(eq(t.productionBatches.batchNo, 'B-261021-01'));
     const m = buildModel(await loadData(db, orgId));
-    expect(b).toMatchObject({ producedOn: '2026-10-21', plannedKg: 500, actualKg: 488, units: 488, cases: 48, createdBy: production.userId });
+    expect(b).toMatchObject({ producedOn: '2026-10-21', plannedKg: 500, plannedUnits: 500, unitsPerCase: 10, actualKg: 488, units: 488, cases: 48, createdBy: production.userId });
     expect(b.materialCost).toBeCloseTo(m.batchCost(m.prodById[f.productId]), 0);
   });
 
   it('batches can be logged without a plan', async () => {
     const fudge = await product(db, orgId, FUDGE);
-    await svc.logBatch(db, admin, { productId: fudge.id, batchNo: 'X-1', date: '2026-10-20', actualKg: 500, units: 500, cases: 50 });
+    await svc.logBatch(db, admin, { productId: fudge.id, batchNo: 'X-1', date: '2026-10-20', cases: 50, looseUnits: 0 });
     expect((await loadData(db, orgId)).batches.find((b) => b.batchNo === 'X-1')).toMatchObject({ forecastId: null, by: 'Ana Reyes' });
   });
 
   it('every batch number is unique within the organization', async () => {
     const fudge = await product(db, orgId, FUDGE);
-    const base = { productId: fudge.id, date: '2026-10-20', actualKg: 490, units: 490, cases: 49 };
+    const base = { productId: fudge.id, date: '2026-10-20', cases: 49, looseUnits: 0 };
     await svc.logBatch(db, production, { ...base, batchNo: 'B-1' });
     const before = (await material(db, orgId, SUGAR)).inHand;
     await expect(svc.logBatch(db, production, { ...base, batchNo: 'b-1' })).rejects.toMatchObject({ code: 'conflict', fieldErrors: { batchNo: expect.any(String) } });
@@ -395,32 +395,35 @@ describe('stock, orders and production', () => {
     await svc.logBatch(db, other, { ...base, productId: theirFudge.id, batchNo: 'B-1' });
   });
 
-  it('refuses a batch when in-hand stock is short, a future date, or zero kg', async () => {
+  it('refuses a batch when in-hand stock is short, a future date, or nothing produced', async () => {
     const coating = await product(db, orgId, 'Chocolate Coating');
-    const base = { productId: coating.id, date: '2026-10-20', actualKg: 980, units: 196, cases: 49 };
+    const base = { productId: coating.id, date: '2026-10-20', cases: 49, looseUnits: 0 };
     await svc.logBatch(db, production, { ...base, batchNo: 'C-1' }); // 3.87 of 6 kg salt + vanilla
     await expect(svc.logBatch(db, production, { ...base, batchNo: 'C-2' })).rejects.toThrow(/Salt \+ Vanilla Powder/);
     await expect(svc.logBatch(db, production, { ...base, batchNo: 'C-3', date: '2999-01-01' })).rejects.toMatchObject({ fieldErrors: { date: expect.any(String) } });
-    await expect(svc.logBatch(db, production, { ...base, batchNo: 'C-4', actualKg: 0 })).rejects.toMatchObject({ fieldErrors: { actualKg: expect.any(String) } });
+    await expect(svc.logBatch(db, production, { ...base, batchNo: 'C-4', cases: 0 })).rejects.toMatchObject({ fieldErrors: { cases: expect.any(String) } });
+    // Kg produced comes from units × unit weight (1000 kg ÷ 200 units = 5 kg each).
+    const [c1] = await db.select().from(t.productionBatches).where(eq(t.productionBatches.batchNo, 'C-1'));
+    expect(c1).toMatchObject({ units: 196, cases: 49, actualKg: 980, plannedUnits: 200 });
   });
 
   it('only Admin and Production record batches', async () => {
     const fudge = await product(db, orgId, FUDGE);
-    await forbidden(svc.logBatch(db, warehouse, { productId: fudge.id, batchNo: 'W-1', date: '2026-10-20', actualKg: 500, units: 500, cases: 50 }));
+    await forbidden(svc.logBatch(db, warehouse, { productId: fudge.id, batchNo: 'W-1', date: '2026-10-20', cases: 50, looseUnits: 0 }));
   });
 
   it('batch records can be corrected without touching stock', async () => {
     const fudge = await product(db, orgId, FUDGE);
-    await svc.logBatch(db, production, { productId: fudge.id, batchNo: 'E-1', date: '2026-10-20', actualKg: 500, units: 500, cases: 50 });
+    await svc.logBatch(db, production, { productId: fudge.id, batchNo: 'E-1', date: '2026-10-20', cases: 50, looseUnits: 0 });
     const stock = (await material(db, orgId, SUGAR)).inHand;
     const [b] = await db.select().from(t.productionBatches).where(eq(t.productionBatches.batchNo, 'E-1'));
-    await svc.updateBatch(db, production, b.id, { batchNo: 'E-1A', date: '2026-10-19', actualKg: 470, units: 470, cases: 47, notes: 'spill at filling' });
+    await svc.updateBatch(db, production, b.id, { batchNo: 'E-1A', date: '2026-10-19', cases: 46, looseUnits: 10, notes: 'spill at filling' });
     const [after] = await db.select().from(t.productionBatches).where(eq(t.productionBatches.id, b.id));
-    expect(after).toMatchObject({ batchNo: 'E-1A', producedOn: '2026-10-19', actualKg: 470, notes: 'spill at filling', materialCost: b.materialCost });
+    expect(after).toMatchObject({ batchNo: 'E-1A', producedOn: '2026-10-19', units: 470, cases: 46, actualKg: 470, notes: 'spill at filling', materialCost: b.materialCost });
     expect((await material(db, orgId, SUGAR)).inHand).toBe(stock);
     // Can't take another batch's number.
     const [sample] = (await loadData(db, orgId)).batches.filter((x) => x.batchNo !== 'E-1A');
-    await expect(svc.updateBatch(db, production, b.id, { batchNo: sample.batchNo, date: '2026-10-19', actualKg: 470, units: 470, cases: 47 })).rejects.toMatchObject({ code: 'conflict' });
+    await expect(svc.updateBatch(db, production, b.id, { batchNo: sample.batchNo, date: '2026-10-19', cases: 47, looseUnits: 0 })).rejects.toMatchObject({ code: 'conflict' });
   });
 
   it('changing batch weight scales mix lines but not packaging', async () => {

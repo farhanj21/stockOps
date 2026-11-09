@@ -212,8 +212,14 @@ export const productionBatches = pgTable(
     forecastId: text('forecast_id').references(() => forecasts.id, { onDelete: 'set null' }),
     /** The recipe's batch weight when the batch was made. */
     plannedKg: qty('planned_kg').notNull(),
+    /** The recipe's units per batch and units per case when the batch was made (null on very old records). */
+    plannedUnits: integer('planned_units'),
+    unitsPerCase: integer('units_per_case'),
+    /** Kg produced = units × (planned kg ÷ planned units); older records were typed in directly. */
     actualKg: qty('actual_kg').notNull(),
+    /** Total units made: full cases × units per case + loose units. */
     units: integer('units').notNull(),
+    /** Full cases packed. */
     cases: integer('cases').notNull(),
     materialCost: numeric('material_cost', { precision: 14, scale: 2, mode: 'number' }).notNull(),
     notes: text('notes'),

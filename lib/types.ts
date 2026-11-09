@@ -60,8 +60,14 @@ export interface Batch {
   forecastId: string | null;
   /** Recipe batch weight when it was made. */
   plannedKg: number;
+  /** Recipe units per batch and units per case when it was made (0 on very old records). */
+  plannedUnits: number;
+  upc: number;
+  /** Units × unit weight (planned kg ÷ planned units). */
   actualKg: number;
+  /** Total units made: full cases × units per case + loose units. */
   units: number;
+  /** Full cases packed. */
   cases: number;
   /** Recipe × material prices at the time it was logged. */
   materialCost: number;
