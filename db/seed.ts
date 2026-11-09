@@ -51,6 +51,7 @@ export async function insertSampleContent(db: Db | Tx, organizationId: string, a
       batchKg: n(p.batchKg),
       unitsPerBatch: n(p.upb),
       unitsPerCase: n(p.upc),
+      unitWeightG: n(p.unitG) || null,
       position,
     })),
   );
@@ -98,6 +99,7 @@ export async function insertSampleContent(db: Db | Tx, organizationId: string, a
         plannedKg: b.plannedKg,
         plannedUnits: b.plannedUnits || null,
         unitsPerCase: b.upc || null,
+        unitWeightG: b.unitG || null,
         actualKg: b.actualKg,
         units: b.units,
         cases: b.cases,

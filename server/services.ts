@@ -13,7 +13,7 @@ import type { ImportUndo } from '@/lib/api';
 import { num, qu, round } from '@/lib/format';
 import { planImport, type ImportRow } from '@/lib/import-plan';
 import { buildModel } from '@/lib/mrp';
-import { normBatchNo, producedKg, totalUnits } from '@/lib/production';
+import { normBatchNo, producedKg, totalUnits, unitWeightG } from '@/lib/production';
 import { isBuiltInRole, ROLES, type Perms } from '@/lib/roles';
 import type { MaterialKind, Role } from '@/lib/types';
 import { can, plantToday, requireAdmin, requirePerm, type Actor } from './actor';
@@ -524,7 +524,7 @@ export async function revertImport(db: Db, actor: Actor, undo: ImportUndo) {
 
 // ── Products & recipes (Admin) ──────────────────────────────────────────────
 
-export async function addProduct(db: Db, actor: Actor, input: { name: string; batchKg: number; upb: number; upc: number }) {
+export async function addProduct(db: Db, actor: Actor, input: { name: string; batchKg: number; upb: number; upc: number; unitG?: number | null }) {
   requirePerm(actor, 'setup');
   requireAdmin(actor);
   if (input.batchKg <= 0) throw new AppError('Batch size must be more than 0 kg.', 'invalid', { batchKg: 'Must be more than 0.' });
@@ -541,6 +541,7 @@ export async function addProduct(db: Db, actor: Actor, input: { name: string; ba
       batchKg: round(input.batchKg),
       unitsPerBatch: input.upb,
       unitsPerCase: Math.max(1, input.upc),
+      unitWeightG: input.unitG && input.unitG > 0 ? round(input.unitG) : null,
       position: Number(max) + 1,
     });
   } catch (e) {
@@ -614,6 +615,18 @@ export async function setProductCounts(db: Db, actor: Actor, productId: string, 
   const res = await db
     .update(t.products)
     .set(field === 'upb' ? { unitsPerBatch: value } : { unitsPerCase: value })
+    .where(and(eq(t.products.id, productId), eq(t.products.organizationId, actor.organizationId)))
+    .returning({ id: t.products.id });
+  if (!res.length) throw new AppError('That product no longer exists.', 'not_found');
+}
+
+/** Grams per unit, entered on its own: it doesn't change units per batch or batch size. */
+export async function setUnitWeight(db: Db, actor: Actor, productId: string, grams: number | null) {
+  requirePerm(actor, 'setup');
+  requireAdmin(actor);
+  const res = await db
+    .update(t.products)
+    .set({ unitWeightG: grams && grams > 0 ? round(grams) : null })
     .where(and(eq(t.products.id, productId), eq(t.products.organizationId, actor.organizationId)))
     .returning({ id: t.products.id });
   if (!res.length) throw new AppError('That product no longer exists.', 'not_found');
@@ -700,11 +713,11 @@ function checkBatchDate(input: BatchInput) {
 }
 
 /** Units and kg produced from cases + loose units, using the recipe figures the batch was made with. */
-function batchOutput(input: BatchInput, spec: { plannedKg: number; plannedUnits: number; upc: number }) {
-  if (!(spec.plannedUnits > 0)) throw new AppError('Set units per batch for this product in Setup first.', 'conflict');
+function batchOutput(input: BatchInput, spec: { plannedUnits: number; upc: number; unitG: number }) {
+  if (!(spec.unitG > 0)) throw new AppError('Set the unit weight (or units per batch) for this product in Setup first.', 'conflict');
   const units = totalUnits(input.cases, input.looseUnits, spec.upc);
   if (!(units > 0)) throw new AppError('Enter the cases or units actually produced.', 'invalid', { cases: 'Enter what was produced.' });
-  return { units, cases: input.cases, actualKg: producedKg(spec.plannedKg, spec.plannedUnits, units) };
+  return { units, cases: input.cases, actualKg: producedKg(units, spec.unitG) };
 }
 
 async function assertBatchNoFree(tx: Db | Tx, actor: Actor, batchNo: string, exceptId?: string) {
@@ -733,7 +746,8 @@ export async function logBatch(db: Db, actor: Actor, input: BatchInput & { produ
   try {
     return await db.transaction(async (tx) => {
       const p = await ownProduct(tx, actor, input.productId);
-      const out = batchOutput(input, { plannedKg: p.batchKg, plannedUnits: p.unitsPerBatch, upc: p.unitsPerCase });
+      const unitG = unitWeightG(p.batchKg, p.unitsPerBatch, p.unitWeightG ?? 0);
+      const out = batchOutput(input, { plannedUnits: p.unitsPerBatch, upc: p.unitsPerCase, unitG });
       await assertBatchNoFree(tx, actor, batchNo);
       if (input.forecastId) {
         const f = await ownForecast(tx, actor, input.forecastId, true);
@@ -762,6 +776,7 @@ export async function logBatch(db: Db, actor: Actor, input: BatchInput & { produ
         plannedKg: p.batchKg,
         plannedUnits: p.unitsPerBatch,
         unitsPerCase: p.unitsPerCase,
+        unitWeightG: round(unitG),
         ...out,
         materialCost: Math.round(materialCost * 100) / 100,
         notes: input.notes?.trim() || null,
@@ -791,13 +806,17 @@ export async function updateBatch(db: Db, actor: Actor, id: string, input: Batch
       await assertBatchNoFree(tx, actor, batchNo, id);
       // Very old records didn't keep the recipe's units; fall back to the product's current figures.
       const spec =
-        b.plannedUnits && b.unitsPerCase
-          ? { plannedUnits: b.plannedUnits, upc: b.unitsPerCase }
-          : await ownProduct(tx, actor, b.productId).then((p) => ({ plannedUnits: p.unitsPerBatch, upc: p.unitsPerCase }));
-      const out = batchOutput(input, { plannedKg: b.plannedKg, ...spec });
+        b.plannedUnits && b.unitsPerCase && b.unitWeightG
+          ? { plannedUnits: b.plannedUnits, upc: b.unitsPerCase, unitG: b.unitWeightG }
+          : await ownProduct(tx, actor, b.productId).then((p) => ({
+              plannedUnits: b.plannedUnits || p.unitsPerBatch,
+              upc: b.unitsPerCase || p.unitsPerCase,
+              unitG: unitWeightG(p.batchKg, p.unitsPerBatch, p.unitWeightG ?? 0),
+            }));
+      const out = batchOutput(input, spec);
       await tx
         .update(t.productionBatches)
-        .set({ batchNo, producedOn: input.date, ...out, plannedUnits: spec.plannedUnits, unitsPerCase: spec.upc, notes: input.notes?.trim() || null, updatedAt: new Date() })
+        .set({ batchNo, producedOn: input.date, ...out, plannedUnits: spec.plannedUnits, unitsPerCase: spec.upc, unitWeightG: round(spec.unitG), notes: input.notes?.trim() || null, updatedAt: new Date() })
         .where(eq(t.productionBatches.id, id));
       return { batchNo };
     });

@@ -45,7 +45,7 @@ interface StoreState {
   importRows: (rows: ImportRow[], fileName: string) => Promise<{ updated: number; added: number; undo: Undo } | null>;
 
   setRecipeQty: (productId: string, ing: string, qty: Num) => void;
-  setProductField: (productId: string, field: 'upb' | 'upc', v: Num) => void;
+  setProductField: (productId: string, field: 'upb' | 'upc' | 'unitG', v: Num) => void;
   setBatchKg: (productId: string, v: Num) => void;
   /** Typed product name; saved after a short pause. */
   renameProduct: (productId: string, name: string) => void;
@@ -203,7 +203,7 @@ export const useStore = create<StoreState>()((set, get) => {
     },
     setProductField: (productId, field, v) => {
       edit((d) => ({ products: d.products.map((p) => (p.id === productId ? { ...p, [field]: v } : p)) }));
-      sendLater(`product|${productId}|${field}`, v, (n) => api.setProductCounts(productId, field, n));
+      sendLater(`product|${productId}|${field}`, v, (n) => (field === 'unitG' ? api.setUnitWeight(productId, num(n) > 0 ? num(n) : null) : api.setProductCounts(productId, field, n)));
     },
     renameProduct: (productId, name) => {
       edit((d) => ({ products: d.products.map((p) => (p.id === productId ? { ...p, name } : p)) }));

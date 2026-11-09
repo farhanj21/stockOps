@@ -140,6 +140,8 @@ export const products = pgTable(
     batchKg: qty('batch_kg').notNull(),
     unitsPerBatch: integer('units_per_batch').notNull(),
     unitsPerCase: integer('units_per_case').notNull(),
+    /** Grams per finished unit. Entered on its own; it doesn't change units per batch or batch size. */
+    unitWeightG: qty('unit_weight_g'),
     position: integer('position').notNull().default(0),
   },
   (t) => [unique('products_org_name').on(t.organizationId, t.name)],
@@ -216,6 +218,8 @@ export const productionBatches = pgTable(
     /** The recipe's units per batch and units per case when the batch was made (null on very old records). */
     plannedUnits: integer('planned_units'),
     unitsPerCase: integer('units_per_case'),
+    /** The product's unit weight (g) when the batch was made. */
+    unitWeightG: qty('unit_weight_g'),
     /** Kg produced = units × (planned kg ÷ planned units); older records were typed in directly. */
     actualKg: qty('actual_kg').notNull(),
     /** Total units made: full cases × units per case + loose units. */

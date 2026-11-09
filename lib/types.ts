@@ -35,6 +35,8 @@ export interface Product {
   batchKg: Num;
   upb: Num;
   upc: Num;
+  /** Grams per unit, entered in Setup ('' when not set). */
+  unitG: Num;
 }
 
 export interface RecipeLine {
@@ -63,6 +65,8 @@ export interface Batch {
   /** Recipe units per batch and units per case when it was made (0 on very old records). */
   plannedUnits: number;
   upc: number;
+  /** Unit weight (g) used to work out kg produced (0 on very old records). */
+  unitG: number;
   /** Units × unit weight (planned kg ÷ planned units). */
   actualKg: number;
   /** Total units made: full cases × units per case + loose units. */
@@ -116,6 +120,8 @@ export interface Data {
   batches: Batch[];
   /** Built-in roles first, then the organization's custom roles. */
   roles: RoleDef[];
+  /** Latest stock count, adjustment, import or delivery received (ISO time), or null if never. */
+  lastStockUpdate?: { at: string; by: string } | null;
 }
 
 export interface Organization {

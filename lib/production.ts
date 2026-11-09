@@ -1,7 +1,7 @@
 /**
  * Production records maths, shared by the server and the screens.
  *
- * - Production enters full cases + loose units; kg produced = units × unit weight (batch kg ÷ units per batch).
+ * - Production enters full cases + loose units; kg produced = units × the product's unit weight.
  * - Wastage = the recipe's batch weight − the kg actually produced (the same share as units short).
  * - Cost per kg (after wastage) = the batch's material cost ÷ the kg actually produced,
  *   so losses push the real cost per kg up.
@@ -10,10 +10,15 @@
  */
 import type { Batch, Product } from './types';
 
-/** Kg produced from the units made: units × unit weight, where unit weight = batch kg ÷ units per batch. */
-export function producedKg(plannedKg: number, plannedUnits: number, units: number) {
-  if (!(plannedUnits > 0)) return 0;
-  return Math.round(((plannedKg * units) / plannedUnits) * 1000) / 1000;
+/** The product's entered unit weight in grams; if none was entered, batch kg ÷ units per batch. */
+export function unitWeightG(batchKg: number, upb: number, unitG: number) {
+  if (unitG > 0) return unitG;
+  return upb > 0 ? (batchKg * 1000) / upb : 0;
+}
+
+/** Kg produced from the units made: units × unit weight (g). */
+export function producedKg(units: number, unitG: number) {
+  return Math.round(units * unitG) / 1000;
 }
 
 /** Full cases × units per case + loose units. */

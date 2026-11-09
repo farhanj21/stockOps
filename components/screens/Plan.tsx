@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Icon } from '@/components/Icon';
+import { LastUpdated } from '@/components/LastUpdated';
 import { daysFromToday, fmt, fmtDate, inputVal, money, num, plural, qu } from '@/lib/format';
 import { useCurrentUser, useGo, useShowCost } from '@/lib/hooks';
 import { packTxt, useModel } from '@/lib/model';
@@ -35,6 +36,7 @@ export function Plan() {
         </h1>
         <div className="page-sub">Plan batches, record each batch made, and see monthly and yearly totals.</div>
       </div>
+      <LastUpdated />
       <div className="tabs" role="tablist" aria-label="Production sections">
         {tabs.map(([k, label]) => (
           <button

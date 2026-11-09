@@ -2,6 +2,7 @@
 
 import type { ChangeEvent } from 'react';
 import { Icon } from '@/components/Icon';
+import { LastUpdated } from '@/components/LastUpdated';
 import { useStockSummary } from '@/components/shell/AppShell';
 import { useOpeners } from '@/components/sheets/openers';
 import { downloadWorkbook, stockRows } from '@/lib/export';
@@ -80,6 +81,8 @@ export function Stock() {
           </button>
         )}
       </div>
+
+      <LastUpdated />
 
       <div className="chips-row">
         <div className="chips-scroll" role="group" aria-label="Filter materials">

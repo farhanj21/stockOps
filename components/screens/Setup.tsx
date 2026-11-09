@@ -240,7 +240,12 @@ function ProductDetail({ id, onBack }: { id: string; onBack: () => void }) {
             <label htmlFor="unitg" className="field-label sm">
               Unit weight
             </label>
-            <UnitWeightInput readOnly={!canEdit} batchKg={num(sp.batchKg)} upb={num(sp.upb)} onUpb={(v) => setProductField(sp.id, 'upb', v)} />
+            <div className="input-shell" style={{ height: 46 }}>
+              <input id="unitg" placeholder="Enter g" type="number" inputMode="decimal" style={{ fontWeight: 600 }} readOnly={!canEdit} value={sp.unitG} onChange={(e) => setProductField(sp.id, 'unitG', inputVal(e.target.value))} />
+              <span className="subtle" style={{ paddingRight: 14, fontSize: 12 }}>
+                g
+              </span>
+            </div>
           </div>
           <div>
             <label htmlFor="upb" className="field-label sm">
@@ -465,67 +470,23 @@ function AddRecipeLine({ productId }: { productId: string }) {
   );
 }
 
-/** Grams per finished unit ⇄ units per batch. Unit weight isn't stored; it's batch kg ÷ units per batch. */
-const unitsFromWeight = (batchKg: number, grams: number) => (batchKg > 0 && grams > 0 ? Math.round((batchKg * 1000) / grams) : 0);
-const weightFromUnits = (batchKg: number, upb: number) => (batchKg > 0 && upb > 0 ? String(Math.round(((batchKg * 1000) / upb) * 10) / 10) : '');
-
-function UnitWeightInput({ batchKg, upb, onUpb, readOnly }: { batchKg: number; upb: number; onUpb: (upb: number) => void; readOnly?: boolean }) {
-  const [draft, setDraft] = useState(() => weightFromUnits(batchKg, upb));
-  const [seen, setSeen] = useState({ batchKg, upb });
-  // Batch size or units per batch changed elsewhere → show the newly derived weight.
-  if (seen.batchKg !== batchKg || seen.upb !== upb) {
-    setSeen({ batchKg, upb });
-    if (unitsFromWeight(batchKg, num(draft)) !== upb) setDraft(weightFromUnits(batchKg, upb));
-  }
-  return (
-    <div className="input-shell" style={{ height: 46 }}>
-      <input
-        id="unitg"
-        placeholder="Enter g"
-        type="number"
-        inputMode="decimal"
-        style={{ fontWeight: 600 }}
-        readOnly={readOnly}
-        value={draft}
-        onChange={(e) => {
-          setDraft(e.target.value);
-          const u = unitsFromWeight(batchKg, num(e.target.value));
-          if (u > 0) onUpb(u);
-        }}
-      />
-      <span className="subtle" style={{ paddingRight: 14, fontSize: 12 }}>
-        g
-      </span>
-    </div>
-  );
-}
-
 function NewProduct({ onCancel, onCreated }: { onCancel?: () => void; onCreated: (id: string) => void }) {
   const submit = useStore((s) => s.submit);
   const [f, setF] = useState({ name: '', batchKg: '', unitG: '', upb: '', upc: '' });
   const [err, setErr] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
+  // Every field is its own input; none of them fills in another.
   const set = (k: keyof typeof f, v: string) => {
-    setF((x) => {
-      const next = { ...x, [k]: v };
-      // Unit weight drives units per batch; batch size re-derives it while a weight is set.
-      if ((k === 'unitG' || k === 'batchKg') && num(next.unitG) > 0) {
-        const u = unitsFromWeight(num(next.batchKg), num(next.unitG));
-        if (u > 0) next.upb = String(u);
-      }
-      // Typing units per batch directly updates the shown unit weight.
-      if (k === 'upb') next.unitG = weightFromUnits(num(next.batchKg), num(v));
-      return next;
-    });
-    setErr((e) => ({ ...e, [k]: '', upb: k === 'unitG' ? '' : e.upb }));
+    setF((x) => ({ ...x, [k]: v }));
+    setErr((e) => ({ ...e, [k]: '' }));
   };
 
   async function save(e: FormEvent) {
     e.preventDefault();
-    const missing = Object.fromEntries(Object.entries(f).filter(([k, v]) => k !== 'unitG' && !String(v).trim()).map(([k]) => [k, 'Required.']));
+    const missing = Object.fromEntries(Object.entries(f).filter(([, v]) => !String(v).trim()).map(([k]) => [k, 'Required.']));
     if (Object.keys(missing).length) return setErr(missing);
     setBusy(true);
-    const res = await submit(() => api.addProduct({ name: f.name, batchKg: num(f.batchKg), upb: Math.floor(num(f.upb)), upc: Math.max(1, Math.floor(num(f.upc))) }));
+    const res = await submit(() => api.addProduct({ name: f.name, batchKg: num(f.batchKg), upb: Math.floor(num(f.upb)), upc: Math.max(1, Math.floor(num(f.upc))), unitG: num(f.unitG) }));
     setBusy(false);
     if (!res.ok) return setErr(res.fieldErrors ?? { name: res.error });
     toast(`${f.name.trim()} added. Now build its recipe.`);
@@ -548,7 +509,7 @@ function NewProduct({ onCancel, onCreated }: { onCancel?: () => void; onCreated:
           <input id="np-kg" placeholder="Enter batch size" className="input" type="number" inputMode="decimal" value={f.batchKg} aria-invalid={!!err.batchKg} onChange={(e) => set('batchKg', e.target.value)} />
         </FormField>
         <FormField id="np-unitg" label="Unit weight (g)" error={err.unitG}>
-          <input id="np-unitg" placeholder="Enter unit weight" className="input" type="number" inputMode="decimal" value={f.unitG} onChange={(e) => set('unitG', e.target.value)} />
+          <input id="np-unitg" placeholder="Enter unit weight" className="input" type="number" inputMode="decimal" value={f.unitG} aria-invalid={!!err.unitG} onChange={(e) => set('unitG', e.target.value)} />
         </FormField>
         <FormField id="np-upb" label="Units / batch" error={err.upb}>
           <input id="np-upb" placeholder="Enter units per batch" className="input" type="number" inputMode="numeric" value={f.upb} aria-invalid={!!err.upb} onChange={(e) => set('upb', e.target.value)} />

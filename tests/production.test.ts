@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { batchMetrics, byMonth, looseUnitsOf, producedKg, totalUnits, byProduct, inPeriod, periodsWithData, suggestBatchNo, totals } from '@/lib/production';
+import { batchMetrics, byMonth, looseUnitsOf, producedKg, totalUnits, unitWeightG, byProduct, inPeriod, periodsWithData, suggestBatchNo, totals } from '@/lib/production';
 import type { Batch } from '@/lib/types';
 
 const b = (over: Partial<Batch>): Batch => ({
@@ -11,6 +11,7 @@ const b = (over: Partial<Batch>): Batch => ({
   plannedKg: 500,
   plannedUnits: 500,
   upc: 10,
+  unitG: 1000,
   actualKg: 500,
   units: 500,
   cases: 50,
@@ -72,9 +73,12 @@ describe('cases + loose units', () => {
   it('works out units, kg produced and unit wastage', () => {
     const units = totalUnits(48, 8, 10);
     expect(units).toBe(488);
-    expect(producedKg(500, 500, units)).toBe(488);
-    expect(producedKg(1000, 200, 196)).toBe(980);
-    expect(producedKg(500, 0, 10)).toBe(0);
+    expect(producedKg(units, 1000)).toBe(488);
+    expect(producedKg(196, 5000)).toBe(980);
+    expect(producedKg(10, 0)).toBe(0);
+    // Unit weight is its own input; batch kg ÷ units per batch is only the fallback when it's blank.
+    expect(unitWeightG(500, 500, 250)).toBe(250);
+    expect(unitWeightG(500, 500, 0)).toBe(1000);
     expect(looseUnitsOf({ units: 488, cases: 48, upc: 10 })).toBe(8);
     const x = batchMetrics({ plannedKg: 500, actualKg: 488, materialCost: 1000, plannedUnits: 500, units: 488 });
     expect(x.wastageUnits).toBe(12);

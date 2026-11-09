@@ -1603,3 +1603,25 @@ input.input[readonly],
 .unit-input input[readonly] {
   cursor: default;
 }
+
+/* "Stock last updated / Last production" line on Home, Stock and Production. */
+.last-updated {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  font-size: 12px;
+  color: var(--ink);
+}
+.last-updated > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.last-updated strong {
+  color: var(--strong);
+}

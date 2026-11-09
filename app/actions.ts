@@ -232,8 +232,8 @@ export async function revertImport(undo: ImportUndo) {
 
 // ── Recipes ─────────────────────────────────────────────────────────────────
 
-export async function addProduct(form: { name: string; batchKg: number; upb: number; upc: number }) {
-  const parsed = z.object({ name: Name, batchKg: Qty, upb: Count, upc: Count }).safeParse(form);
+export async function addProduct(form: { name: string; batchKg: number; upb: number; upc: number; unitG?: number | null }) {
+  const parsed = z.object({ name: Name, batchKg: Qty, upb: Count, upc: Count, unitG: Qty.nullable().optional() }).safeParse(form);
   if (!parsed.success) return fieldFail(parsed.error);
   return act((db, actor) => svc.addProduct(db, actor, parsed.data));
 }
@@ -260,6 +260,10 @@ export async function setRecipeQty(productId: string, ingredientId: string, qty:
 
 export async function setProductCounts(productId: string, field: string, value: number) {
   return act((db, actor) => svc.setProductCounts(db, actor, Id.parse(productId), z.enum(['upb', 'upc']).parse(field), Count.parse(value)));
+}
+
+export async function setUnitWeight(productId: string, grams: number | null) {
+  return act((db, actor) => svc.setUnitWeight(db, actor, Id.parse(productId), Qty.nullable().parse(grams)));
 }
 
 export async function setBatchKg(productId: string, kg: number) {

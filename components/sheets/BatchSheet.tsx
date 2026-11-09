@@ -6,7 +6,7 @@ import { FormField } from '@/components/FormField';
 import { useShowCost } from '@/lib/hooks';
 import { fmt, fmtDate, money, num, plural, qu, today } from '@/lib/format';
 import { useModel } from '@/lib/model';
-import { batchMetrics, looseUnitsOf, producedKg, suggestBatchNo, totalUnits } from '@/lib/production';
+import { batchMetrics, looseUnitsOf, producedKg, suggestBatchNo, totalUnits, unitWeightG } from '@/lib/production';
 import { useStore } from '@/lib/store';
 import { toast, useUI } from '@/lib/ui';
 import { SheetHeader } from './Sheet';
@@ -84,7 +84,8 @@ function BatchForm({ editingId }: { editingId?: string }) {
   const plannedUnits = editing?.plannedUnits || num(p?.upb);
   const upc = Math.max(1, editing?.upc || num(p?.upc));
   const units = totalUnits(Math.floor(num(f.cases)), Math.floor(num(f.loose)), upc);
-  const actualKg = producedKg(plannedKg, plannedUnits, units);
+  const unitG = editing?.unitG || unitWeightG(num(p?.batchKg), num(p?.upb), num(p?.unitG));
+  const actualKg = producedKg(units, unitG);
   const materialCost = editing?.materialCost ?? (p ? m.batchCost(p) : 0);
   const metrics = batchMetrics({ plannedKg, actualKg, materialCost, plannedUnits, units });
 
@@ -106,7 +107,7 @@ function BatchForm({ editingId }: { editingId?: string }) {
     if (num(f.cases) < 0) next.cases = "Can't be negative.";
     if (num(f.loose) < 0) next.loose = "Can't be negative.";
     if (!next.cases && !next.loose && !(units > 0)) next.cases = 'Enter what was produced.';
-    if (!(plannedUnits > 0)) next.cases = 'Set units per batch for this product in Setup first.';
+    if (!(unitG > 0)) next.cases = 'Set the unit weight for this product in Setup first.';
     if (!f.date) next.date = 'Pick the production date.';
     if (Object.keys(next).length) return setErr(next);
     const fields = {
@@ -200,7 +201,7 @@ function BatchForm({ editingId }: { editingId?: string }) {
           </FormField>
         </div>
         <div className="subtle tnum" style={{ marginTop: -8, fontSize: 12 }}>
-          = {fmt(units)} units · {qu(actualKg, 'kg')} produced ({plannedUnits > 0 ? `${fmt(Math.round((plannedKg * 1000 * 10) / plannedUnits) / 10)} g` : '—'} per unit)
+          = {fmt(units)} units · {qu(actualKg, 'kg')} produced ({unitG > 0 ? `${fmt(Math.round(unitG * 10) / 10)} g` : '—'} per unit)
         </div>
 
         <div className="batch-preview tnum">

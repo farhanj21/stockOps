@@ -1,6 +1,7 @@
 'use client';
 
 import { Icon, type IconName } from '@/components/Icon';
+import { LastUpdated } from '@/components/LastUpdated';
 import { useGreeting } from '@/components/shell/AppShell';
 import { SearchBox, SearchResultsPage } from '@/components/shell/Search';
 import { useOpeners } from '@/components/sheets/openers';
@@ -94,6 +95,8 @@ export function Dashboard() {
         </div>
         <SearchBox size="page" />
       </div>
+
+      <LastUpdated />
 
       {hasQuery && (
         <div className="n-only">

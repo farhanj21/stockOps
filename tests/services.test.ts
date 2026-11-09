@@ -303,6 +303,7 @@ describe('role permissions (blueprint §3)', () => {
     await forbidden(svc.setBatchKg(db, setupRole, fudge.id, 600));
     await forbidden(svc.setProductCounts(db, setupRole, fudge.id, 'upb', 10));
     await forbidden(svc.setProductCounts(db, setupRole, fudge.id, 'upc', 5));
+    await forbidden(svc.setUnitWeight(db, setupRole, fudge.id, 250));
     await forbidden(svc.setRecipeQty(db, setupRole, fudge.id, sugar.id, 1));
     await forbidden(svc.removeRecipeLine(db, setupRole, fudge.id, sugar.id));
     await forbidden(svc.addProduct(db, setupRole, { name: 'X', batchKg: 1, upb: 1, upc: 1 }));
@@ -329,6 +330,14 @@ describe('stock, orders and production', () => {
     await svc.stepStock(db, warehouse, sugar.id, 'inHand', 1);
     expect((await material(db, orgId, SUGAR)).inHand).toBe(2268);
     expect((await movements(sugar.id))[0]).toMatchObject({ delta: 25, balanceAfter: 2268, reason: 'adjust', userId: warehouse.userId, organizationId: orgId });
+  });
+
+  it('the snapshot says when stock was last updated and by whom', async () => {
+    const sugar = await material(db, orgId, SUGAR);
+    await svc.setStock(db, warehouse, sugar.id, 'inHand', 2000);
+    const last = (await loadData(db, orgId)).lastStockUpdate;
+    expect(last?.by).toBe(warehouse.name);
+    expect(Date.now() - new Date(last!.at).getTime()).toBeLessThan(60_000);
   });
 
   it('orders whole packs for every suggestion and moves them into pipeline', async () => {
@@ -410,6 +419,18 @@ describe('stock, orders and production', () => {
   it('only Admin and Production record batches', async () => {
     const fudge = await product(db, orgId, FUDGE);
     await forbidden(svc.logBatch(db, warehouse, { productId: fudge.id, batchNo: 'W-1', date: '2026-10-20', cases: 50, looseUnits: 0 }));
+  });
+
+  it('unit weight is its own input and sets kg produced', async () => {
+    const fudge = await product(db, orgId, FUDGE);
+    await svc.setUnitWeight(db, admin, fudge.id, 950);
+    const [p] = await db.select().from(t.products).where(eq(t.products.id, fudge.id));
+    expect(p).toMatchObject({ unitWeightG: 950, unitsPerBatch: 500, batchKg: 500 }); // nothing else changed
+    await svc.setBatchKg(db, admin, fudge.id, 600);
+    expect((await db.select().from(t.products).where(eq(t.products.id, fudge.id)))[0].unitWeightG).toBe(950);
+    await svc.logBatch(db, production, { productId: fudge.id, batchNo: 'U-1', date: '2026-10-20', cases: 10, looseUnits: 0 });
+    const [b] = await db.select().from(t.productionBatches).where(eq(t.productionBatches.batchNo, 'U-1'));
+    expect(b).toMatchObject({ units: 100, actualKg: 95, unitWeightG: 950 });
   });
 
   it('batch records can be corrected without touching stock', async () => {

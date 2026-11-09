@@ -15,7 +15,7 @@ import { can, resolveRole, type Actor } from './actor';
 export async function loadData(db: Db, organizationId: string, people: { all: boolean; selfId?: string } = { all: true }): Promise<Data> {
   const org = organizationId;
   const receiver = alias(t.users, 'receiver');
-  const [ingredients, products, forecasts, pos, users, batches, customRoles, [poSeq]] = await Promise.all([
+  const [ingredients, products, forecasts, pos, users, batches, customRoles, [poSeq], [lastStock]] = await Promise.all([
     db.select().from(t.ingredients).where(eq(t.ingredients.organizationId, org)).orderBy(asc(t.ingredients.position), asc(t.ingredients.name)),
     db.select().from(t.products).where(eq(t.products.organizationId, org)).orderBy(asc(t.products.position), asc(t.products.name)),
     db
@@ -48,6 +48,14 @@ export async function loadData(db: Db, organizationId: string, people: { all: bo
       .select({ max: sql<number | null>`max(nullif(regexp_replace(${t.stockMovements.ref}, '[^0-9]', '', 'g'), '')::bigint)` })
       .from(t.stockMovements)
       .where(and(eq(t.stockMovements.organizationId, org), eq(t.stockMovements.reason, 'po_created'))),
+    // Last time someone changed stock: a count, adjustment, import or delivery received.
+    db
+      .select({ at: t.stockMovements.createdAt, by: t.users.name })
+      .from(t.stockMovements)
+      .leftJoin(t.users, eq(t.stockMovements.userId, t.users.id))
+      .where(and(eq(t.stockMovements.organizationId, org), inArray(t.stockMovements.reason, ['count', 'adjust', 'import', 'po_received'])))
+      .orderBy(desc(t.stockMovements.createdAt))
+      .limit(1),
   ]);
   const customById = new Map(customRoles.map((r) => [r.id, r]));
 
@@ -77,7 +85,7 @@ export async function loadData(db: Db, organizationId: string, people: { all: bo
       inHand: i.inHand,
       pipeline: i.pipeline,
     })),
-    products: products.map((p) => ({ id: p.id, name: p.name, batchKg: p.batchKg, upb: p.unitsPerBatch, upc: p.unitsPerCase })),
+    products: products.map((p) => ({ id: p.id, name: p.name, batchKg: p.batchKg, upb: p.unitsPerBatch, upc: p.unitsPerCase, unitG: p.unitWeightG ?? '' })),
     recipes,
     forecasts: forecasts.map(({ f, by }) => ({ id: f.id, productId: f.productId, batches: f.batches, date: f.targetDate, by: by ?? '—' })),
     // People see the PO code (PO-2041); it is unique within the organization, so it doubles as the id.
@@ -91,6 +99,7 @@ export async function loadData(db: Db, organizationId: string, people: { all: bo
       lines: poLines.filter((l) => l.poId === po.id).map((l) => ({ ing: l.ingredientId, packs: l.packs, qty: l.qty })),
     })),
     lastPoNo: Number(poSeq?.max) || 0,
+    lastStockUpdate: lastStock ? { at: new Date(lastStock.at).toISOString(), by: lastStock.by ?? '' } : null,
     batches: batches.map(({ b, by }) => ({
       id: b.id,
       batchNo: b.batchNo,
@@ -100,6 +109,7 @@ export async function loadData(db: Db, organizationId: string, people: { all: bo
       plannedKg: b.plannedKg,
       plannedUnits: b.plannedUnits ?? 0,
       upc: b.unitsPerCase ?? 0,
+      unitG: b.unitWeightG ?? 0,
       actualKg: b.actualKg,
       units: b.units,
       cases: b.cases,

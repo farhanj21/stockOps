@@ -37,9 +37,9 @@ export function seed(): Data {
       { id: 'tape', name: 'Packing Tape', unit: 'pcs', kind: 'packaging', cost: 120, pack: 36, packName: 'box', par: 24, inHand: 40, pipeline: 0 },
     ],
     products: [
-      { id: 'fudge', name: 'Chocolate Hot Fudge (McD)', batchKg: 500, upb: 500, upc: 10 },
-      { id: 'coating', name: 'Chocolate Coating', batchKg: 1000, upb: 200, upc: 4 },
-      { id: 'compound', name: 'Compound Chocolate', batchKg: 1000, upb: 1000, upc: 10 },
+      { id: 'fudge', name: 'Chocolate Hot Fudge (McD)', batchKg: 500, upb: 500, upc: 10, unitG: 1000 },
+      { id: 'coating', name: 'Chocolate Coating', batchKg: 1000, upb: 200, upc: 4, unitG: 5000 },
+      { id: 'compound', name: 'Compound Chocolate', batchKg: 1000, upb: 1000, upc: 10, unitG: 1000 },
     ],
     recipes: {
       fudge: pctBom(
@@ -114,7 +114,8 @@ function sampleBatches(): Data['batches'] {
       plannedKg,
       plannedUnits,
       upc,
-      actualKg: producedKg(plannedKg, plannedUnits, units),
+      unitG: (plannedKg * 1000) / plannedUnits,
+      actualKg: producedKg(units, (plannedKg * 1000) / plannedUnits),
       units,
       cases: Math.floor(units / upc),
       materialCost: 0,
