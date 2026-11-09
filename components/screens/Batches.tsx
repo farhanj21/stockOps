@@ -194,7 +194,10 @@ function BatchCard({ b }: { b: Batch }) {
 
 // ── Reports ─────────────────────────────────────────────────────────────────
 
-/** Monthly and yearly production per product: kg, units, cases, wastage and average cost per kg. */
+/**
+ * Monthly and yearly production, always for one product at a time (products are never added together):
+ * kg, units, cases, wastage and average cost per kg, plus a side-by-side table of every product.
+ */
 export function ProductionReports() {
   const SHOW_COST = useShowCost();
   const m = useModel();
@@ -202,18 +205,24 @@ export function ProductionReports() {
   const { months, years } = periodsWithData(all);
   const [mode, setMode] = useState<'month' | 'year'>('month');
   const [pick, setPick] = useState<{ month?: string; year?: string }>({});
-  const [trendProduct, setTrendProduct] = useState('');
+  const [productPick, setProductPick] = useState('');
 
   if (!all.length) return <NoBatches />;
 
   const period = mode === 'month' ? (pick.month && months.includes(pick.month) ? pick.month : months[0]) : pick.year && years.includes(pick.year) ? pick.year : years[0];
   const year = period.slice(0, 4);
   const inIt = inPeriod(all, period);
-  const t = totals(inIt);
   const rows = byProduct(inIt, m.data.products);
-  const trend = byMonth(all, year, trendProduct || undefined);
-  const trendTotal = totals(all.filter((b) => b.date.startsWith(year) && (!trendProduct || b.productId === trendProduct)));
+  // Default: the product with the most kg made in this period (or the first product if none).
+  const busiest = [...rows].sort((a, b) => b.actualKg - a.actualKg)[0]?.product.id;
+  const productId = m.prodById[productPick] ? productPick : (busiest ?? m.data.products[0]?.id ?? '');
+  const productName = m.prodById[productId]?.name ?? '—';
+  const mine = inIt.filter((b) => b.productId === productId);
+  const t = totals(mine);
+  const trend = byMonth(all, year, productId);
+  const trendTotal = totals(all.filter((b) => b.date.startsWith(year) && b.productId === productId));
   const label = mode === 'month' ? monthName(period) : period;
+  const fileSlug = productName.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase();
 
   return (
     <div className="col" style={{ gap: 18 }}>
@@ -237,19 +246,19 @@ export function ProductionReports() {
             </option>
           ))}
         </select>
+        <select className="input" aria-label="Product" value={productId} onChange={(e) => setProductPick(e.target.value)}>
+          {m.data.products.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </select>
         <button
           type="button"
           className="btn btn-outline"
           onClick={() =>
-            downloadWorkbook(`production-report-${period}`, [
-              {
-                name: `By product ${label}`,
-                rows: totalsRows(
-                  'Product',
-                  rows.map((r) => ({ label: r.product.name, t: r })),
-                  { label: 'Total', t },
-                ),
-              },
+            downloadWorkbook(`production-report-${fileSlug}-${period}`, [
+              { name: `Summary ${label}`, rows: totalsRows('Product', [{ label: productName, t }]) },
               {
                 name: `Month by month ${year}`,
                 rows: totalsRows(
@@ -258,7 +267,8 @@ export function ProductionReports() {
                   { label: `Year ${year}`, t: trendTotal },
                 ),
               },
-              { name: `Batches ${label}`, rows: batchRows(m, inIt) },
+              { name: `Batches ${label}`, rows: batchRows(m, mine) },
+              { name: `All products ${label}`, rows: totalsRows('Product', rows.map((r) => ({ label: r.product.name, t: r }))) },
             ]).catch(() => toast("Couldn't build the export."))
           }
         >
@@ -266,6 +276,14 @@ export function ProductionReports() {
         </button>
       </div>
 
+      <h2 className="eyebrow" style={{ margin: 0 }}>
+        {productName} · {label}
+      </h2>
+      {!t.batches && (
+        <div className="muted" style={{ fontSize: 13, marginTop: -8 }}>
+          No batches of {productName} in {label}.
+        </div>
+      )}
       <div className="kpi-grid tnum">
         <Kpi k="Batches" v={fmt(t.batches)} />
         <Kpi k="Kg produced" v={qu(t.actualKg, 'kg')} />
@@ -275,64 +293,41 @@ export function ProductionReports() {
         {SHOW_COST && <Kpi k="Avg cost / kg" v={money(t.costPerKg)} />}
       </div>
 
-      {SHOW_COST && <WastageSummary label={label} t={t} rows={rows} batches={inIt} />}
+      {SHOW_COST && t.batches > 0 && <WastageSummary label={`${productName} · ${label}`} t={t} batches={mine} />}
 
       <section>
         <div className="sec-head">
           <h2 className="eyebrow" style={{ margin: 0 }}>
-            By product · {label}
+            Month by month · {productName} · {year}
           </h2>
         </div>
-        <TotalsTable
-          first="Product"
-          rows={rows.map((r) => ({ key: r.product.id, label: r.product.name, t: r }))}
-          total={t}
-        />
+        <TotalsTable first="Month" rows={trend.map((r) => ({ key: r.month, label: monthName(r.month).slice(0, 3), t: r }))} total={trendTotal} totalLabel={`Year ${year}`} />
+      </section>
+
+      <section>
+        <div className="sec-head">
+          <h2 className="eyebrow" style={{ margin: 0 }}>
+            Each product side by side · {label}
+          </h2>
+        </div>
+        <TotalsTable first="Product" rows={rows.map((r) => ({ key: r.product.id, label: r.product.name, t: r }))} />
         {SHOW_COST && (
           <div className="subtle" style={{ fontSize: 12, marginTop: 8 }}>
             Cost / kg is material cost ÷ kg actually produced, so wastage raises it. Averages are weighted by kg.
           </div>
         )}
       </section>
-
-      <section>
-        <div className="sec-head" style={{ alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          <h2 className="eyebrow" style={{ margin: 0 }}>
-            Month by month · {year}
-          </h2>
-          <select className="input report-inline-select" aria-label="Product for month by month" value={trendProduct} onChange={(e) => setTrendProduct(e.target.value)}>
-            <option value="">All products</option>
-            {m.data.products.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <TotalsTable first="Month" rows={trend.map((r) => ({ key: r.month, label: monthName(r.month).slice(0, 3), t: r }))} total={trendTotal} totalLabel={`Year ${year}`} />
-      </section>
     </div>
   );
 }
 
 /**
- * Where the money went: material spent, how much of it was lost as wastage, and the products
- * and batches that lost the most. Only shown to roles with "See costs".
+ * Where the money went: material spent, how much of it was lost as wastage, and the batches
+ * that lost the most. Only shown to roles with "See costs".
  */
-function WastageSummary({
-  label,
-  t,
-  rows,
-  batches,
-}: {
-  label: string;
-  t: ProductionTotals;
-  rows: (ProductionTotals & { product: { id: string; name: string } })[];
-  batches: Batch[];
-}) {
+function WastageSummary({ label, t, batches }: { label: string; t: ProductionTotals; batches: Batch[] }) {
   const m = useModel();
   const idealPerKg = t.plannedKg > 0 ? t.materialCost / t.plannedKg : 0;
-  const lossByProduct = rows.filter((r) => r.wastageCost > 0).sort((a, b) => b.wastageCost - a.wastageCost).slice(0, 5);
   const worstBatches = batches
     .map((b) => ({ b, x: batchMetrics(b) }))
     .filter(({ x }) => x.wastageKg > 0)
@@ -358,22 +353,6 @@ function WastageSummary({
         <Kpi k="Cost / kg, actual" v={money(t.costPerKg)} />
         <Kpi k="Extra cost / kg" v={money(Math.max(0, t.costPerKg - idealPerKg))} />
       </div>
-
-      {lossByProduct.length > 0 && (
-        <div>
-          <div className="field-label sm">Biggest losses by product</div>
-          <div className="list">
-            {lossByProduct.map((r) => (
-              <div key={r.product.id} className="row" style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '8px 0' }}>
-                <span className="row-title">{r.product.name}</span>
-                <span className="tnum muted" style={{ fontSize: 13 }}>
-                  {qu(r.wastageKg, 'kg')} · {pct(r.wastagePct)} · <strong style={{ color: 'var(--danger)' }}>{money(r.wastageCost)}</strong>
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {worstBatches.length > 0 && (
         <div>
@@ -418,7 +397,8 @@ function TotalsTable({
 }: {
   first: string;
   rows: { key: string; label: string; t: ProductionTotals }[];
-  total: ProductionTotals;
+  /** Footer row; left out where it would add different products together. */
+  total?: ProductionTotals;
   totalLabel?: string;
 }) {
   const SHOW_COST = useShowCost();
@@ -450,17 +430,19 @@ function TotalsTable({
             </tr>
           ))}
         </tbody>
-        <tfoot className="tnum">
-          <tr>
-            <th scope="row">{totalLabel}</th>
-            <td className="num">{fmt(total.batches)}</td>
-            <td className="num">{qu(total.actualKg, 'kg')}</td>
-            <td className="num">{fmt(total.units)}</td>
-            <td className="num">{fmt(total.cases)}</td>
-            <td className="num">{pct(total.wastagePct)}</td>
-            {SHOW_COST && <td className="num">{money(total.costPerKg)}</td>}
-          </tr>
-        </tfoot>
+        {total && (
+          <tfoot className="tnum">
+            <tr>
+              <th scope="row">{totalLabel}</th>
+              <td className="num">{fmt(total.batches)}</td>
+              <td className="num">{qu(total.actualKg, 'kg')}</td>
+              <td className="num">{fmt(total.units)}</td>
+              <td className="num">{fmt(total.cases)}</td>
+              <td className="num">{pct(total.wastagePct)}</td>
+              {SHOW_COST && <td className="num">{money(total.costPerKg)}</td>}
+            </tr>
+          </tfoot>
+        )}
       </table>
     </div>
   );

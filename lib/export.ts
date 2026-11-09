@@ -127,8 +127,8 @@ export function batchRows(m: Model, batches: Batch[]): Row[] {
 }
 
 /** A totals table from the reports screen (by product, or month by month). */
-export function totalsRows(first: string, rows: { label: string; t: ProductionTotals }[], total: { label: string; t: ProductionTotals }): Row[] {
-  return [...rows, total].map(({ label, t }) => ({
+export function totalsRows(first: string, rows: { label: string; t: ProductionTotals }[], total?: { label: string; t: ProductionTotals }): Row[] {
+  return [...rows, ...(total ? [total] : [])].map(({ label, t }) => ({
     [first]: label,
     Batches: t.batches,
     'Kg made': round(t.actualKg),
