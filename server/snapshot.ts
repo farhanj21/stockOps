@@ -140,6 +140,6 @@ export async function loadSnapshot(db: Db, actor: Actor): Promise<Snapshot> {
   const logoUrl = org.logoUpdatedAt ? `/api/org-logo?v=${org.logoUpdatedAt.getTime()}` : null;
   return {
     data,
-    me: { userId: actor.userId, org: { id: org.id, name: org.name, logoUrl }, isOwner: actor.isOwner, role: actor.role, roleId: actor.roleId, perms: actor.perms, demo: demoMode(), sampleData: sampleDataEnabled(), assistant: !!process.env.GEMINI_API_KEY },
+    me: { userId: actor.userId, org: { id: org.id, name: org.name, logoUrl }, isOwner: actor.isOwner, role: actor.role, roleId: actor.roleId, perms: actor.perms, demo: demoMode(), sampleData: sampleDataEnabled() },
   };
 }

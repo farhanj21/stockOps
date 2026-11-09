@@ -2,7 +2,6 @@
 
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef, type ReactNode } from 'react';
-import { Assistant } from '@/components/assistant/Assistant';
 import { InstallBanner } from '@/components/InstallApp';
 import { Sheet } from '@/components/sheets/Sheet';
 import { tabOf, useCurrentUser, type Tab } from '@/lib/hooks';
@@ -76,7 +75,6 @@ export function AppShell({ children }: { children: ReactNode }) {
         <BottomNav tab={tab} />
       </div>
       <Sheet />
-      <Assistant />
     </div>
   );
 }

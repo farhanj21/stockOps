@@ -16,8 +16,6 @@ export interface Me {
   demo: boolean;
   /** The owner can load the sample plant ("Load sample data"): always in development. */
   sampleData: boolean;
-  /** The AI assistant is configured (GEMINI_API_KEY). */
-  assistant: boolean;
 }
 
 export interface Snapshot {
