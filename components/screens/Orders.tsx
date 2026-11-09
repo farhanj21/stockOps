@@ -84,7 +84,7 @@ export function Orders() {
         <section className="min0">
           <div className="sec-head">
             <h2 className="eyebrow" style={{ margin: 0 }}>
-              New purchase order
+              New Purchase Order
             </h2>
             <span className="sec-meta">{m.suggestions.length ? `${m.suggestions.length} suggested` : 'Nothing suggested'}</span>
           </div>
@@ -239,7 +239,7 @@ function ReceivedHistory() {
         {all.length > 0 && (
           <button type="button" className="btn-link" style={{ fontSize: 13 }} onClick={exportRows}>
             <Icon name="download" size={14} />
-            Export{q || month ? ' filtered' : ''}
+            Export
           </button>
         )}
       </div>
@@ -326,22 +326,18 @@ function PoDraftRow({ line, onPacks, onRemove }: { line: DraftLine; onPacks: (v:
 
   return (
     <div className="po-row">
-      <button type="button" className="row-remove po-remove" aria-label={`Remove ${i.name} from the order`} onClick={onRemove}>
-        <Icon name="x" size={15} stroke={2.2} />
-      </button>
-      <div className="po-row-main min0">
-        <div style={{ fontSize: 14, fontWeight: 700 }}>{i.name}</div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: 4 }}>
-          <span className={`pill sm ${tone}`} style={{ fontWeight: 600 }}>
-            {label}
+      {/* Name, reason and shortfall on one line; they wrap under the name only when space runs out. */}
+      <div className="po-row-main min0" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px 8px' }}>
+        <span style={{ fontSize: 14, fontWeight: 700 }}>{i.name}</span>
+        <span className={`pill sm ${tone}`} style={{ fontWeight: 600 }}>
+          {label}
+        </span>
+        {line.deficit > 0 && (
+          <span className="subtle tnum" style={{ fontSize: 11 }}>
+            Short {qu(line.deficit, i.unit)}
+            {changed && ` · suggested ${line.suggestedPacks}`}
           </span>
-          {line.deficit > 0 && (
-            <span className="subtle tnum" style={{ fontSize: 11 }}>
-              Short {qu(line.deficit, i.unit)}
-              {changed && ` · suggested ${line.suggestedPacks}`}
-            </span>
-          )}
-        </div>
+        )}
       </div>
       <div className="po-row-qty">
         <div className="po-stepper" aria-label={`${i.name} packs`}>
@@ -369,6 +365,9 @@ function PoDraftRow({ line, onPacks, onRemove }: { line: DraftLine; onPacks: (v:
           {SHOW_COST && <span className="muted">{money(qty * num(i.cost))}</span>}
         </div>
       </div>
+      <button type="button" className="row-remove po-remove" aria-label={`Remove ${i.name} from the order`} onClick={onRemove}>
+        <Icon name="x" size={15} stroke={2.2} />
+      </button>
     </div>
   );
 }

@@ -27,7 +27,7 @@ export function Stock() {
 
   const filters: [StockFilter, string, (i: Ingredient) => boolean][] = [
     ['all', 'All', () => true],
-    ['low', `Below par · ${m.alerts.length}`, m.isLow],
+    ['low', 'Below par', m.isLow],
     ['ingredient', 'Ingredients', (i) => i.kind === 'ingredient'],
     ['packaging', 'Packaging', (i) => i.kind === 'packaging'],
   ];
@@ -84,13 +84,18 @@ export function Stock() {
 
       <LastUpdated />
 
-      <div className="chips-row">
-        <div className="chips-scroll" role="group" aria-label="Filter materials">
-          {filters.map(([k, label]) => (
-            <button key={k} type="button" className="chip" aria-pressed={filter === k} onClick={() => setUI({ stockFilter: k })}>
-              {label}
-            </button>
-          ))}
+      <div className="stock-bar">
+        {/* Same segmented control as Monthly / Yearly on Reports, with a count on each option. */}
+        <div className="seg stock-seg" role="radiogroup" aria-label="Filter materials">
+          {filters.map(([k, label, fn]) => {
+            const count = m.ings.filter(fn).length;
+            return (
+              <button key={k} type="button" role="radio" aria-checked={filter === k} onClick={() => setUI({ stockFilter: k })}>
+                {label}
+                <span className={`seg-count${k === 'low' && count > 0 ? ' alert' : ''}`}>{count}</span>
+              </button>
+            );
+          })}
         </div>
         <button type="button" className="btn btn-outline w-only" style={{ flex: 'none', padding: '0 14px' }} onClick={exportStock} disabled={!rows.length}>
           <Icon name="download" size={16} />
@@ -103,12 +108,6 @@ export function Stock() {
           </button>
         )}
       </div>
-
-      {perms.stock && (
-        <div className="stock-hint">
-          <strong>− / +</strong> buttons count in whole supplier packs (one bag, drum or box at a time). Tap the number to type an exact count.
-        </div>
-      )}
 
       {!perms.stock && (
         <div className="readonly-note">

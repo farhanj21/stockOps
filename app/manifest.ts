@@ -20,7 +20,7 @@ export default function manifest(): MetadataRoute.Manifest {
     ],
     shortcuts: [
       { name: 'Stock', url: '/stock' },
-      { name: 'Purchase orders', url: '/orders' },
+      { name: 'Purchase Orders', url: '/orders' },
     ],
   };
 }

@@ -199,6 +199,22 @@ function ProductDetail({ id, onBack }: { id: string; onBack: () => void }) {
       : []),
   ];
 
+  async function removeProduct() {
+    const ok = await confirmDialog({
+      title: `Delete ${sp.name}?`,
+      body: "Its recipe, committed plans and production history are deleted too. This can't be undone.",
+      confirmLabel: 'Delete product',
+      danger: true,
+    });
+    if (!ok) return;
+    const res = await send(() => api.deleteProduct(sp.id));
+    if (res) {
+      setUI({ setupProduct: '' });
+      onBack();
+      toast(`${res.name} deleted.`);
+    }
+  }
+
   return (
     <div className="col" style={{ gap: 16 }}>
       <button type="button" className="back-link n-only" onClick={onBack}>
@@ -206,10 +222,19 @@ function ProductDetail({ id, onBack }: { id: string; onBack: () => void }) {
       </button>
 
       <div className="card pad prod-head">
-        <label htmlFor="prod-name" className="sr-only">
-          Product name
-        </label>
-        <TitleInput id="prod-name" value={sp.name} onChange={(v) => renameProduct(sp.id, v)} />
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+          <div className="min0" style={{ flex: 1 }}>
+            <label htmlFor="prod-name" className="sr-only">
+              Product name
+            </label>
+            <TitleInput id="prod-name" value={sp.name} onChange={(v) => renameProduct(sp.id, v)} />
+          </div>
+          {canEdit && (
+            <button type="button" className="btn btn-outline danger-btn" style={{ flex: 'none', height: 38, padding: '0 12px' }} onClick={() => void removeProduct()}>
+              <Icon name="trash" size={15} /> Delete
+            </button>
+          )}
+        </div>
         <div className="muted" style={{ fontSize: 13, marginTop: 2 }}>
           Stock on hand makes {plural(capacity.batches, 'batch', 'batches')} ({fmt(capacity.cases)} cases)
           {capacity.lim ? ` · limited by ${capacity.lim.name}` : ''}
@@ -273,36 +298,6 @@ function ProductDetail({ id, onBack }: { id: string; onBack: () => void }) {
       </div>
 
       <RecipeTable productId={sp.id} canEdit={canEdit} />
-
-      {canEdit && (
-        <div className="danger-zone">
-          <div className="min0">
-            <div style={{ fontSize: 14, fontWeight: 700 }}>Delete this product</div>
-            <div className="row-sub">Its recipe, committed plans and production history go with it.</div>
-          </div>
-          <button
-            type="button"
-            className="btn btn-outline danger-btn"
-            onClick={async () => {
-              const ok = await confirmDialog({
-                title: `Delete ${sp.name}?`,
-                body: "Its recipe, committed plans and production history are deleted too. This can't be undone.",
-                confirmLabel: 'Delete product',
-                danger: true,
-              });
-              if (!ok) return;
-              const res = await send(() => api.deleteProduct(sp.id));
-              if (res) {
-                setUI({ setupProduct: '' });
-                onBack();
-                toast(`${res.name} deleted.`);
-              }
-            }}
-          >
-            <Icon name="trash" size={15} /> Delete
-          </button>
-        </div>
-      )}
     </div>
   );
 }
@@ -563,10 +558,6 @@ function Materials() {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button type="button" className="btn btn-outline n-only" onClick={() => setAdding(true)}>
-            <Icon name="plus" size={16} stroke={2.2} />
-            Add material
-          </button>
           <button
             type="button"
             className="btn btn-primary"
@@ -585,19 +576,28 @@ function Materials() {
               onClick={() => downloadTemplate(materials, today()).catch(() => toast("Couldn't build the export."))}
             >
               <Icon name="download" size={16} />
-              Export Excel
+              Export
             </button>
           )}
         </div>
       </div>
 
-      {/* Phones: one card per material, since the wide table doesn't fit. */}
+      {/* Phones: one card per material, since the wide table doesn't fit; "Add material" comes after the last one. */}
       <div className="n-only">
-        {(adding || !materials.length) && <NewMaterial onDone={() => setAdding(false)} canCancel={materials.length > 0} />}
-        <div className="mat-grid" style={{ marginTop: adding || !materials.length ? 12 : 0 }}>
+        <div className="mat-grid">
           {materials.map((i) => (
             <MaterialCard key={i.id} id={i.id} />
           ))}
+        </div>
+        <div style={{ marginTop: materials.length ? 12 : 0 }}>
+          {adding || !materials.length ? (
+            <NewMaterial onDone={() => setAdding(false)} canCancel={materials.length > 0} />
+          ) : (
+            <button type="button" className="btn btn-outline" style={{ width: '100%' }} onClick={() => setAdding(true)}>
+              <Icon name="plus" size={16} stroke={2.2} />
+              Add material
+            </button>
+          )}
         </div>
       </div>
 
@@ -665,6 +665,7 @@ function Materials() {
                   <button
                     type="button"
                     className="row-remove"
+                    style={{ color: 'var(--danger)' }}
                     aria-label={`Delete ${i.name}`}
                     onClick={async () => {
                       const ok = await confirmDialog({
@@ -720,6 +721,7 @@ function MaterialCard({ id }: { id: string }) {
           <button
             type="button"
             className="row-remove"
+            style={{ color: 'var(--danger)' }}
             aria-label={`Delete ${i.name}`}
             onClick={async () => {
               const ok = await confirmDialog({

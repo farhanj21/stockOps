@@ -89,35 +89,26 @@ export function BatchCalculator() {
 
   return (
     <div className="col" style={{ gap: 14 }}>
-      <div className="card pad col" style={{ gap: 12 }}>
-        <div className="grid2" style={{ gap: 10 }}>
-          <div>
-            <label htmlFor="calc-product" className="field-label sm">
-              Product recipe
-            </label>
-            <select id="calc-product" className="input" value={p.id} onChange={(e) => pick(e.target.value)}>
-              {products.map((x) => (
-                <option key={x.id} value={x.id}>
-                  {x.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label htmlFor="calc-kg" className="field-label sm">
-              Batch size
-            </label>
-            <div className="input-shell" style={{ height: 46 }}>
-              <input id="calc-kg" type="number" inputMode="decimal" min={0} placeholder="Enter kg" style={{ fontWeight: 600 }} value={kg} onChange={(e) => setKg(e.target.value)} />
-              <span className="subtle" style={{ paddingRight: 14, fontSize: 12 }}>
-                kg
-              </span>
-            </div>
-          </div>
+      <div className="report-bar">
+        <select className="input" aria-label="Product recipe" value={p.id} onChange={(e) => pick(e.target.value)}>
+          {products.map((x) => (
+            <option key={x.id} value={x.id}>
+              {x.name}
+            </option>
+          ))}
+        </select>
+        <div className="input-shell calc-kg">
+          <input type="number" inputMode="decimal" min={0} placeholder="Batch size" aria-label="Batch size in kg" style={{ fontWeight: 600 }} value={kg} onChange={(e) => setKg(e.target.value)} />
+          <span className="subtle" style={{ paddingRight: 14, fontSize: 12 }}>
+            kg
+          </span>
         </div>
-        <div className="subtle tnum" style={{ fontSize: 12 }}>
-          Recipe is {qu(recipeKg, 'kg')} per batch · this is ×{fmt(Math.round(factor * 1000) / 1000)} · about {fmt(units)} units / {fmt(cases)} cases
-        </div>
+        <button type="button" className="btn btn-outline" disabled={!lines.length || !(batchKg > 0)} onClick={exportIt}>
+          <Icon name="download" size={16} /> Export
+        </button>
+      </div>
+      <div className="subtle tnum" style={{ fontSize: 12, marginTop: -4 }}>
+        Recipe is {qu(recipeKg, 'kg')} per batch · this is ×{fmt(Math.round(factor * 1000) / 1000)} · about {fmt(units)} units / {fmt(cases)} cases
       </div>
 
       {!lines.length ? (
@@ -174,11 +165,6 @@ export function BatchCalculator() {
       )}
       {anyShort && <div className="stock-hint">Some materials are short for this batch size. Receive stock before making it.</div>}
 
-      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-        <button type="button" className="btn btn-outline" disabled={!lines.length || !(batchKg > 0)} onClick={exportIt}>
-          <Icon name="download" size={16} /> Export to Excel
-        </button>
-      </div>
       <div className="subtle" style={{ fontSize: 12 }}>
         Ingredients keep their recipe percentages. Packaging scales with the units made and is rounded up to whole pieces. Nothing is deducted from stock.
       </div>

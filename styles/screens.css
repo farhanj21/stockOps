@@ -189,30 +189,6 @@
 
 /* ── Stock ───────────────────────────────────────────────────────────── */
 
-.chips-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0 -16px;
-  padding: 0 16px;
-}
-.chips-scroll {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.chips-scroll::-webkit-scrollbar {
-  display: none;
-}
-@media (min-width: 960px) {
-  .chips-row {
-    margin: 0;
-    padding: 0;
-  }
-}
 .readonly-note {
   display: flex;
   align-items: center;
@@ -377,10 +353,6 @@
     grid-template-columns: minmax(0, 380px) minmax(0, 1fr);
     gap: 24px;
   }
-  .plan-left {
-    position: sticky;
-    top: 0;
-  }
 }
 .big-stepper {
   display: grid;
@@ -465,6 +437,10 @@
   .plans-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+/* In the planner's left column, committed plans stack in one column. */
+.plan-left .plans-grid {
+  grid-template-columns: minmax(0, 1fr);
 }
 .plan-card {
   display: flex;
@@ -1278,17 +1254,6 @@ select.cell-input {
   padding: 14px 16px;
   border-bottom: 1px solid var(--line-soft);
 }
-.danger-zone {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 14px 16px;
-  border: 1px dashed var(--danger-line);
-  border-radius: 14px;
-  background: var(--surface);
-}
 .danger-btn {
   border-color: var(--danger-line);
   color: var(--danger);
@@ -1324,10 +1289,10 @@ button.back-link {
 }
 .po-row {
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto 32px;
   align-items: center;
   gap: 6px 10px;
-  padding: 10px 16px 10px 6px;
+  padding: 10px 10px 10px 16px;
   transition: opacity 160ms ease;
 }
 .po-row[data-off='true'] .po-row-main,
@@ -1397,13 +1362,23 @@ button.back-link {
   outline: none;
   background: var(--gold-bg);
 }
-/* Phones: the pack stepper and total sit under the material name. */
+/* Phones: the ✕ stays top right beside the name; the pack stepper and total sit underneath. */
 @media (max-width: 620px) {
   .po-row {
-    grid-template-columns: 44px minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) 32px;
+  }
+  .po-row-main {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .po-remove {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: start;
   }
   .po-row-qty {
-    grid-column: 2;
+    grid-column: 1 / -1;
+    grid-row: 2;
     justify-content: space-between;
   }
 }
@@ -1489,6 +1464,16 @@ button.back-link {
     flex: 1 1 100%;
   }
 }
+/* Batch calculator: the kg box sits in the report bar beside the product picker. */
+.report-bar > .calc-kg {
+  flex: 1 1 140px;
+  height: 48px;
+}
+@media (min-width: 960px) {
+  .report-bar > .calc-kg {
+    flex: 0 1 180px;
+  }
+}
 .report-inline-select {
   width: auto;
   height: 38px;
@@ -1516,6 +1501,82 @@ button.back-link {
 .seg button[aria-checked='true'] {
   background: var(--navy);
   color: var(--on-navy);
+}
+/* Stock: filter control on the left, Export / Import on the right (desktop). */
+.stock-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.stock-bar > .btn {
+  flex: none;
+  padding: 0 14px;
+}
+.stock-bar > .seg {
+  margin-right: auto;
+}
+.stock-seg {
+  display: flex;
+  max-width: 100%;
+}
+.stock-seg button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.seg-count {
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--fill);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.seg button[aria-checked='true'] .seg-count {
+  background: rgba(255, 255, 255, 0.18);
+  color: inherit;
+}
+.seg-count.alert {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+/* Phones: the control fills the width and the four options share it equally (no scrolling). */
+@media (max-width: 959px) {
+  .stock-bar > .seg {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin-right: 0;
+  }
+  .stock-seg {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .stock-seg button {
+    min-width: 0;
+    height: 38px;
+    padding: 0 6px;
+    font-size: 13px;
+  }
+}
+/* Narrow phones: the count sits under the label so every option fits. */
+@media (max-width: 520px) {
+  .stock-seg button {
+    flex-direction: column;
+    gap: 2px;
+    height: 48px;
+    padding: 0 2px;
+    font-size: 12px;
+  }
+  .stock-seg .seg-count {
+    min-width: 0;
+    padding: 0 6px;
+    font-size: 10px;
+    line-height: 15px;
+  }
 }
 .kpi-grid {
   display: grid;

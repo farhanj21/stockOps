@@ -54,7 +54,7 @@ export function PoSheet({ id }: { id: string }) {
 
   return (
     <>
-      <SheetHeader kicker="Purchase order" title={po.id} />
+      <SheetHeader kicker="Purchase Order" title={po.id} />
       <div className="sheet-body">
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12 }}>
           <div>

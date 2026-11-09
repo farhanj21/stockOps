@@ -28,7 +28,7 @@ const QUICK_ACTIONS: Record<Role, QuickAction[]> = {
   Admin: [
     { title: 'Plan production', sub: 'Forecast batches', icon: 'calendar', to: 'plan' },
     { title: 'Log stock', sub: 'In-hand & pipeline', icon: 'clipboard', to: 'stock' },
-    { title: 'Purchase orders', sub: 'Review & generate', icon: 'receipt', to: 'orders' },
+    { title: 'Purchase Orders', sub: 'Review & generate', icon: 'receipt', to: 'orders' },
     { title: 'Recipes & par', sub: 'Admin setup', icon: 'sliders', to: 'setup' },
   ],
   Warehouse: [
@@ -55,7 +55,7 @@ function quickActionsFor(roleId: string, perms: Perms): QuickAction[] {
   if (perms.plan) list.push({ title: 'Log a batch', sub: 'Batch no. · kg · cases', icon: 'check', iconStroke: 2.2, to: 'batch' });
   if (perms.setup) list.push({ title: 'Recipes & par', sub: 'Setup', icon: 'sliders', to: 'setup' });
   if (!perms.stock) list.push({ title: 'Check stock', sub: 'View only', icon: 'box', to: 'stock' });
-  list.push({ title: 'Purchase orders', sub: 'Review & generate', icon: 'receipt', to: 'orders' });
+  list.push({ title: 'Purchase Orders', sub: 'Review & generate', icon: 'receipt', to: 'orders' });
   list.push({ title: 'Below-par items', sub: 'Filtered stock list', icon: 'alert', to: 'stockLow' });
   return list.slice(0, 4);
 }

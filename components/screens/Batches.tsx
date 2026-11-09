@@ -1,14 +1,16 @@
 'use client';
 
 import { useState } from 'react';
+import { deleteBatch } from '@/app/actions';
 import { Icon } from '@/components/Icon';
-import { useShowCost } from '@/lib/hooks';
+import { useCurrentUser, useShowCost } from '@/lib/hooks';
 import { batchRows, downloadWorkbook, totalsRows } from '@/lib/export';
 import { fmt, fmtDate, money, plural, qu } from '@/lib/format';
 import { useModel } from '@/lib/model';
 import { batchMetrics, byMonth, byProduct, inPeriod, periodsWithData, totals, type ProductionTotals } from '@/lib/production';
+import { useStore } from '@/lib/store';
 import type { Batch } from '@/lib/types';
-import { toast, useUI } from '@/lib/ui';
+import { confirmDialog, toast, useUI } from '@/lib/ui';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const monthName = (ym: string) => `${MONTHS[Number(ym.slice(5, 7)) - 1]} ${ym.slice(0, 4)}`;
@@ -41,6 +43,21 @@ function NoBatches({ filtered }: { filtered?: boolean }) {
 /** Every batch made, newest first, filterable by product and month. */
 export function BatchRecords() {
   const SHOW_COST = useShowCost();
+  const canDelete = useCurrentUser().perms.plan;
+  const send = useStore((s) => s.send);
+
+  // Same rule as the batch sheet: only the record goes; stock and plans stay as they are.
+  async function remove(b: Batch) {
+    const ok = await confirmDialog({
+      title: `Delete batch ${b.batchNo}?`,
+      body: "The batch record is removed from batches and reports. In-hand stock doesn't change. This can't be undone.",
+      confirmLabel: 'Delete batch',
+      danger: true,
+    });
+    if (!ok) return;
+    const res = await send(() => deleteBatch(b.id));
+    if (res) toast(`Batch ${res.batchNo} deleted.`);
+  }
   const m = useModel();
   const [product, setProduct] = useState('');
   const [month, setMonth] = useState('');
@@ -118,7 +135,7 @@ export function BatchRecords() {
                   {SHOW_COST && <th className="num">Cost / batch</th>}
                   {SHOW_COST && <th className="num">Cost / kg</th>}
                   <th>Logged by</th>
-                  <th aria-label="Edit" />
+                  <th aria-label="Actions" />
                 </tr>
               </thead>
               <tbody className="tnum">
@@ -142,9 +159,16 @@ export function BatchRecords() {
                       {SHOW_COST && <td className="num">{money(x.costPerKg)}</td>}
                       <td className="muted">{b.by}</td>
                       <td>
-                        <button type="button" className="icon-btn" aria-label={`Edit batch ${b.batchNo}`} onClick={() => openBatch(b.id)}>
-                          <Icon name="edit" size={16} stroke={2} />
-                        </button>
+                        <div style={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
+                          <button type="button" className="icon-btn" aria-label={`Edit batch ${b.batchNo}`} title="Edit" onClick={() => openBatch(b.id)}>
+                            <Icon name="edit" size={16} stroke={2} />
+                          </button>
+                          {canDelete && (
+                            <button type="button" className="icon-btn" aria-label={`Delete batch ${b.batchNo}`} title="Delete" style={{ color: 'var(--danger)' }} onClick={() => void remove(b)}>
+                              <Icon name="trash" size={16} stroke={2} />
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -272,7 +296,7 @@ export function ProductionReports() {
             ]).catch(() => toast("Couldn't build the export."))
           }
         >
-          <Icon name="download" size={16} /> Export report
+          <Icon name="download" size={16} /> Export
         </button>
       </div>
 

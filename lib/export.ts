@@ -97,7 +97,7 @@ export function poItemRows(m: Model, pos: PurchaseOrder[]): Row[] {
   );
 }
 
-export const poSheets = (m: Model, pos: PurchaseOrder[]): ExportSheet[] => [{ name: 'Purchase orders', rows: poItemRows(m, pos) }];
+export const poSheets = (m: Model, pos: PurchaseOrder[]): ExportSheet[] => [{ name: 'Purchase Orders', rows: poItemRows(m, pos) }];
 
 // ── Production ──────────────────────────────────────────────────────────────
 

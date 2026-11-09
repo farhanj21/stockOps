@@ -125,37 +125,79 @@ function Planner() {
     </>
   );
 
+  // Shown in the left column on desktop and at the bottom on phones.
+  const plansSection = (
+    <section>
+      <div className="sec-head">
+        <h2 className="eyebrow" style={{ margin: 0 }}>
+          Committed plans
+        </h2>
+        <span className="sec-meta">{plural(m.forecastsSorted.length, 'plan')}</span>
+      </div>
+      <div className="plans-grid">
+        {m.forecastsSorted.map((f) => {
+          const p = m.prodById[f.productId];
+          const cases = fmt(Math.floor(num(f.batches) * (p ? m.perCase(p) : 0)));
+          return (
+            <div key={f.id} className="plan-card">
+              <div className="min0" style={{ flex: 1 }}>
+                <div style={{ fontSize: 14, fontWeight: 700 }}>{p?.name ?? '—'}</div>
+                <div className="muted tnum" style={{ marginTop: 2, fontSize: 12 }}>
+                  {plural(num(f.batches), 'batch', 'batches')} · {cases} cases · due {fmtDate(f.date)}
+                </div>
+              </div>
+              <button
+                type="button"
+                className="btn btn-outline"
+                style={{ padding: '0 14px' }}
+                onClick={() => {
+                  ui.set({ runId: f.id });
+                  ui.openSheet('batch');
+                }}
+              >
+                Log batch
+              </button>
+              <button
+                type="button"
+                className="icon-btn"
+                aria-label={`Remove plan for ${p?.name ?? 'product'}`}
+                onClick={async () => {
+                  const undo = await removeForecast(f.id);
+                  if (undo) toast('Plan removed.', { label: 'Undo', fn: undo });
+                }}
+              >
+                <Icon name="x" size={16} stroke={2.2} />
+              </button>
+            </div>
+          );
+        })}
+      </div>
+      {!m.forecastsSorted.length && (
+        <div className="empty">
+          <div className="empty-t">No committed plans</div>
+          <div className="empty-s">Pick a product, set batches and commit to allocate stock.</div>
+        </div>
+      )}
+    </section>
+  );
+
   return (
     <div className="col" style={{ gap: 22 }}>
       <div className="plan-grid">
         <div className="plan-left">
           <section>
-            <div className="sec-head">
-              <h2 id="plan-product" className="eyebrow" style={{ margin: 0 }}>
-                Product
-              </h2>
-            </div>
-            <div className="col" style={{ gap: 8 }} role="radiogroup" aria-labelledby="plan-product">
+            <label htmlFor="plan-product" className="eyebrow" style={{ display: 'block', marginBottom: 8 }}>
+              Product
+            </label>
+            <select id="plan-product" className="input" value={pp.id} onChange={(e) => ui.set({ planProduct: e.target.value })}>
               {products.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  role="radio"
-                  aria-checked={p.id === pp.id}
-                  className="radio-card"
-                  style={{ minHeight: 60, padding: '12px 14px' }}
-                  onClick={() => ui.set({ planProduct: p.id })}
-                >
-                  <span className="radio-dot" />
-                  <span className="row-main">
-                    <span className="row-title">{p.name}</span>
-                    <span className="row-sub">
-                      {qu(num(p.batchKg), 'kg')} · {fmt(m.perCase(p))} cases / batch · free stock covers{' '}
-                      {plural(m.capacity(p, m.free).batches, 'batch', 'batches')}
-                    </span>
-                  </span>
-                </button>
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
               ))}
+            </select>
+            <div className="row-sub tnum" style={{ marginTop: 6 }}>
+              {qu(num(pp.batchKg), 'kg')} · {fmt(m.perCase(pp))} cases / batch · free stock covers {plural(coverBatches, 'batch', 'batches')}
             </div>
           </section>
 
@@ -202,6 +244,9 @@ function Planner() {
             </div>
             <div className="commit-inline w-only">{commitBlock}</div>
           </section>
+
+          {/* Desktop: committed plans in the left column, under the batches card. */}
+          <div className="w-only">{plansSection}</div>
         </div>
 
         <section className="min0">
@@ -254,58 +299,8 @@ function Planner() {
 
       <div className="commit-bar n-only">{commitBlock}</div>
 
-      <section>
-        <div className="sec-head">
-          <h2 className="eyebrow" style={{ margin: 0 }}>
-            Committed plans
-          </h2>
-          <span className="sec-meta">{plural(m.forecastsSorted.length, 'plan')}</span>
-        </div>
-        <div className="plans-grid">
-          {m.forecastsSorted.map((f) => {
-            const p = m.prodById[f.productId];
-            const cases = fmt(Math.floor(num(f.batches) * (p ? m.perCase(p) : 0)));
-            return (
-              <div key={f.id} className="plan-card">
-                <div className="min0" style={{ flex: 1 }}>
-                  <div style={{ fontSize: 14, fontWeight: 700 }}>{p?.name ?? '—'}</div>
-                  <div className="muted tnum" style={{ marginTop: 2, fontSize: 12 }}>
-                    {plural(num(f.batches), 'batch', 'batches')} · {cases} cases · due {fmtDate(f.date)}
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  className="btn btn-outline"
-                  style={{ padding: '0 14px' }}
-                  onClick={() => {
-                    ui.set({ runId: f.id });
-                    ui.openSheet('batch');
-                  }}
-                >
-                  Log batch
-                </button>
-                <button
-                  type="button"
-                  className="icon-btn"
-                  aria-label={`Remove plan for ${p?.name ?? 'product'}`}
-                  onClick={async () => {
-                    const undo = await removeForecast(f.id);
-                    if (undo) toast('Plan removed.', { label: 'Undo', fn: undo });
-                  }}
-                >
-                  <Icon name="x" size={16} stroke={2.2} />
-                </button>
-              </div>
-            );
-          })}
-        </div>
-        {!m.forecastsSorted.length && (
-          <div className="empty">
-            <div className="empty-t">No committed plans</div>
-            <div className="empty-s">Set batches above and commit to allocate stock.</div>
-          </div>
-        )}
-      </section>
+      {/* Phones: committed plans at the bottom, after the commit bar. */}
+      <div className="n-only">{plansSection}</div>
     </div>
   );
 }
