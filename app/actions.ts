@@ -356,6 +356,11 @@ export async function updateBatch(id: string, form: { batchNo: string; date: str
   return act((db, actor) => svc.updateBatch(db, actor, Id.parse(id), parsed.data));
 }
 
+/** Delete a batch record; stock isn't touched. */
+export async function deleteBatch(id: string) {
+  return act((db, actor) => svc.deleteBatch(db, actor, Id.parse(id)));
+}
+
 // ── Purchasing ──────────────────────────────────────────────────────────────
 
 /** Raise a PO with the materials and pack counts the user chose. */

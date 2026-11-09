@@ -1,14 +1,15 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
-import { logBatch, updateBatch } from '@/app/actions';
+import { deleteBatch, logBatch, updateBatch } from '@/app/actions';
 import { FormField } from '@/components/FormField';
+import { Icon } from '@/components/Icon';
 import { useShowCost } from '@/lib/hooks';
 import { fmt, fmtDate, money, num, plural, qu, today } from '@/lib/format';
 import { useModel } from '@/lib/model';
 import { batchMetrics, looseUnitsOf, producedKg, suggestBatchNo, totalUnits, unitWeightG } from '@/lib/production';
 import { useStore } from '@/lib/store';
-import { toast, useUI } from '@/lib/ui';
+import { confirmDialog, toast, useUI } from '@/lib/ui';
 import { SheetHeader } from './Sheet';
 
 /**
@@ -26,6 +27,7 @@ function BatchForm({ editingId }: { editingId?: string }) {
   const SHOW_COST = useShowCost();
   const m = useModel();
   const submit = useStore((s) => s.submit);
+  const send = useStore((s) => s.send);
   const ui = useUI();
   const editing = editingId ? m.data.batches.find((b) => b.id === editingId) : undefined;
   const products = m.data.products;
@@ -99,6 +101,23 @@ function BatchForm({ editingId }: { editingId?: string }) {
       });
   const short = deductions.filter((d) => d.after < -1e-9);
   const noRecipe = !editing && !m.recipeOf(productId).length;
+
+  async function remove() {
+    if (!editing || busy) return;
+    const ok = await confirmDialog({
+      title: `Delete batch ${editing.batchNo}?`,
+      body: "The batch record is removed from batches and reports. In-hand stock doesn't change. This can't be undone.",
+      confirmLabel: 'Delete batch',
+      danger: true,
+    });
+    if (!ok) return;
+    setBusy(true);
+    const res = await send(() => deleteBatch(editing.id));
+    setBusy(false);
+    if (!res) return;
+    ui.set({ sheetOpen: false });
+    toast(`Batch ${res.batchNo} deleted.`);
+  }
 
   async function save(e: FormEvent) {
     e.preventDefault();
@@ -265,6 +284,11 @@ function BatchForm({ editingId }: { editingId?: string }) {
         <button type="submit" className="btn btn-primary btn-lg" disabled={busy || short.length > 0 || noRecipe}>
           {busy ? 'Saving…' : editing ? 'Save changes' : `Log batch ${f.batchNo.trim().toUpperCase()}`}
         </button>
+        {editing && (
+          <button type="button" className="btn btn-outline danger-btn" style={{ width: '100%' }} disabled={busy} onClick={remove}>
+            <Icon name="trash" size={14} /> Delete batch
+          </button>
+        )}
       </form>
     </>
   );

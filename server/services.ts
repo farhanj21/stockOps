@@ -826,6 +826,17 @@ export async function updateBatch(db: Db, actor: Actor, id: string, input: Batch
   }
 }
 
+/** Remove a batch record. Only the record goes: in-hand stock and plans are left as they are. */
+export async function deleteBatch(db: Db, actor: Actor, id: string) {
+  requirePerm(actor, 'plan');
+  const [b] = await db
+    .delete(t.productionBatches)
+    .where(and(eq(t.productionBatches.id, id), eq(t.productionBatches.organizationId, actor.organizationId)))
+    .returning({ batchNo: t.productionBatches.batchNo });
+  if (!b) throw new AppError('That batch no longer exists.', 'not_found');
+  return b;
+}
+
 // ── Purchasing (everyone raises POs; Admin/Warehouse receive) ───────────────
 
 export interface PoLineInput {

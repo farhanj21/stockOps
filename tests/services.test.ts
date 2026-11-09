@@ -433,6 +433,18 @@ describe('stock, orders and production', () => {
     expect(b).toMatchObject({ units: 100, actualKg: 95, unitWeightG: 950 });
   });
 
+  it('Production can delete a batch record; stock stays as it is', async () => {
+    const fudge = await product(db, orgId, FUDGE);
+    await svc.logBatch(db, production, { productId: fudge.id, batchNo: 'D-1', date: '2026-10-20', cases: 50, looseUnits: 0 });
+    const stock = (await material(db, orgId, SUGAR)).inHand;
+    const [b] = await db.select().from(t.productionBatches).where(eq(t.productionBatches.batchNo, 'D-1'));
+    await forbidden(svc.deleteBatch(db, warehouse, b.id));
+    expect(await svc.deleteBatch(db, production, b.id)).toEqual({ batchNo: 'D-1' });
+    expect(await db.select().from(t.productionBatches).where(eq(t.productionBatches.id, b.id))).toEqual([]);
+    expect((await material(db, orgId, SUGAR)).inHand).toBe(stock);
+    await expect(svc.deleteBatch(db, production, b.id)).rejects.toMatchObject({ code: 'not_found' });
+  });
+
   it('batch records can be corrected without touching stock', async () => {
     const fudge = await product(db, orgId, FUDGE);
     await svc.logBatch(db, production, { productId: fudge.id, batchNo: 'E-1', date: '2026-10-20', cases: 50, looseUnits: 0 });
