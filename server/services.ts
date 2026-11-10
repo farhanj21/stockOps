@@ -422,7 +422,7 @@ export async function deleteMaterial(db: Db, actor: Actor, id: string) {
     const [{ value: inRecipes }] = await tx.select({ value: count() }).from(t.recipeLines).where(eq(t.recipeLines.ingredientId, id));
     if (inRecipes) throw new AppError(`${ing.name} is used in ${inRecipes} recipe${inRecipes === 1 ? '' : 's'}. Remove it there first.`, 'conflict');
     const [{ value: onPos }] = await tx.select({ value: count() }).from(t.poLines).where(eq(t.poLines.ingredientId, id));
-    if (onPos) throw new AppError(`${ing.name} appears on purchase orders, so it is kept for the record.`, 'conflict');
+    if (onPos) throw new AppError(`${ing.name} appears on purchase requests, so it is kept for the record.`, 'conflict');
     await tx.delete(t.ingredients).where(eq(t.ingredients.id, id));
   });
 }
@@ -516,7 +516,7 @@ export async function revertImport(db: Db, actor: Actor, undo: ImportUndo) {
       if (!ids.length) return;
       const [inRecipe] = await tx.select({ id: t.recipeLines.ingredientId }).from(t.recipeLines).where(inArray(t.recipeLines.ingredientId, ids)).limit(1);
       const [onPo] = await tx.select({ id: t.poLines.ingredientId }).from(t.poLines).where(inArray(t.poLines.ingredientId, ids)).limit(1);
-      if (inRecipe || onPo) throw new AppError("A material from that import is already used in a recipe or order, so the import can't be undone.", 'conflict');
+      if (inRecipe || onPo) throw new AppError("A material from that import is already used in a recipe or purchase request, so the import can't be undone.", 'conflict');
       await tx.delete(t.ingredients).where(inArray(t.ingredients.id, ids));
     }
   });
@@ -837,7 +837,9 @@ export async function deleteBatch(db: Db, actor: Actor, id: string) {
   return b;
 }
 
-// ── Purchasing (everyone raises POs; Admin/Warehouse receive) ───────────────
+// ── Purchase requests (everyone raises them; Admin/Warehouse receive) ────────
+// Stored as purchase orders. A request no longer touches pipeline: what's still to arrive on it
+// is counted on its own. Each item is received separately with what actually arrived.
 
 export interface PoLineInput {
   ingredientId: string;
@@ -852,10 +854,10 @@ export interface PoLineInput {
 export async function createPO(db: Db, actor: Actor, input: PoLineInput[]) {
   const packsById = new Map<string, number>();
   for (const l of input) {
-    if (!Number.isInteger(l.packs) || l.packs < 1) throw new AppError('Order at least one whole pack per line.');
+    if (!Number.isInteger(l.packs) || l.packs < 1) throw new AppError('Request at least one whole pack per item.');
     packsById.set(l.ingredientId, (packsById.get(l.ingredientId) ?? 0) + l.packs);
   }
-  if (!packsById.size) throw new AppError('Add at least one material to the order.');
+  if (!packsById.size) throw new AppError('Add at least one material to the request.');
 
   for (let attempt = 0; ; attempt++) {
     try {
@@ -867,12 +869,17 @@ export async function createPO(db: Db, actor: Actor, input: PoLineInput[]) {
         const rows: { ing: Ingredient; packs: number; qty: number }[] = [];
         for (const [ingredientId, packs] of packsById) {
           const ing = await lockIngredient(tx, actor, ingredientId);
-          if (ing.kind === 'utility') throw new AppError(`${ing.name} is a utility and isn't ordered.`);
+          if (ing.kind === 'utility') throw new AppError(`${ing.name} is a utility and isn't requested.`);
           rows.push({ ing, packs, qty: round(packs * ing.pack) });
         }
         await tx.insert(t.purchaseOrders).values({ id, organizationId: actor.organizationId, code, status: 'Open', placedOn: plantToday(), createdBy: actor.userId });
         await tx.insert(t.poLines).values(rows.map((r, position) => ({ poId: id, ingredientId: r.ing.id, packs: r.packs, qty: r.qty, position })));
-        for (const r of rows) await writeStock(tx, actor, r.ing, 'pipeline', r.ing.pipeline + r.qty, 'po_created', code);
+        // Remember the number so it's never handed out again, even if this request is deleted.
+        const no = parseInt(code.replace(/\D/g, ''), 10) || 0;
+        await tx
+          .update(t.organizations)
+          .set({ lastRequestNo: sql`greatest(${t.organizations.lastRequestNo}, ${no})` })
+          .where(eq(t.organizations.id, actor.organizationId));
         return { id: code, lines: rows.length };
       });
     } catch (e) {
@@ -889,7 +896,7 @@ export async function createPO(db: Db, actor: Actor, input: PoLineInput[]) {
 export async function generatePO(db: Db, actor: Actor, excluded: string[]) {
   const m = buildModel(await loadData(db, actor.organizationId, { all: false }));
   const lines = m.suggestions.filter((s) => !excluded.includes(s.i.id));
-  if (!lines.length) throw new AppError('Nothing to order — stock covers every plan and par level.', 'conflict');
+  if (!lines.length) throw new AppError('Nothing to request — stock covers every plan and par level.', 'conflict');
   return createPO(
     db,
     actor,
@@ -897,31 +904,71 @@ export async function generatePO(db: Db, actor: Actor, excluded: string[]) {
   );
 }
 
-/** Delivery arrived: move each line from pipeline into in-hand. `code` is the PO number, e.g. PO-2041. */
+async function lockOpenRequest(tx: Tx, actor: Actor, code: string) {
+  const [po] = await tx
+    .select()
+    .from(t.purchaseOrders)
+    .where(and(eq(t.purchaseOrders.code, code), eq(t.purchaseOrders.organizationId, actor.organizationId)))
+    .for('update');
+  if (!po) throw new AppError('That purchase request no longer exists.', 'not_found');
+  if (po.status !== 'Open') throw new AppError(`${code} is already closed.`, 'conflict');
+  return po;
+}
+
+/** Add what arrived to in-hand and record it on the line. */
+async function receiveLine(tx: Tx, actor: Actor, code: string, line: typeof t.poLines.$inferSelect, qty: number, note: string | null) {
+  const ing = await lockIngredient(tx, actor, line.ingredientId);
+  await writeStock(tx, actor, ing, 'inHand', ing.inHand + qty, 'po_received', code);
+  await tx
+    .update(t.poLines)
+    .set({ receivedQty: round(qty), receivedOn: plantToday(), receivedBy: actor.userId, receiveNote: note?.trim() || null })
+    .where(and(eq(t.poLines.poId, line.poId), eq(t.poLines.ingredientId, line.ingredientId)));
+}
+
+/** Once every item is received, the request closes. */
+async function closeIfDone(tx: Tx, actor: Actor, poId: string) {
+  const lines = await tx.select({ receivedQty: t.poLines.receivedQty }).from(t.poLines).where(eq(t.poLines.poId, poId));
+  const done = lines.every((l) => l.receivedQty != null);
+  if (done) await tx.update(t.purchaseOrders).set({ status: 'Received', receivedOn: plantToday(), receivedBy: actor.userId }).where(eq(t.purchaseOrders.id, poId));
+  return done;
+}
+
+/**
+ * Receive one item of a purchase request: `qty` is what actually arrived (it can differ from what
+ * was requested; the difference is kept on the record), with an optional note. The item is then
+ * done; the request closes when its last item is received.
+ */
+export async function receivePOLine(db: Db, actor: Actor, code: string, ingredientId: string, qty: number, note: string | null) {
+  requirePerm(actor, 'receive');
+  if (!(qty >= 0) || !Number.isFinite(qty)) throw new AppError('Enter the quantity that arrived (0 or more).', 'invalid', { qty: 'Enter 0 or more.' });
+  return db.transaction(async (tx) => {
+    const po = await lockOpenRequest(tx, actor, code);
+    const [line] = await tx
+      .select()
+      .from(t.poLines)
+      .where(and(eq(t.poLines.poId, po.id), eq(t.poLines.ingredientId, ingredientId)));
+    if (!line) throw new AppError('That item is not on this purchase request.', 'not_found');
+    if (line.receivedQty != null) throw new AppError('That item was already received.', 'conflict');
+    await receiveLine(tx, actor, code, line, qty, note);
+    return { closed: await closeIfDone(tx, actor, po.id) };
+  });
+}
+
+/** Receive every item still to arrive, exactly as requested, and close the request. */
 export async function receivePO(db: Db, actor: Actor, code: string) {
   requirePerm(actor, 'receive');
   await db.transaction(async (tx) => {
-    const [po] = await tx
-      .select()
-      .from(t.purchaseOrders)
-      .where(and(eq(t.purchaseOrders.code, code), eq(t.purchaseOrders.organizationId, actor.organizationId)))
-      .for('update');
-    if (!po) throw new AppError('That order no longer exists.', 'not_found');
-    if (po.status !== 'Open') throw new AppError(`${code} was already received.`, 'conflict');
+    const po = await lockOpenRequest(tx, actor, code);
     const lines = await tx.select().from(t.poLines).where(eq(t.poLines.poId, po.id));
-    for (const l of lines) {
-      const ing = await lockIngredient(tx, actor, l.ingredientId);
-      await writeStock(tx, actor, ing, 'inHand', ing.inHand + l.qty, 'po_received', code);
-      await writeStock(tx, actor, ing, 'pipeline', ing.pipeline - l.qty, 'po_received', code);
-    }
-    await tx.update(t.purchaseOrders).set({ status: 'Received', receivedOn: plantToday(), receivedBy: actor.userId }).where(eq(t.purchaseOrders.id, po.id));
+    for (const l of lines) if (l.receivedQty == null) await receiveLine(tx, actor, code, l, l.qty, null);
+    await closeIfDone(tx, actor, po.id);
   });
 }
 
 /**
- * Delete a purchase order. An order still in transit is cancelled: its quantities come back out
- * of pipeline. A received order only leaves the history; in-hand stock stays as it is, because
- * the goods did arrive. Its number is never handed out again.
+ * Delete a purchase request. An open one is cancelled (needs "Receive deliveries"); a closed one
+ * only leaves the history (needs "Setup"). Items already received stay in in-hand stock, because
+ * they did arrive. Its number is never handed out again.
  */
 export async function deletePO(db: Db, actor: Actor, code: string) {
   await db.transaction(async (tx) => {
@@ -930,15 +977,9 @@ export async function deletePO(db: Db, actor: Actor, code: string) {
       .from(t.purchaseOrders)
       .where(and(eq(t.purchaseOrders.code, code), eq(t.purchaseOrders.organizationId, actor.organizationId)))
       .for('update');
-    if (!po) throw new AppError('That order no longer exists.', 'not_found');
+    if (!po) throw new AppError('That purchase request no longer exists.', 'not_found');
     requirePerm(actor, po.status === 'Open' ? 'receive' : 'setup');
-    if (po.status === 'Open') {
-      const lines = await tx.select().from(t.poLines).where(eq(t.poLines.poId, po.id));
-      for (const l of lines) {
-        const ing = await lockIngredient(tx, actor, l.ingredientId);
-        await writeStock(tx, actor, ing, 'pipeline', ing.pipeline - l.qty, 'adjust', code);
-      }
-    }
+    // Requests don't add to pipeline, so there's nothing to take back out; anything already received stays in stock.
     await tx.delete(t.purchaseOrders).where(eq(t.purchaseOrders.id, po.id));
   });
 }

@@ -52,44 +52,50 @@ export function stockRows(m: Model, only?: (id: string) => boolean): Row[] {
         Unit: i.unit,
         'Pack size': num(i.pack),
         Pack: i.packName,
-        'In-hand': round(num(i.inHand)),
+        'In stock (in-hand)': round(num(i.inHand)),
+        'Purchase requests': round(m.requestedOf(i)),
         Pipeline: round(num(i.pipeline)),
-        Total: round(total),
+        'Available (all)': round(total),
         'Par level': round(num(i.par)),
         'Short of par': round(m.shortOf(i)),
         Status: m.isLow(i) ? 'Below par' : 'At par',
         'Allocated to plans': round(m.allocOf(i)),
         'Free after plans': round(m.free(i)),
         'Cost per unit (Rs)': r2(num(i.cost)),
-        'Stock value (Rs)': r2(total * num(i.cost)),
+        'Stock value (Rs)': r2(num(i.inHand) * num(i.cost)),
       };
     });
 }
 
-// ── Purchase orders ─────────────────────────────────────────────────────────
+// ── Purchase requests ───────────────────────────────────────────────────────
 
-/** PO items don't store a price, so value is at today's material prices. */
+/** Request items don't store a price, so value is at today's material prices. */
 export const poValue = (m: Model, po: PurchaseOrder) => po.lines.reduce((a, l) => a + l.qty * num(m.byId[l.ing]?.cost), 0);
 
-/** One row per item ordered, with the order's own details repeated on each row so it filters and sorts cleanly. */
+/** One row per item requested, with the request's own details repeated on each row so it filters and sorts cleanly. */
 export function poItemRows(m: Model, pos: PurchaseOrder[]): Row[] {
   return pos.flatMap((po) =>
     po.lines.map((l) => {
       const i = m.byId[l.ing];
       return {
-        'PO no.': po.id,
-        Status: po.status === 'Open' ? 'In transit' : 'Received',
-        'Order date': po.date,
-        'Ordered by': po.by,
-        'Received date': po.received ?? '',
-        'Received by': po.receivedBy ?? '',
+        'Request no.': po.id,
+        'Request status': po.status === 'Open' ? 'Open' : 'Closed',
+        'Request date': po.date,
+        'Requested by': po.by,
+        'Closed date': po.received ?? '',
         Item: i?.name ?? 'Deleted material',
         Type: i ? kindLabel(i.kind) : '',
-        'Packs ordered': l.packs,
+        'Packs requested': l.packs,
         'Pack size': i ? num(i.pack) : '',
         'Pack type': i?.packName ?? '',
-        Quantity: round(l.qty),
+        'Quantity requested': round(l.qty),
+        'Quantity received': l.received ? round(l.received.qty) : '',
+        'Difference (received − requested)': l.received ? round(l.received.qty - l.qty) : '',
         Unit: i?.unit ?? '',
+        'Item status': l.received ? (l.received.qty < l.qty - 1e-9 ? 'Received short' : 'Received') : 'Awaiting delivery',
+        'Received date': l.received?.date ?? '',
+        'Received by': l.received?.by ?? '',
+        'Receiving note': l.received?.note ?? '',
         'Price per unit (Rs, current)': i ? r2(num(i.cost)) : '',
         'Value (Rs, current prices)': r2(l.qty * num(i?.cost)),
       };
@@ -97,7 +103,7 @@ export function poItemRows(m: Model, pos: PurchaseOrder[]): Row[] {
   );
 }
 
-export const poSheets = (m: Model, pos: PurchaseOrder[]): ExportSheet[] => [{ name: 'Purchase Orders', rows: poItemRows(m, pos) }];
+export const poSheets = (m: Model, pos: PurchaseOrder[]): ExportSheet[] => [{ name: 'Purchase Requests', rows: poItemRows(m, pos) }];
 
 // ── Production ──────────────────────────────────────────────────────────────
 

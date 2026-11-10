@@ -19,7 +19,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
           <div className="auth-hero-k">For production plants</div>
           <div className="auth-hero-t">Every batch, every bag, accounted for.</div>
           <div className="auth-hero-s">
-            Stock counts, recipes, forecasts and purchase orders in one place, built to replace the shared spreadsheet.
+            Stock counts, recipes, forecasts and purchase requests in one place, built to replace the shared spreadsheet.
           </div>
         </div>
         <div className="auth-foot w-only">Team accounts are created by your organization&apos;s admin.</div>

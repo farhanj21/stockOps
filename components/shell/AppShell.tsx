@@ -31,7 +31,7 @@ function TopBar({ tab }: { tab: Tab }) {
     home: [greeting, dateLabel],
     stock: ['Stock', stockSummary],
     plan: ['Production', 'Plan batches, record each batch made, and see monthly and yearly totals.'],
-    orders: ['Purchase Orders', 'Quantities round up to full supplier packs.'],
+    orders: ['Purchase Requests', 'Quantities round up to full supplier packs.'],
     setup: ['Setup', 'Products, recipes and materials. Changes recalculate capacity and orders instantly.'],
     team: ['Team', 'Create accounts for your warehouse, production and admin people.'],
   };

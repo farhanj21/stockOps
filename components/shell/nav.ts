@@ -21,7 +21,7 @@ export function useNavItems(): NavItem[] {
     { tab: 'home', label: 'Dashboard', short: 'Home', icon: 'home' },
     { tab: 'stock', label: 'Stock', short: 'Stock', icon: 'box', badge: { count: m.alerts.length, tone: 'danger' } },
     perms.plan && { tab: 'plan', label: 'Production', short: 'Produce', icon: 'calendar' },
-    { tab: 'orders', label: 'Purchase Orders', short: 'Orders', icon: 'truck', badge: { count: m.suggestions.length, tone: 'gold' } },
+    { tab: 'orders', label: 'Purchase Requests', short: 'Requests', icon: 'truck', badge: { count: m.suggestions.length, tone: 'gold' } },
     perms.setup && { tab: 'setup', label: 'Setup', short: 'Setup', icon: 'sliders' },
     perms.team && { tab: 'team', label: 'Team', short: 'Team', icon: 'users' },
   ];

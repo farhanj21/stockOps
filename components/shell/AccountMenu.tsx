@@ -68,7 +68,7 @@ export function AccountMenu({ variant }: { variant: 'sidebar' | 'header' }) {
       onClick: run(async () => {
         const ok = await confirmDialog({
           title: 'Load the sample plant?',
-          body: 'Every material, recipe, plan and purchase order is replaced with the sample chocolate plant. Team accounts stay.',
+          body: 'Every material, recipe, plan and purchase request is replaced with the sample chocolate plant. Team accounts stay.',
           confirmLabel: 'Replace my data',
           danger: true,
         });

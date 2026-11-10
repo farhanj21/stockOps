@@ -111,7 +111,7 @@ function Roles() {
         </div>
       )}
       <RoleMatrix roles={roles} />
-      <div className="role-note">Everyone can also view every screen, export to Excel and raise purchase orders.</div>
+      <div className="role-note">Everyone can also view every screen, export to Excel and raise purchase requests.</div>
 
       {custom.length > 0 && (
         <div className="card flat clip list" style={{ marginTop: 12 }}>

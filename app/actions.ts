@@ -366,14 +366,24 @@ export async function deleteBatch(id: string) {
 /** Raise a PO with the materials and pack counts the user chose. */
 export async function createPO(lines: { ingredientId: string; packs: number }[]) {
   const Lines = z
-    .array(z.object({ ingredientId: Id, packs: z.number().int('Order whole packs.').min(1, 'Order at least one pack.').max(100000) }))
-    .min(1, 'Add at least one material to the order.')
+    .array(z.object({ ingredientId: Id, packs: z.number().int('Request whole packs.').min(1, 'Request at least one pack.').max(100000) }))
+    .min(1, 'Add at least one material to the request.')
     .max(1000);
   return act((db, actor) => svc.createPO(db, actor, Lines.parse(lines)));
 }
 
+/** Receive everything still to arrive on a purchase request, as requested. */
 export async function receivePO(id: string) {
   return act((db, actor) => svc.receivePO(db, actor, Id.parse(id)));
+}
+
+/** Receive one item of a purchase request: what actually arrived, plus an optional note. */
+export async function receivePOLine(id: string, ingredientId: string, qty: number, note?: string) {
+  const parsed = z
+    .object({ qty: z.number().finite().min(0, 'Enter 0 or more.').max(1e9), note: z.string().trim().max(300, 'Keep the note under 300 characters.').optional() })
+    .safeParse({ qty, note });
+  if (!parsed.success) return fieldFail(parsed.error);
+  return act((db, actor) => svc.receivePOLine(db, actor, Id.parse(id), Id.parse(ingredientId), parsed.data.qty, parsed.data.note ?? null));
 }
 
 export async function deletePO(id: string) {

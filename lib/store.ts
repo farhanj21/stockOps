@@ -57,6 +57,7 @@ interface StoreState {
 
   createPO: (lines: { ingredientId: string; packs: number }[]) => Promise<{ id: string; lines: number } | null>;
   receivePO: (id: string) => Promise<boolean>;
+  receivePOLine: (id: string, ingredientId: string, qty: number, note: string) => Promise<{ closed: boolean } | null>;
   deletePO: (id: string) => Promise<boolean>;
 }
 
@@ -250,6 +251,7 @@ export const useStore = create<StoreState>()((set, get) => {
 
     createPO: (lines) => send(() => api.createPO(lines)),
     receivePO: async (id) => (await send(() => api.receivePO(id))) !== null,
+    receivePOLine: (id, ingredientId, qty, note) => send(() => api.receivePOLine(id, ingredientId, qty, note)),
     deletePO: async (id) => (await send(() => api.deletePO(id))) !== null,
   };
 });

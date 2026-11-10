@@ -34,7 +34,8 @@ const EPS = 1e-9;
 
 /**
  * All MRP math from the blueprint, derived from the stored data:
- * total = in-hand + pipeline, free = total − what committed plans use,
+ * requested = items on open purchase requests not yet received,
+ * total (available for planning) = in-hand + requested + pipeline, free = total − what committed plans use,
  * capacity = min over recipe lines of stock ÷ qty per batch,
  * order = deficit rounded up to whole supplier packs.
  */
@@ -45,7 +46,17 @@ export function buildModel(d: Data) {
   const recipeOf = (productId: string) => d.recipes[productId] || [];
   const isUtil = (i: Ingredient | undefined): i is undefined => !i || i.kind === 'utility';
 
-  const total = (i: Ingredient) => num(i.inHand) + num(i.pipeline);
+  // What's still to arrive on open purchase requests, per material (received items no longer count).
+  const requested: Record<string, number> = {};
+  d.pos.forEach((po) => {
+    if (po.status !== 'Open') return;
+    po.lines.forEach((l) => {
+      if (!l.received) requested[l.ing] = (requested[l.ing] ?? 0) + num(l.qty);
+    });
+  });
+  const requestedOf = (i: Ingredient) => requested[i.id] ?? 0;
+  /** Available for planning: in-hand + open purchase requests + pipeline. "In stock" on screen is in-hand only. */
+  const total = (i: Ingredient) => num(i.inHand) + requestedOf(i) + num(i.pipeline);
   const alloc: Record<string, number> = {};
   ings.forEach((i) => (alloc[i.id] = 0));
   d.forecasts.forEach((f) =>
@@ -131,7 +142,8 @@ export function buildModel(d: Data) {
 
   const openPOs = d.pos.filter((p) => p.status === 'Open');
   const receivedPOs = d.pos.filter((p) => p.status === 'Received');
-  const nextPoId = 'PO-' + (Math.max(2039, d.lastPoNo ?? 0, ...d.pos.map((p) => parseInt(String(p.id).replace(/\D/g, ''), 10) || 0)) + 1);
+  // New purchase requests are numbered PR-…; older records keep their PO-… numbers.
+  const nextPoId = 'PR-' + (Math.max(2039, d.lastPoNo ?? 0, ...d.pos.map((p) => parseInt(String(p.id).replace(/\D/g, ''), 10) || 0)) + 1);
 
   return {
     data: d,
@@ -140,6 +152,7 @@ export function buildModel(d: Data) {
     prodById,
     recipeOf,
     isUtil,
+    requestedOf,
     total,
     allocOf,
     free,

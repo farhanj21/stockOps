@@ -271,7 +271,7 @@
 
 .st-row {
   display: grid;
-  grid-template-columns: minmax(170px, 1.3fr) 110px 164px 164px 96px minmax(170px, 1fr);
+  grid-template-columns: minmax(170px, 1.3fr) 110px 164px 120px 164px minmax(170px, 1fr);
   gap: 14px;
   align-items: center;
   padding: 10px 20px;
@@ -987,7 +987,7 @@ select.input {
 }
 .mat-table {
   width: 100%;
-  min-width: 980px;
+  min-width: 1200px;
   border-collapse: separate;
   border-spacing: 0;
   font-size: 14px;
@@ -1029,7 +1029,9 @@ select.input {
 .mat-table thead th:nth-child(5),
 .mat-table thead th:nth-child(7) { width: 110px; }
 .mat-table thead th:nth-child(6) { width: 130px; }
-.mat-table thead th:nth-child(8) { width: 120px; }
+.mat-table thead th:nth-child(8),
+.mat-table thead th:nth-child(9),
+.mat-table thead th:nth-child(10) { width: 120px; }
 .mat-table tbody tr:hover > * {
   background: var(--hover);
 }

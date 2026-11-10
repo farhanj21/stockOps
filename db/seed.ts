@@ -83,7 +83,20 @@ export async function insertSampleContent(db: Db | Tx, organizationId: string, a
       createdBy: by,
       receivedBy: po.status === 'Received' ? by : null,
     });
-    await db.insert(t.poLines).values(po.lines.map((l, position) => ({ poId: id, ingredientId: ingId.get(l.ing)!, packs: l.packs, qty: l.qty, position })));
+    // A received sample order counts as every item received in full.
+    const got = po.status === 'Received';
+    await db.insert(t.poLines).values(
+      po.lines.map((l, position) => ({
+        poId: id,
+        ingredientId: ingId.get(l.ing)!,
+        packs: l.packs,
+        qty: l.qty,
+        position,
+        receivedQty: got ? l.qty : null,
+        receivedOn: got ? (po.received ?? null) : null,
+        receivedBy: got ? by : null,
+      })),
+    );
   }
   // Past batches: material cost = recipe quantities × sample prices.
   const costOf = new Map(d.ingredients.map((i) => [i.id, n(i.cost)]));

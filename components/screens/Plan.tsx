@@ -109,7 +109,7 @@ function Planner() {
     ui.set({ planBatches: 0 });
     const what = `${pp.name} · ${plural(pb, 'batch', 'batches')} committed.`;
     if (impact.shortCount > 0)
-      toast(`${what} ${plural(impact.shortCount, 'material')} need ordering.`, { label: 'Review', fn: () => go('orders') });
+      toast(`${what} ${plural(impact.shortCount, 'material')} need requesting.`, { label: 'Review', fn: () => go('orders') });
     else toast(`${what} All materials covered.`);
   }
 
@@ -261,7 +261,7 @@ function Planner() {
             )}
           </div>
           <div className="subtle" style={{ marginBottom: 10, fontSize: 12 }}>
-            Free stock = in-hand + pipeline, minus what committed plans already use.
+            Free stock = in-hand + open purchase requests + pipeline, minus what committed plans already use.
           </div>
           <div className="card clip list">
             {impact.lines.map((l) => {

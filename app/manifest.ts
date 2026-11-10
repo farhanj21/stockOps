@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
     id: '/',
     name: 'StockOps — Production MRP',
     short_name: 'StockOps',
-    description: 'Stock counts, recipes, forecasts and purchase orders for the plant floor.',
+    description: 'Stock counts, recipes, forecasts and purchase requests for the plant floor.',
     start_url: '/',
     scope: '/',
     display: 'standalone',
@@ -20,7 +20,7 @@ export default function manifest(): MetadataRoute.Manifest {
     ],
     shortcuts: [
       { name: 'Stock', url: '/stock' },
-      { name: 'Purchase Orders', url: '/orders' },
+      { name: 'Purchase Requests', url: '/orders' },
     ],
   };
 }

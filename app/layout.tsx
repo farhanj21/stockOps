@@ -24,7 +24,7 @@ const serif = Marcellus({
 
 export const metadata: Metadata = {
   title: { default: 'StockOps', template: '%s · StockOps' },
-  description: 'Production MRP & inventory control — stock counts, recipes, forecasts and purchase orders.',
+  description: 'Production MRP & inventory control — stock counts, recipes, forecasts and purchase requests.',
   applicationName: 'StockOps',
   appleWebApp: { capable: true, title: 'StockOps', statusBarStyle: 'black-translucent' },
   formatDetection: { telephone: false },

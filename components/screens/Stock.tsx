@@ -118,7 +118,7 @@ export function Stock() {
 
       {/* Mobile: one card per material */}
       <div className="col n-only" style={{ gap: 10 }}>
-        {rows.map(({ i, t, par, low, pct, parPos }) => (
+        {rows.map(({ i, par, low, pct, parPos }) => (
           <div key={i.id} className="card" style={{ padding: '14px 16px' }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
               <button type="button" className="stock-name" onClick={() => openMat(i.id)}>
@@ -136,7 +136,7 @@ export function Stock() {
                     <span className="row-main" style={{ gap: 0 }}>
                       <span style={{ fontSize: 13, fontWeight: 600 }}>{field === 'inHand' ? 'In-hand' : 'Pipeline'}</span>
                       <span className="subtle" style={{ fontSize: 11 }}>
-                        {field === 'inHand' ? `${i.unit} on site` : 'ordered, not received'}
+                        {field === 'inHand' ? `${i.unit} on site` : 'on the way, not on a request'}
                       </span>
                     </span>
                     <input
@@ -153,10 +153,14 @@ export function Stock() {
                 ))}
               </div>
             ) : (
-              <div className="grid2" style={{ marginTop: 10 }}>
+              <div className="grid3 keep3" style={{ marginTop: 10 }}>
                 <div className="cell">
                   <div className="cell-k">In-hand</div>
                   <div className="cell-v">{qu(num(i.inHand), i.unit)}</div>
+                </div>
+                <div className="cell">
+                  <div className="cell-k">Requests</div>
+                  <div className="cell-v">{qu(m.requestedOf(i), i.unit)}</div>
                 </div>
                 <div className="cell">
                   <div className="cell-k">Pipeline</div>
@@ -169,7 +173,7 @@ export function Stock() {
               <div className="bar-par" style={{ left: parPos }} />
             </div>
             <div className="stock-foot tnum">
-              <span style={{ fontWeight: 600 }}>Total {qu(t, i.unit)}</span>
+              <span style={{ fontWeight: 600 }}>{perms.stock ? `Purchase requests ${qu(m.requestedOf(i), i.unit)}` : `In stock ${qu(num(i.inHand), i.unit)}`}</span>
               <span className="subtle">Par {qu(par, i.unit)}</span>
             </div>
           </div>
@@ -184,12 +188,12 @@ export function Stock() {
               <span role="columnheader">Material</span>
               <span role="columnheader">Pack size</span>
               <span role="columnheader">In-hand</span>
+              <span role="columnheader">Purchase Requests</span>
               <span role="columnheader">Pipeline</span>
-              <span role="columnheader">Total</span>
               <span role="columnheader">Against par</span>
             </div>
             <div className="list">
-              {rows.map(({ i, t, par, low, pct, parPos }) => (
+              {rows.map(({ i, par, low, pct, parPos }) => (
                 <div key={i.id} className="st-row" role="row">
                   <button type="button" className="stock-name" style={{ gap: 1, minHeight: 0 }} onClick={() => openMat(i.id)} role="cell">
                     <span style={{ fontSize: 14, fontWeight: 700 }}>{i.name}</span>
@@ -200,8 +204,13 @@ export function Stock() {
                   <span className="muted" style={{ fontSize: 13 }} role="cell">
                     {cap1(i.packName)} · {qu(num(i.pack), i.unit)}
                   </span>
-                  {(['inHand', 'pipeline'] as const).map((field) =>
-                    perms.stock ? (
+                  {(['inHand', 'requested', 'pipeline'] as const).map((field) =>
+                    field === 'requested' ? (
+                      // What's still to arrive on open purchase requests; it changes as items are received.
+                      <span key={field} className="tnum muted" style={{ fontSize: 14, fontWeight: 600 }} role="cell">
+                        {qu(m.requestedOf(i), i.unit)}
+                      </span>
+                    ) : perms.stock ? (
                       <div key={field} className="st-stepper" role="cell">
                         <input
                           type="number"
@@ -218,9 +227,6 @@ export function Stock() {
                       </span>
                     ),
                   )}
-                  <span className="tnum" style={{ fontSize: 14, fontWeight: 700, color: 'var(--strong)' }} role="cell">
-                    {qu(t, i.unit)}
-                  </span>
                   <div className="col" style={{ gap: 6 }} role="cell">
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                       <span className="subtle tnum" style={{ fontSize: 12 }}>

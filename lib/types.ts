@@ -82,9 +82,13 @@ export interface Batch {
 export interface PoLine {
   ing: string;
   packs: number;
+  /** Quantity requested (packs × pack size). */
   qty: number;
+  /** Set once this item has been received: what actually arrived, when, by whom, and any note. */
+  received?: { qty: number; date: string; by: string; note: string };
 }
 
+/** A purchase request (stored as a purchase order). It closes ("Received") once every item is received. */
 export interface PurchaseOrder {
   id: string;
   date: string;

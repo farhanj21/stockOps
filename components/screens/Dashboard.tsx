@@ -28,20 +28,20 @@ const QUICK_ACTIONS: Record<Role, QuickAction[]> = {
   Admin: [
     { title: 'Plan production', sub: 'Forecast batches', icon: 'calendar', to: 'plan' },
     { title: 'Log stock', sub: 'In-hand & pipeline', icon: 'clipboard', to: 'stock' },
-    { title: 'Purchase Orders', sub: 'Review & generate', icon: 'receipt', to: 'orders' },
+    { title: 'Purchase Requests', sub: 'Review & generate', icon: 'receipt', to: 'orders' },
     { title: 'Recipes & par', sub: 'Admin setup', icon: 'sliders', to: 'setup' },
   ],
   Warehouse: [
     { title: 'Log stock count', sub: 'In-hand & pipeline', icon: 'clipboard', to: 'stock' },
-    { title: 'Receive delivery', sub: 'Orders in transit', icon: 'truck', to: 'orders' },
+    { title: 'Receive delivery', sub: 'Items awaiting delivery', icon: 'truck', to: 'orders' },
     { title: 'Below-par items', sub: 'Filtered stock list', icon: 'alert', to: 'stockLow' },
-    { title: 'Generate PO', sub: 'Rounded to packs', icon: 'receipt', to: 'orders' },
+    { title: 'New request', sub: 'Rounded to packs', icon: 'receipt', to: 'orders' },
   ],
   Production: [
     { title: 'Plan batches', sub: 'Forecast & preview', icon: 'calendar', to: 'plan' },
     { title: 'Log a batch', sub: 'Batch no. · kg · cases', icon: 'check', iconStroke: 2.2, to: 'batch' },
     { title: 'Check stock', sub: 'View only', icon: 'box', to: 'stock' },
-    { title: 'Generate PO', sub: 'Rounded to packs', icon: 'receipt', to: 'orders' },
+    { title: 'New request', sub: 'Rounded to packs', icon: 'receipt', to: 'orders' },
   ],
 };
 
@@ -51,11 +51,11 @@ function quickActionsFor(roleId: string, perms: Perms): QuickAction[] {
   const list: QuickAction[] = [];
   if (perms.plan) list.push({ title: 'Plan batches', sub: 'Forecast & preview', icon: 'calendar', to: 'plan' });
   if (perms.stock) list.push({ title: 'Log stock count', sub: 'In-hand & pipeline', icon: 'clipboard', to: 'stock' });
-  if (perms.receive) list.push({ title: 'Receive delivery', sub: 'Orders in transit', icon: 'truck', to: 'orders' });
+  if (perms.receive) list.push({ title: 'Receive delivery', sub: 'Items awaiting delivery', icon: 'truck', to: 'orders' });
   if (perms.plan) list.push({ title: 'Log a batch', sub: 'Batch no. · kg · cases', icon: 'check', iconStroke: 2.2, to: 'batch' });
   if (perms.setup) list.push({ title: 'Recipes & par', sub: 'Setup', icon: 'sliders', to: 'setup' });
   if (!perms.stock) list.push({ title: 'Check stock', sub: 'View only', icon: 'box', to: 'stock' });
-  list.push({ title: 'Purchase Orders', sub: 'Review & generate', icon: 'receipt', to: 'orders' });
+  list.push({ title: 'Purchase Requests', sub: 'Review & generate', icon: 'receipt', to: 'orders' });
   list.push({ title: 'Below-par items', sub: 'Filtered stock list', icon: 'alert', to: 'stockLow' });
   return list.slice(0, 4);
 }
@@ -80,9 +80,9 @@ export function Dashboard() {
   };
 
   const suggestCost = m.suggestions.reduce((a, x) => a + x.cost, 0);
-  const openLines = m.openPOs.reduce((a, p) => a + p.lines.length, 0);
+  const openLines = m.openPOs.reduce((a, p) => a + p.lines.filter((l) => !l.received).length, 0);
   const alertLine = (i: (typeof m.alerts)[number]) =>
-    `In-hand ${fmt(num(i.inHand))} + Pipeline ${fmt(num(i.pipeline))} = ${qu(m.total(i), i.unit)} · Par ${qu(num(i.par), i.unit)}`;
+    `In-hand ${fmt(num(i.inHand))} + Requests ${fmt(m.requestedOf(i))} + Pipeline ${fmt(num(i.pipeline))} = ${qu(m.total(i), i.unit)} · Par ${qu(num(i.par), i.unit)}`;
 
   return (
     <div className="col" style={{ gap: 22 }}>
@@ -114,18 +114,18 @@ export function Dashboard() {
             <span className="kpi-m">materials under par level</span>
           </button>
           <button type="button" className="kpi" onClick={() => go('orders')}>
-            <span className="kpi-k">Suggested orders</span>
+            <span className="kpi-k">Suggested requests</span>
             <span className="kpi-v" style={{ color: 'var(--warn)' }}>
               {m.suggestions.length}
             </span>
-            <span className="kpi-m">{SHOW_COST ? `${money(suggestCost)} est. at pack sizes` : 'items ready to order'}</span>
+            <span className="kpi-m">{SHOW_COST ? `${money(suggestCost)} est. at pack sizes` : 'items ready to request'}</span>
           </button>
           <button type="button" className="kpi" onClick={() => go('orders')}>
-            <span className="kpi-k">In transit</span>
+            <span className="kpi-k">Open requests</span>
             <span className="kpi-v" style={{ color: 'var(--info)' }}>
               {m.openPOs.length}
             </span>
-            <span className="kpi-m">{m.openPOs.length ? `${plural(openLines, 'item')} on order` : 'nothing on order'}</span>
+            <span className="kpi-m">{m.openPOs.length ? `${plural(openLines, 'item')} awaiting delivery` : 'nothing awaiting delivery'}</span>
           </button>
           <button type="button" className="kpi dark" onClick={() => perms.plan && go('plan')}>
             <span className="kpi-k">Committed batches</span>
@@ -216,7 +216,7 @@ export function Dashboard() {
               <h2 className="eyebrow" style={{ margin: 0 }}>
                 Can produce now
               </h2>
-              <span className="sec-meta">In-hand + pipeline</span>
+              <span className="sec-meta">In-hand + requests + pipeline</span>
             </div>
             <div className="card clip list">
               {!m.data.products.length && <div className="empty-inline">No products yet.</div>}
@@ -273,7 +273,7 @@ export function Dashboard() {
             <div>
               <div className="sec-head">
                 <h2 className="eyebrow" style={{ margin: 0 }}>
-                  In transit
+                  Open purchase requests
                 </h2>
                 <button type="button" className="btn-link" style={{ fontSize: 12 }} onClick={() => go('orders')}>
                   View ›
@@ -285,13 +285,15 @@ export function Dashboard() {
                     <span className="row-main" style={{ gap: 1 }}>
                       <span className="row-title">{po.id}</span>
                       <span className="row-sub">
-                        Placed {fmtDate(po.date)} · {po.by}
+                        Requested {fmtDate(po.date)} · {po.by}
                       </span>
                     </span>
-                    <span className="pill xs info">{plural(po.lines.length, 'item')}</span>
+                    <span className="pill xs info">
+                      {po.lines.some((l) => l.received) ? `${po.lines.filter((l) => l.received).length} of ${po.lines.length} received` : plural(po.lines.length, 'item')}
+                    </span>
                   </div>
                 ))}
-                {!m.openPOs.length && <div className="empty-inline">No orders in transit.</div>}
+                {!m.openPOs.length && <div className="empty-inline">No open purchase requests.</div>}
               </div>
             </div>
           </section>

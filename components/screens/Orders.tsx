@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Icon } from '@/components/Icon';
+import { receivedText, requestStatus } from '@/components/sheets/PoSheet';
 import { downloadWorkbook, poSheets } from '@/lib/export';
 import { fmt, fmtDate, inputVal, money, num, plural, qu } from '@/lib/format';
 import { useCurrentUser, useShowCost } from '@/lib/hooks';
@@ -20,7 +21,6 @@ export function Orders() {
   const extra = useUI((s) => s.poExtra);
   const setUI = useUI((s) => s.set);
   const createPO = useStore((s) => s.createPO);
-  const receivePO = useStore((s) => s.receivePO);
 
   // The draft order: every suggestion (tickable) plus anything added by hand, each with an editable pack count.
   const suggestedIds = new Set(m.suggestions.map((x) => x.i.id));
@@ -44,6 +44,7 @@ export function Orders() {
   const addable = m.ings.filter((i) => i.kind !== 'utility' && !shown.some((l) => l.i.id === i.id));
   const lineName = (l: PoLine) => m.byId[l.ing]?.name ?? l.ing;
   const lineQty = (l: PoLine) => (m.byId[l.ing] ? qu(l.qty, m.byId[l.ing].unit) : fmt(l.qty));
+  const lineUnit = (l: PoLine) => m.byId[l.ing]?.unit ?? '';
 
   const setPacks = (id: string, v: Num) => setUI({ poPacks: { ...packsOverride, [id]: v } });
   const removeExtra = (id: string) => {
@@ -60,22 +61,14 @@ export function Orders() {
     setBusy(null);
     if (!po) return;
     setUI({ poExcluded: {}, poPacks: {}, poExtra: [] });
-    toast(`${po.id} created · ${plural(po.lines, 'item')} added to pipeline.`);
-  }
-
-  async function receive(id: string) {
-    if (busy) return;
-    setBusy(id);
-    const ok = await receivePO(id);
-    setBusy(null);
-    if (ok) toast(`${id} received. Pipeline moved to in-hand.`);
+    toast(`${po.id} created · ${plural(po.lines, 'item')} requested.`);
   }
 
   return (
     <div className="col" style={{ gap: 22 }}>
       <div className="n-only">
         <h1 className="page-title" style={{ margin: 0, fontWeight: 400 }}>
-          Orders
+          Purchase Requests
         </h1>
         <div className="page-sub">Quantities round up to full supplier packs.</div>
       </div>
@@ -84,7 +77,7 @@ export function Orders() {
         <section className="min0">
           <div className="sec-head">
             <h2 className="eyebrow" style={{ margin: 0 }}>
-              New Purchase Order
+              New Purchase Request
             </h2>
             <span className="sec-meta">{m.suggestions.length ? `${m.suggestions.length} suggested` : 'Nothing suggested'}</span>
           </div>
@@ -93,7 +86,7 @@ export function Orders() {
               <div className="po-intro">
                 {m.suggestions.length
                   ? 'Suggested items cover plans and par levels. Change the number of packs, remove what you don\'t need with ×, or add any other material.'
-                  : 'Stock covers every plan and par level, so nothing is suggested. You can still order any material below.'}
+                  : 'Stock covers every plan and par level, so nothing is suggested. You can still request any material below.'}
               </div>
               <div className="list">
                 {shown.map((l) => (
@@ -104,7 +97,7 @@ export function Orders() {
                     onRemove={() => (l.reason === 'manual' ? removeExtra(l.i.id) : setUI({ poExcluded: { ...excluded, [l.i.id]: true } }))}
                   />
                 ))}
-                {!shown.length && <div className="empty-inline">No materials on this order yet. Add one below.</div>}
+                {!shown.length && <div className="empty-inline">No materials on this request yet. Add one below.</div>}
               </div>
               {removedSuggestions.length > 0 && (
                 <div className="po-removed">
@@ -129,7 +122,7 @@ export function Orders() {
             </div>
             <div className="commit-summary tnum">
               <span>
-                {plural(toOrder.length, 'item')} to order
+                {plural(toOrder.length, 'item')} to request
               </span>
               {SHOW_COST && <span style={{ color: 'var(--strong)' }}>{money(poCost)}</span>}
             </div>
@@ -143,19 +136,21 @@ export function Orders() {
           <section>
             <div className="sec-head">
               <h2 className="eyebrow" style={{ margin: 0 }}>
-                In transit
+                Awaiting delivery
               </h2>
-              <span className="sec-meta">{plural(m.openPOs.length, 'order')}</span>
+              <span className="sec-meta">{plural(m.openPOs.length, 'request')}</span>
             </div>
             <div className="col" style={{ gap: 10 }}>
-              {m.openPOs.map((po) => (
+              {m.openPOs.map((po) => {
+                const st = requestStatus(po);
+                return (
                 <div key={po.id} className="card pad">
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
                     <button type="button" className="btn-link serif" style={{ fontSize: 19, color: 'var(--strong)' }} onClick={() => openPo(po.id)} aria-label={`${po.id}, view details`}>
                       {po.id}
                       <Icon name="chevronRight" size={14} color="var(--subtle)" />
                     </button>
-                    <span className="pill xs info">In transit</span>
+                    <span className={`pill xs ${st.tone}`}>{st.label}</span>
                   </div>
                   <div className="muted" style={{ marginTop: 2, fontSize: 12 }}>
                     Placed {fmtDate(po.date)} · {po.by}
@@ -163,32 +158,38 @@ export function Orders() {
                   <div style={{ marginTop: 10 }}>
                     {po.lines.map((l) => (
                       <div key={l.ing} className="po-line">
-                        <span>{lineName(l)}</span>
-                        <span className="tnum" style={{ fontWeight: 700 }}>
+                        <span className="min0">
+                          {lineName(l)}
+                          {l.received && (
+                            <span className={`subtle tnum`} style={{ display: 'block', fontSize: 11 }}>
+                              ✓ {receivedText(l, lineUnit(l))}
+                            </span>
+                          )}
+                        </span>
+                        <span className="tnum" style={{ fontWeight: 700, color: l.received ? 'var(--subtle)' : undefined }}>
                           {lineQty(l)}
                         </span>
                       </div>
                     ))}
                   </div>
-                  {perms.receive && (
-                    <button
-                      type="button"
-                      className="btn btn-outline"
-                      style={{ width: '100%', height: 46, marginTop: 10 }}
-                      disabled={!!busy}
-                      onClick={() => receive(po.id)}
-                    >
-                      <Icon name="check" size={14} stroke={2.5} color="var(--ok)" />
-                      Receive delivery
-                    </button>
-                  )}
+                  <button type="button" className="btn btn-outline" style={{ width: '100%', height: 46, marginTop: 10 }} onClick={() => openPo(po.id)}>
+                    {perms.receive ? (
+                      <>
+                        <Icon name="check" size={14} stroke={2.5} color="var(--ok)" />
+                        Receive items
+                      </>
+                    ) : (
+                      'View request'
+                    )}
+                  </button>
                 </div>
-              ))}
+                );
+              })}
             </div>
             {!m.openPOs.length && (
               <div className="empty">
-                <div className="empty-t">No orders in transit</div>
-                <div className="empty-s">Generated POs appear here until received.</div>
+                <div className="empty-t">No open requests</div>
+                <div className="empty-s">New purchase requests stay here until every item is received.</div>
               </div>
             )}
           </section>
@@ -206,7 +207,7 @@ const PAGE = 8;
 
 const openPo = (id: string) => useUI.getState().openSheet('po', id);
 
-/** Every delivery received, newest first: search by PO number or material, filter by month, open for detail, export. */
+/** Every closed purchase request, newest first: search by number or material, filter by month, open for detail, export. */
 function ReceivedHistory() {
   const m = useModel();
   const [q, setQ] = useState('');
@@ -226,7 +227,7 @@ function ReceivedHistory() {
   const shownRows = rows.slice(0, limit);
 
   const exportRows = () => {
-    const label = month ? `received-POs-${month}` : 'received-POs';
+    const label = month ? `closed-requests-${month}` : 'closed-requests';
     downloadWorkbook(label, poSheets(m, rows)).catch(() => toast("Couldn't build the export."));
   };
 
@@ -234,7 +235,7 @@ function ReceivedHistory() {
     <section>
       <div className="sec-head">
         <h2 className="eyebrow" style={{ margin: 0 }}>
-          Received
+          Closed
         </h2>
         {all.length > 0 && (
           <button type="button" className="btn-link" style={{ fontSize: 13 }} onClick={exportRows}>
@@ -248,8 +249,8 @@ function ReceivedHistory() {
           <input
             className="input"
             type="search"
-            placeholder="PO no. or material"
-            aria-label="Search received orders"
+            placeholder="Request no. or material"
+            aria-label="Search closed requests"
             value={q}
             onChange={(e) => {
               setQ(e.target.value);
@@ -258,7 +259,7 @@ function ReceivedHistory() {
           />
           <select
             className="input"
-            aria-label="Month received"
+            aria-label="Month closed"
             value={month}
             onChange={(e) => {
               setMonth(e.target.value);
@@ -280,16 +281,20 @@ function ReceivedHistory() {
             <span className="row-main">
               <span className="row-title">{po.id}</span>
               <span className="row-sub">
-                {plural(po.lines.length, 'item')} · received {fmtDate(po.received)}
+                {plural(po.lines.length, 'item')} · closed {fmtDate(po.received)}
                 {po.receivedBy ? ` by ${po.receivedBy}` : ''}
+                {(() => {
+                  const short = po.lines.filter((l) => l.received && l.received.qty < l.qty - 1e-9).length;
+                  return short ? ` · ${short} short` : '';
+                })()}
               </span>
             </span>
-            <span className="pill xs ok">Received</span>
+            <span className="pill xs ok">Closed</span>
             <Icon name="chevronRight" size={14} color="var(--subtle)" />
           </button>
         ))}
-        {!all.length && <div className="empty-inline">No deliveries received yet.</div>}
-        {all.length > 0 && !rows.length && <div className="empty-inline">No received orders match.</div>}
+        {!all.length && <div className="empty-inline">No closed requests yet.</div>}
+        {all.length > 0 && !rows.length && <div className="empty-inline">No closed requests match.</div>}
       </div>
       {rows.length > shownRows.length && (
         <button type="button" className="btn btn-outline" style={{ width: '100%', marginTop: 10 }} onClick={() => setLimit((n) => n + PAGE * 3)}>
@@ -365,7 +370,7 @@ function PoDraftRow({ line, onPacks, onRemove }: { line: DraftLine; onPacks: (v:
           {SHOW_COST && <span className="muted">{money(qty * num(i.cost))}</span>}
         </div>
       </div>
-      <button type="button" className="row-remove po-remove" aria-label={`Remove ${i.name} from the order`} onClick={onRemove}>
+      <button type="button" className="row-remove po-remove" aria-label={`Remove ${i.name} from the request`} onClick={onRemove}>
         <Icon name="x" size={15} stroke={2.2} />
       </button>
     </div>

@@ -1,6 +1,6 @@
 # StockOps
 
-Production MRP and inventory control for the plant floor: stock counts, recipes, production forecasts and purchase orders, replacing the shared spreadsheet. It implements the *Inventory Control Blueprint*: in-hand + pipeline stock, recipe-based capacity, par-level alerts, forecasts, pack-rounded purchase orders, role-based access and Excel import.
+Production MRP and inventory control for the plant floor: stock counts, recipes, production forecasts and purchase requests, replacing the shared spreadsheet. It implements the *Inventory Control Blueprint*: in-hand + pipeline stock, recipe-based capacity, par-level alerts, forecasts, pack-rounded purchase requests, role-based access and Excel import.
 
 - **App:** Next.js 16, responsive (phone layout below 960px, desktop at 960px and up), installable as a PWA
 - **Backend:** Next.js Server Actions and API routes, PostgreSQL through Drizzle ORM, password sign-in with server-side sessions
@@ -55,7 +55,7 @@ The server enforces every rule below on every request, and keeps each organizati
 | Products, recipes, costs, mix %, materials, par levels, pack sizes | ✓ | | |
 | Log stock (in-hand and pipeline), import stock sheets, receive deliveries | ✓ | ✓ | |
 | Forecasts and production runs | ✓ | | ✓ |
-| Alerts and raising purchase orders | ✓ | ✓ | ✓ |
+| Alerts and raising purchase requests | ✓ | ✓ | ✓ |
 
 - **Owner:** always an Admin and can't be demoted or removed.
 - **Admins:** can't remove themselves or take Admin away from themselves.
@@ -81,7 +81,7 @@ When a PO is raised, the server recomputes these numbers from live stock. Quanti
 
 | Path | What's there |
 | --- | --- |
-| `db/schema.ts` | Tables: organizations, users, sessions, ingredients, products, recipe lines, forecasts, production runs, purchase orders and lines, stock movements. Every business table has `organization_id` |
+| `db/schema.ts` | Tables: organizations, users, sessions, ingredients, products, recipe lines, forecasts, production runs, purchase requests and lines, stock movements. Every business table has `organization_id` |
 | `drizzle/` | SQL migrations (generate new ones with `npm run db:generate` after changing the schema) |
 | `db/index.ts`, `db/seed.ts` | Database connection (Postgres or PGlite), auto-migrate, sample data and the demo organization |
 | `server/services.ts` | Every business rule and permission check |

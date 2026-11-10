@@ -185,7 +185,8 @@ function ProductDetail({ id, onBack }: { id: string; onBack: () => void }) {
   const bkg = Math.max(num(sp.batchKg), 1e-9);
   const batchCost = m.batchCost(sp);
   const perCase = m.perCase(sp);
-  const capacity = m.capacity(sp, m.total);
+  // "Stock on hand" means in-hand only; requests and pipeline haven't arrived yet.
+  const capacity = m.capacity(sp, (i) => num(i.inHand));
 
   const showCost = useShowCost();
   const stats: [string, string][] = [
@@ -621,6 +622,12 @@ function Materials() {
               <th scope="col" className="num">
                 In stock
               </th>
+              <th scope="col" className="num">
+                Purchase Requests
+              </th>
+              <th scope="col" className="num">
+                Pipeline
+              </th>
               <th scope="col">
                 <span className="sr-only">Delete</span>
               </th>
@@ -660,7 +667,10 @@ function Materials() {
                     />
                   </td>
                 ))}
-                <td className="num tnum muted">{i.kind === 'utility' ? '—' : qu(m.total(i), i.unit)}</td>
+                {/* In stock is in-hand only; open purchase requests and pipeline are shown on their own. */}
+                <td className="num tnum muted">{i.kind === 'utility' ? '—' : qu(num(i.inHand), i.unit)}</td>
+                <td className="num tnum muted">{i.kind === 'utility' ? '—' : qu(m.requestedOf(i), i.unit)}</td>
+                <td className="num tnum muted">{i.kind === 'utility' ? '—' : qu(num(i.pipeline), i.unit)}</td>
                 <td>
                   <button
                     type="button"
@@ -670,7 +680,7 @@ function Materials() {
                     onClick={async () => {
                       const ok = await confirmDialog({
                         title: `Delete ${i.name}?`,
-                        body: 'This removes the material for good. Materials used in a recipe or on a purchase order are kept.',
+                        body: 'This removes the material for good. Materials used in a recipe or on a purchase request are kept.',
                         confirmLabel: 'Delete material',
                         danger: true,
                       });
@@ -701,7 +711,8 @@ const BLANK = { name: '', kind: 'ingredient' as MaterialKind, unit: 'kg', packNa
 
 /** Phone layout: a material's name and type, with cost, pack size and par to edit. */
 function MaterialCard({ id }: { id: string }) {
-  const i = useModel().byId[id];
+  const m = useModel();
+  const i = m.byId[id];
   const update = useStore((s) => s.updateIngredient);
   const send = useStore((s) => s.send);
   if (!i) return null;
@@ -726,7 +737,7 @@ function MaterialCard({ id }: { id: string }) {
             onClick={async () => {
               const ok = await confirmDialog({
                 title: `Delete ${i.name}?`,
-                body: 'This removes the material for good. Materials used in a recipe or on a purchase order are kept.',
+                body: 'This removes the material for good. Materials used in a recipe or on a purchase request are kept.',
                 confirmLabel: 'Delete material',
                 danger: true,
               });
@@ -753,6 +764,11 @@ function MaterialCard({ id }: { id: string }) {
           </label>
         ))}
       </div>
+      {i.kind !== 'utility' && (
+        <div className="subtle tnum" style={{ marginTop: 10, fontSize: 12 }}>
+          In stock <strong style={{ color: 'var(--strong)' }}>{qu(num(i.inHand), i.unit)}</strong> · Purchase requests {qu(m.requestedOf(i), i.unit)} · Pipeline {qu(num(i.pipeline), i.unit)}
+        </div>
+      )}
     </div>
   );
 }
@@ -915,7 +931,7 @@ function NewMaterialRow({ first }: { first: boolean }) {
             />
           </td>
         ))}
-        <td colSpan={2} className="num">
+        <td colSpan={4} className="num">
           <button type="button" className="btn btn-primary add-btn" disabled={busy || !f.name.trim()} onClick={() => void save()}>
             <Icon name="plus" size={14} stroke={2.4} />
             Add
@@ -924,7 +940,7 @@ function NewMaterialRow({ first }: { first: boolean }) {
       </tr>
       {err && (
         <tr className="new-row-err">
-          <td colSpan={9} role="alert">
+          <td colSpan={11} role="alert">
             {err}
           </td>
         </tr>

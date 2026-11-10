@@ -15,7 +15,8 @@ import { can, resolveRole, type Actor } from './actor';
 export async function loadData(db: Db, organizationId: string, people: { all: boolean; selfId?: string } = { all: true }): Promise<Data> {
   const org = organizationId;
   const receiver = alias(t.users, 'receiver');
-  const [ingredients, products, forecasts, pos, users, batches, customRoles, [poSeq], [lastStock]] = await Promise.all([
+  const lineReceiver = alias(t.users, 'line_receiver');
+  const [ingredients, products, forecasts, pos, users, batches, customRoles, [poSeq], [lastStock], [orgRow]] = await Promise.all([
     db.select().from(t.ingredients).where(eq(t.ingredients.organizationId, org)).orderBy(asc(t.ingredients.position), asc(t.ingredients.name)),
     db.select().from(t.products).where(eq(t.products.organizationId, org)).orderBy(asc(t.products.position), asc(t.products.name)),
     db
@@ -56,6 +57,7 @@ export async function loadData(db: Db, organizationId: string, people: { all: bo
       .where(and(eq(t.stockMovements.organizationId, org), inArray(t.stockMovements.reason, ['count', 'adjust', 'import', 'po_received'])))
       .orderBy(desc(t.stockMovements.createdAt))
       .limit(1),
+    db.select({ lastRequestNo: t.organizations.lastRequestNo }).from(t.organizations).where(eq(t.organizations.id, org)),
   ]);
   const customById = new Map(customRoles.map((r) => [r.id, r]));
 
@@ -65,7 +67,14 @@ export async function loadData(db: Db, organizationId: string, people: { all: bo
     productIds.length
       ? db.select().from(t.recipeLines).where(inArray(t.recipeLines.productId, productIds)).orderBy(asc(t.recipeLines.productId), asc(t.recipeLines.position))
       : Promise.resolve([]),
-    poIds.length ? db.select().from(t.poLines).where(inArray(t.poLines.poId, poIds)).orderBy(asc(t.poLines.poId), asc(t.poLines.position)) : Promise.resolve([]),
+    poIds.length
+      ? db
+          .select({ l: t.poLines, by: lineReceiver.name })
+          .from(t.poLines)
+          .leftJoin(lineReceiver, eq(t.poLines.receivedBy, lineReceiver.id))
+          .where(inArray(t.poLines.poId, poIds))
+          .orderBy(asc(t.poLines.poId), asc(t.poLines.position))
+      : Promise.resolve([]),
   ]);
 
   const recipes: Record<string, RecipeLine[]> = {};
@@ -96,9 +105,16 @@ export async function loadData(db: Db, organizationId: string, people: { all: bo
       received: po.receivedOn ?? undefined,
       receivedBy: receivedBy ?? undefined,
       by: by ?? '—',
-      lines: poLines.filter((l) => l.poId === po.id).map((l) => ({ ing: l.ingredientId, packs: l.packs, qty: l.qty })),
+      lines: poLines
+        .filter(({ l }) => l.poId === po.id)
+        .map(({ l, by: lineBy }) => ({
+          ing: l.ingredientId,
+          packs: l.packs,
+          qty: l.qty,
+          ...(l.receivedQty != null ? { received: { qty: l.receivedQty, date: l.receivedOn ?? '', by: lineBy ?? '', note: l.receiveNote ?? '' } } : {}),
+        })),
     })),
-    lastPoNo: Number(poSeq?.max) || 0,
+    lastPoNo: Math.max(Number(poSeq?.max) || 0, orgRow?.lastRequestNo ?? 0),
     lastStockUpdate: lastStock ? { at: new Date(lastStock.at).toISOString(), by: lastStock.by ?? '' } : null,
     batches: batches.map(({ b, by }) => ({
       id: b.id,

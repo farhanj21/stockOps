@@ -48,6 +48,7 @@ describe('MRP math (blueprint §1)', () => {
     d.ingredients.find((i) => i.id === 'sugar')!.inHand = 0;
     d.ingredients.find((i) => i.id === 'sugar')!.pipeline = 0;
     d.forecasts = [];
+    d.pos = []; // nothing already requested either
     const s = buildModel(d).suggestions.find((x) => x.i.id === 'sugar')!;
     expect(s.deficit).toBe(200);
     expect(s.packs).toBe(8);
@@ -63,8 +64,18 @@ describe('MRP math (blueprint §1)', () => {
     expect(impact.lines.some((l) => l.i.kind === 'utility')).toBe(false);
   });
 
-  it('numbers the next PO after the highest existing one', () => {
-    expect(m.nextPoId).toBe('PO-2041');
+  it('numbers the next purchase request after the highest existing number', () => {
+    expect(m.nextPoId).toBe('PR-2041');
+  });
+
+  it('counts open purchase requests as their own figure, separate from pipeline', () => {
+    // PO-2040 requests 200 kg sugar; pipeline (256) is stock on the way that isn't on a request.
+    expect(m.requestedOf(m.byId.sugar)).toBe(200);
+    expect(m.total(m.byId.sugar)).toBe(2243 + 200 + 256);
+    const d = seed();
+    d.pos[0].lines[0].received = { qty: 150, date: '2026-10-20', by: 'X', note: '' };
+    const m2 = buildModel(d);
+    expect(m2.requestedOf(m2.byId.sugar)).toBe(0); // a received item no longer counts as requested
   });
 });
 

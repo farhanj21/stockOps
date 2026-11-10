@@ -43,6 +43,8 @@ export const organizations = pgTable('organizations', {
   logo: text('logo'),
   /** Changes with every upload, so the logo URL can be cached. */
   logoUpdatedAt: timestamp('logo_updated_at', { withTimezone: true }),
+  /** Highest purchase request number handed out, so a number is never reused (even after a delete). */
+  lastRequestNo: integer('last_request_no').notNull().default(0),
   createdAt: createdAt(),
 });
 
@@ -270,6 +272,12 @@ export const poLines = pgTable(
     packs: integer('packs').notNull(),
     qty: qty('qty').notNull(),
     position: integer('position').notNull().default(0),
+    /** What actually arrived for this item (null until it's received). Can be less or more than ordered. */
+    receivedQty: qty('received_qty'),
+    receivedOn: date('received_on', { mode: 'string' }),
+    receivedBy: text('received_by').references(() => users.id),
+    /** Optional note from whoever received it, e.g. "2 bags damaged". */
+    receiveNote: text('receive_note'),
   },
   (t) => [primaryKey({ columns: [t.poId, t.ingredientId] })],
 );
