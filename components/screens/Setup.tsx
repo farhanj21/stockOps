@@ -623,9 +623,6 @@ function Materials() {
                 In stock
               </th>
               <th scope="col" className="num">
-                Purchase Requests
-              </th>
-              <th scope="col" className="num">
                 Pipeline
               </th>
               <th scope="col">
@@ -667,9 +664,8 @@ function Materials() {
                     />
                   </td>
                 ))}
-                {/* In stock is in-hand only; open purchase requests and pipeline are shown on their own. */}
+                {/* In stock is in-hand only; what's requested and not yet received is in pipeline. */}
                 <td className="num tnum muted">{i.kind === 'utility' ? '—' : qu(num(i.inHand), i.unit)}</td>
-                <td className="num tnum muted">{i.kind === 'utility' ? '—' : qu(m.requestedOf(i), i.unit)}</td>
                 <td className="num tnum muted">{i.kind === 'utility' ? '—' : qu(num(i.pipeline), i.unit)}</td>
                 <td>
                   <button
@@ -766,7 +762,7 @@ function MaterialCard({ id }: { id: string }) {
       </div>
       {i.kind !== 'utility' && (
         <div className="subtle tnum" style={{ marginTop: 10, fontSize: 12 }}>
-          In stock <strong style={{ color: 'var(--strong)' }}>{qu(num(i.inHand), i.unit)}</strong> · Purchase requests {qu(m.requestedOf(i), i.unit)} · Pipeline {qu(num(i.pipeline), i.unit)}
+          In stock <strong style={{ color: 'var(--strong)' }}>{qu(num(i.inHand), i.unit)}</strong> · Pipeline {qu(num(i.pipeline), i.unit)}
         </div>
       )}
     </div>
@@ -931,7 +927,7 @@ function NewMaterialRow({ first }: { first: boolean }) {
             />
           </td>
         ))}
-        <td colSpan={4} className="num">
+        <td colSpan={3} className="num">
           <button type="button" className="btn btn-primary add-btn" disabled={busy || !f.name.trim()} onClick={() => void save()}>
             <Icon name="plus" size={14} stroke={2.4} />
             Add
@@ -940,7 +936,7 @@ function NewMaterialRow({ first }: { first: boolean }) {
       </tr>
       {err && (
         <tr className="new-row-err">
-          <td colSpan={11} role="alert">
+          <td colSpan={10} role="alert">
             {err}
           </td>
         </tr>

@@ -52,7 +52,7 @@ export function PoSheet({ id }: { id: string }) {
       title: `Delete ${id}?`,
       body: closed
         ? "The request is removed from the history. In-hand stock doesn't change. This can't be undone."
-        : "The request is cancelled. Items already received stay in in-hand stock. This can't be undone.",
+        : "The request is cancelled and items still to arrive come off pipeline. Items already received stay in in-hand stock. This can't be undone.",
       confirmLabel: 'Delete request',
       danger: true,
     });
@@ -69,7 +69,7 @@ export function PoSheet({ id }: { id: string }) {
     if (busy) return;
     const ok = await confirmDialog({
       title: `Receive everything on ${id}?`,
-      body: `The ${plural(pending.length, 'item')} still to arrive ${pending.length === 1 ? 'is' : 'are'} added to in-hand exactly as requested, and the request closes.`,
+      body: `The ${plural(pending.length, 'item')} still to arrive ${pending.length === 1 ? 'moves' : 'move'} from pipeline into in-hand exactly as requested, and the request closes.`,
       confirmLabel: 'Receive all',
     });
     if (!ok) return;
@@ -158,7 +158,11 @@ function RequestItem({ code, line: l, i, canReceive }: { code: string; line: PoL
     setBusy(false);
     if (!res) return;
     setOpen(false);
-    toast(res.closed ? `${i?.name ?? 'Item'} received. Every item is in, so ${code} is closed.` : `${i?.name ?? 'Item'} received · ${qu(n, unit)} added to in-hand.`);
+    toast(
+      res.closed
+        ? `${i?.name ?? 'Item'} received. Every item is in, so ${code} is closed.`
+        : `${i?.name ?? 'Item'} received · ${qu(n, unit)} moved from pipeline to in-hand.`,
+    );
   }
 
   return (
@@ -213,7 +217,7 @@ function RequestItem({ code, line: l, i, canReceive }: { code: string; line: PoL
             </div>
             {qty.trim() !== '' && Math.abs(num(qty) - l.qty) > 1e-9 && (
               <div className="subtle tnum" style={{ fontSize: 12 }}>
-                {num(qty) < l.qty ? `${qu(l.qty - num(qty), unit)} short of what was requested.` : `${qu(num(qty) - l.qty, unit)} more than requested.`} The item is still closed with this amount.
+                {num(qty) < l.qty ? `${qu(l.qty - num(qty), unit)} short of what was requested.` : `${qu(num(qty) - l.qty, unit)} more than requested.`} The item still closes: {qu(num(qty), unit)} goes into in-hand and the full {qu(l.qty, unit)} comes off pipeline.
               </div>
             )}
             <div style={{ display: 'flex', gap: 8 }}>

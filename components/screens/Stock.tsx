@@ -136,7 +136,7 @@ export function Stock() {
                     <span className="row-main" style={{ gap: 0 }}>
                       <span style={{ fontSize: 13, fontWeight: 600 }}>{field === 'inHand' ? 'In-hand' : 'Pipeline'}</span>
                       <span className="subtle" style={{ fontSize: 11 }}>
-                        {field === 'inHand' ? `${i.unit} on site` : 'on the way, not on a request'}
+                        {field === 'inHand' ? `${i.unit} on site` : 'requested, not received'}
                       </span>
                     </span>
                     <input
@@ -153,14 +153,10 @@ export function Stock() {
                 ))}
               </div>
             ) : (
-              <div className="grid3 keep3" style={{ marginTop: 10 }}>
+              <div className="grid2" style={{ marginTop: 10 }}>
                 <div className="cell">
                   <div className="cell-k">In-hand</div>
                   <div className="cell-v">{qu(num(i.inHand), i.unit)}</div>
-                </div>
-                <div className="cell">
-                  <div className="cell-k">Requests</div>
-                  <div className="cell-v">{qu(m.requestedOf(i), i.unit)}</div>
                 </div>
                 <div className="cell">
                   <div className="cell-k">Pipeline</div>
@@ -173,7 +169,7 @@ export function Stock() {
               <div className="bar-par" style={{ left: parPos }} />
             </div>
             <div className="stock-foot tnum">
-              <span style={{ fontWeight: 600 }}>{perms.stock ? `Purchase requests ${qu(m.requestedOf(i), i.unit)}` : `In stock ${qu(num(i.inHand), i.unit)}`}</span>
+              <span style={{ fontWeight: 600 }}>In stock {qu(num(i.inHand), i.unit)}</span>
               <span className="subtle">Par {qu(par, i.unit)}</span>
             </div>
           </div>
@@ -188,7 +184,6 @@ export function Stock() {
               <span role="columnheader">Material</span>
               <span role="columnheader">Pack size</span>
               <span role="columnheader">In-hand</span>
-              <span role="columnheader">Purchase Requests</span>
               <span role="columnheader">Pipeline</span>
               <span role="columnheader">Against par</span>
             </div>
@@ -204,13 +199,8 @@ export function Stock() {
                   <span className="muted" style={{ fontSize: 13 }} role="cell">
                     {cap1(i.packName)} · {qu(num(i.pack), i.unit)}
                   </span>
-                  {(['inHand', 'requested', 'pipeline'] as const).map((field) =>
-                    field === 'requested' ? (
-                      // What's still to arrive on open purchase requests; it changes as items are received.
-                      <span key={field} className="tnum muted" style={{ fontSize: 14, fontWeight: 600 }} role="cell">
-                        {qu(m.requestedOf(i), i.unit)}
-                      </span>
-                    ) : perms.stock ? (
+                  {(['inHand', 'pipeline'] as const).map((field) =>
+                    perms.stock ? (
                       <div key={field} className="st-stepper" role="cell">
                         <input
                           type="number"

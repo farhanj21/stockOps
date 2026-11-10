@@ -82,7 +82,7 @@ export function Dashboard() {
   const suggestCost = m.suggestions.reduce((a, x) => a + x.cost, 0);
   const openLines = m.openPOs.reduce((a, p) => a + p.lines.filter((l) => !l.received).length, 0);
   const alertLine = (i: (typeof m.alerts)[number]) =>
-    `In-hand ${fmt(num(i.inHand))} + Requests ${fmt(m.requestedOf(i))} + Pipeline ${fmt(num(i.pipeline))} = ${qu(m.total(i), i.unit)} · Par ${qu(num(i.par), i.unit)}`;
+    `In-hand ${fmt(num(i.inHand))} + Pipeline ${fmt(num(i.pipeline))} = ${qu(m.total(i), i.unit)} · Par ${qu(num(i.par), i.unit)}`;
 
   return (
     <div className="col" style={{ gap: 22 }}>
@@ -216,12 +216,12 @@ export function Dashboard() {
               <h2 className="eyebrow" style={{ margin: 0 }}>
                 Can produce now
               </h2>
-              <span className="sec-meta">In-hand + requests + pipeline</span>
+              <span className="sec-meta">In-hand stock only</span>
             </div>
             <div className="card clip list">
               {!m.data.products.length && <div className="empty-inline">No products yet.</div>}
               {m.data.products.map((p) => {
-                const c = m.capacity(p, m.total);
+                const c = m.capacity(p, m.inHand);
                 return (
                   <button key={p.id} type="button" className="row" onClick={() => openProd(p.id)}>
                     <span className="row-main">

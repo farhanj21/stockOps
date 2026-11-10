@@ -15,12 +15,13 @@ export function ProductSheet({ id }: { id: string }) {
   const p = m.prodById[id];
   if (!p) return null;
 
-  const c = m.capacity(p, m.total);
+  // Batches that can be made now: in-hand stock only (requests and pipeline haven't arrived).
+  const c = m.capacity(p, m.inHand);
   const lines = m.recipeOf(p.id).flatMap((r) => {
     const i = m.byId[r.ing];
     if (m.isUtil(i)) return [];
     const q = num(r.qty);
-    return [{ i, q, possible: q > 0 ? Math.floor(m.total(i) / q) : 0, limiting: c.lim?.id === i.id }];
+    return [{ i, q, possible: q > 0 ? Math.floor(m.inHand(i) / q) : 0, limiting: c.lim?.id === i.id }];
   });
 
   return (
@@ -79,7 +80,7 @@ export function ProductSheet({ id }: { id: string }) {
           <button
             type="button"
             className="btn btn-primary btn-lg"
-            onClick={() => go('plan', { planProduct: p.id, planBatches: Math.max(1, Math.min(8, m.capacity(p, m.free).batches)) })}
+            onClick={() => go('plan', { planProduct: p.id, planBatches: Math.max(1, Math.min(8, m.capacity(p, m.freeInHand).batches)) })}
           >
             Plan this product
           </button>

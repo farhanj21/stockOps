@@ -21,8 +21,13 @@ export interface Suggestion {
 export interface PlanLine {
   i: Ingredient;
   need: number;
+  /** In-hand left after committed plans (never below 0). */
   free: number;
+  /** How much the plan needs beyond that in-hand stock. */
   short: number;
+  /** Part of the shortfall already on its way (pipeline). */
+  coming: number;
+  /** Packs (and quantity) still to request for what isn't on its way yet. */
   packs: number;
   order: number;
 }
@@ -34,8 +39,8 @@ const EPS = 1e-9;
 
 /**
  * All MRP math from the blueprint, derived from the stored data:
- * requested = items on open purchase requests not yet received,
- * total (available for planning) = in-hand + requested + pipeline, free = total − what committed plans use,
+ * pipeline = on its way (raising a purchase request adds to it; receiving moves it into in-hand),
+ * total (for buying decisions) = in-hand + pipeline, free = total − what committed plans use,
  * capacity = min over recipe lines of stock ÷ qty per batch,
  * order = deficit rounded up to whole supplier packs.
  */
@@ -46,17 +51,8 @@ export function buildModel(d: Data) {
   const recipeOf = (productId: string) => d.recipes[productId] || [];
   const isUtil = (i: Ingredient | undefined): i is undefined => !i || i.kind === 'utility';
 
-  // What's still to arrive on open purchase requests, per material (received items no longer count).
-  const requested: Record<string, number> = {};
-  d.pos.forEach((po) => {
-    if (po.status !== 'Open') return;
-    po.lines.forEach((l) => {
-      if (!l.received) requested[l.ing] = (requested[l.ing] ?? 0) + num(l.qty);
-    });
-  });
-  const requestedOf = (i: Ingredient) => requested[i.id] ?? 0;
-  /** Available for planning: in-hand + open purchase requests + pipeline. "In stock" on screen is in-hand only. */
-  const total = (i: Ingredient) => num(i.inHand) + requestedOf(i) + num(i.pipeline);
+  /** In-hand + pipeline: used for buying decisions (par alerts, suggested requests) so nothing is requested twice. */
+  const total = (i: Ingredient) => num(i.inHand) + num(i.pipeline);
   const alloc: Record<string, number> = {};
   ings.forEach((i) => (alloc[i.id] = 0));
   d.forecasts.forEach((f) =>
@@ -66,6 +62,10 @@ export function buildModel(d: Data) {
   );
   const allocOf = (i: Ingredient) => alloc[i.id] ?? 0;
   const free = (i: Ingredient) => total(i) - allocOf(i);
+  /** What's physically here. Anything that uses stock counts this only: pipeline hasn't arrived yet. */
+  const inHand = (i: Ingredient) => num(i.inHand);
+  /** In-hand left after committed plans take their share. */
+  const freeInHand = (i: Ingredient) => inHand(i) - allocOf(i);
   const isLow = (i: Ingredient) => total(i) < num(i.par);
   const shortOf = (i: Ingredient) => Math.max(0, num(i.par) - total(i));
   const perCase = (p: Product) => num(p.upb) / Math.max(1, num(p.upc));
@@ -116,16 +116,18 @@ export function buildModel(d: Data) {
       const i = byId[r.ing];
       if (isUtil(i)) return;
       const need = batches * num(r.qty);
-      const fr = Math.max(0, free(i));
+      // Only in-hand stock can be used: pipeline counts once it's been received.
+      const fr = Math.max(0, freeInHand(i));
       const short = Math.max(0, need - fr);
-      const packs = short > 0 ? packsFor(i, short) : 0;
+      // Still to request = shortfall not already covered by what's on its way.
+      const toRequest = Math.max(0, need - Math.max(0, free(i)));
+      const coming = Math.max(0, short - toRequest);
+      const packs = toRequest > 0 ? packsFor(i, toRequest) : 0;
       const order = packs * num(i.pack);
       materialCost += need * num(i.cost);
-      if (short > 0) {
-        shortCount++;
-        orderCost += order * num(i.cost);
-      }
-      lines.push({ i, need, free: fr, short, packs, order });
+      if (short > 0) shortCount++;
+      orderCost += order * num(i.cost);
+      lines.push({ i, need, free: fr, short, coming, packs, order });
     });
     return { lines, shortCount, orderCost, materialCost };
   }
@@ -152,10 +154,11 @@ export function buildModel(d: Data) {
     prodById,
     recipeOf,
     isUtil,
-    requestedOf,
     total,
     allocOf,
     free,
+    inHand,
+    freeInHand,
     isLow,
     shortOf,
     perCase,

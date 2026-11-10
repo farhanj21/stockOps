@@ -30,7 +30,7 @@ export function MaterialSheet({ id }: { id: string }) {
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12 }}>
           <div>
             <div className="muted" style={{ fontSize: 12 }}>
-              Available incl. requests &amp; pipeline
+              In-hand + pipeline
             </div>
             <div className="serif tnum" style={{ fontSize: 38, lineHeight: 1.1, color: 'var(--strong)' }}>
               {qu(t, i.unit)}
@@ -41,8 +41,7 @@ export function MaterialSheet({ id }: { id: string }) {
         <Cells
           cells={[
             ['In stock (in-hand)', qu(num(i.inHand), i.unit)],
-            ['Purchase requests', qu(m.requestedOf(i), i.unit)],
-            ['Pipeline', qu(num(i.pipeline), i.unit)],
+            ['Pipeline (requested)', qu(num(i.pipeline), i.unit)],
             ['Par level', qu(num(i.par), i.unit)],
             ['Pack size', `${qu(num(i.pack), i.unit)} ${i.packName}`],
             ['Allocated to plans', qu(m.allocOf(i), i.unit)],

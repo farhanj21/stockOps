@@ -89,12 +89,14 @@ function Planner() {
   const pp = m.prodById[ui.planProduct] ?? products[0];
   const pb = Math.max(0, Math.floor(num(ui.planBatches)));
   const planDate = ui.planDate ?? daysFromToday(6);
-  const coverBatches = m.capacity(pp, m.free).batches;
+  // How many more batches in-hand stock can make, after what committed plans already need.
+  const coverBatches = m.capacity(pp, m.freeInHand).batches;
   const impact = m.planImpact(pp, pb);
+  const toRequest = impact.lines.filter((l) => l.packs > 0).length;
 
   const summary =
     impact.shortCount > 0
-      ? `${plural(impact.shortCount, 'material')} short` + (SHOW_COST ? ` · PO est. ${money(impact.orderCost)}` : '')
+      ? `${plural(impact.shortCount, 'material')} short in hand` + (SHOW_COST && impact.orderCost > 0 ? ` · request est. ${money(impact.orderCost)}` : '')
       : pb > 0
         ? 'All materials covered'
         : 'Set batches to preview';
@@ -108,9 +110,9 @@ function Planner() {
     if (!saved) return;
     ui.set({ planBatches: 0 });
     const what = `${pp.name} · ${plural(pb, 'batch', 'batches')} committed.`;
-    if (impact.shortCount > 0)
-      toast(`${what} ${plural(impact.shortCount, 'material')} need requesting.`, { label: 'Review', fn: () => go('orders') });
-    else toast(`${what} All materials covered.`);
+    if (toRequest > 0) toast(`${what} ${plural(toRequest, 'material')} need requesting.`, { label: 'Review', fn: () => go('orders') });
+    else if (impact.shortCount > 0) toast(`${what} ${plural(impact.shortCount, 'material')} short in hand, but already on the way.`);
+    else toast(`${what} All materials in hand.`);
   }
 
   const commitBlock = (
@@ -197,7 +199,7 @@ function Planner() {
               ))}
             </select>
             <div className="row-sub tnum" style={{ marginTop: 6 }}>
-              {qu(num(pp.batchKg), 'kg')} · {fmt(m.perCase(pp))} cases / batch · free stock covers {plural(coverBatches, 'batch', 'batches')}
+              {qu(num(pp.batchKg), 'kg')} · {fmt(m.perCase(pp))} cases / batch · in-hand stock covers {plural(coverBatches, 'batch', 'batches')}
             </div>
           </section>
 
@@ -206,7 +208,7 @@ function Planner() {
               <label htmlFor="plan-batches" className="eyebrow">
                 Batches
               </label>
-              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--gold-ink)' }}>Free stock covers {coverBatches}</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--gold-ink)' }}>In-hand covers {coverBatches}</span>
             </div>
             <div className="big-stepper">
               <button type="button" className="big-step" aria-label="One batch fewer" onClick={() => ui.set({ planBatches: Math.max(0, pb - 1) })}>
@@ -257,11 +259,11 @@ function Planner() {
             {impact.shortCount > 0 ? (
               <span className="pill danger">{impact.shortCount} short</span>
             ) : (
-              <span className="pill ok">All covered</span>
+              <span className="pill ok">All in hand</span>
             )}
           </div>
           <div className="subtle" style={{ marginBottom: 10, fontSize: 12 }}>
-            Free stock = in-hand + open purchase requests + pipeline, minus what committed plans already use.
+            Counts in-hand stock only, minus what committed plans already use. Pipeline (requested, not received) counts once it&apos;s received.
           </div>
           <div className="card clip list">
             {impact.lines.map((l) => {
@@ -282,12 +284,21 @@ function Planner() {
                   </div>
                   {l.short > 0 ? (
                     <div className="tnum" style={{ fontSize: 12, fontWeight: 600, color: 'var(--danger)' }}>
-                      Short {qu(l.short, l.i.unit)} → order {packTxt(l.i, l.packs)} = {qu(l.order, l.i.unit)}
-                      {SHOW_COST && ` · ${money(l.order * num(l.i.cost))}`}
+                      Short {qu(l.short, l.i.unit)} in hand
+                      {l.coming > 0 && <span style={{ color: 'var(--warn)' }}> · {qu(l.coming, l.i.unit)} on the way</span>}
+                      {l.packs > 0 ? (
+                        <>
+                          {' '}
+                          → request {packTxt(l.i, l.packs)} = {qu(l.order, l.i.unit)}
+                          {SHOW_COST && ` · ${money(l.order * num(l.i.cost))}`}
+                        </>
+                      ) : (
+                        <span style={{ color: 'var(--warn)' }}> · nothing more to request</span>
+                      )}
                     </div>
                   ) : (
                     <div className="muted tnum" style={{ fontSize: 12 }}>
-                      {qu(l.free, l.i.unit)} free · {qu(l.free - l.need, l.i.unit)} left after this plan
+                      {qu(l.free, l.i.unit)} in hand free · {qu(l.free - l.need, l.i.unit)} left after this plan
                     </div>
                   )}
                 </div>

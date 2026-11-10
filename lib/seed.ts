@@ -15,17 +15,17 @@ function pctBom(kg: number, pcts: [string, number][], packs: [string, number][] 
 export function seed(): Data {
   return {
     ingredients: [
-      { id: 'sugar', name: 'Sugar (Powdered)', unit: 'kg', kind: 'ingredient', cost: 180, pack: 25, packName: 'bag', par: 200, inHand: 2243, pipeline: 256 },
+      { id: 'sugar', name: 'Sugar (Powdered)', unit: 'kg', kind: 'ingredient', cost: 180, pack: 25, packName: 'bag', par: 200, inHand: 2243, pipeline: 456 },
       { id: 'condensed', name: 'Condensed Milk', unit: 'kg', kind: 'ingredient', cost: 650, pack: 50, packName: 'drum', par: 300, inHand: 1450, pipeline: 950 },
       { id: 'starch', name: 'Starch UT4', unit: 'kg', kind: 'ingredient', cost: 3150, pack: 25, packName: 'bag', par: 50, inHand: 73, pipeline: 80 },
       { id: 'coconut', name: 'Coconut Oil (Un Hydro)', unit: 'kg', kind: 'ingredient', cost: 1230, pack: 200, packName: 'drum', par: 500, inHand: 1954, pipeline: 2154 },
       { id: 'pko', name: 'PKO 38 (HPKO)', unit: 'kg', kind: 'ingredient', cost: 620, pack: 200, packName: 'drum', par: 400, inHand: 820, pipeline: 0 },
       { id: 'soy', name: 'Soyabean Oil', unit: 'kg', kind: 'ingredient', cost: 560, pack: 200, packName: 'drum', par: 300, inHand: 410, pipeline: 200 },
-      { id: 'cocoaN', name: 'Cocoa Powder (N)', unit: 'kg', kind: 'ingredient', cost: 6920, pack: 25, packName: 'bag', par: 150, inHand: 267, pipeline: 24 },
+      { id: 'cocoaN', name: 'Cocoa Powder (N)', unit: 'kg', kind: 'ingredient', cost: 6920, pack: 25, packName: 'bag', par: 150, inHand: 267, pipeline: 124 },
       { id: 'cocoaA', name: 'Cocoa Powder (A)', unit: 'kg', kind: 'ingredient', cost: 4130, pack: 25, packName: 'bag', par: 150, inHand: 595, pipeline: 374 },
       { id: 'smp', name: 'SMP (Skimmed Milk Powder)', unit: 'kg', kind: 'ingredient', cost: 1900, pack: 25, packName: 'bag', par: 100, inHand: 436, pipeline: 214 },
       { id: 'pgpr', name: 'PGPR', unit: 'kg', kind: 'ingredient', cost: 5200, pack: 5, packName: 'jug', par: 10, inHand: 8.7, pipeline: 0.5 },
-      { id: 'lecithin', name: 'Soya Lecithin', unit: 'kg', kind: 'ingredient', cost: 700, pack: 200, packName: 'drum', par: 20, inHand: 14.5, pipeline: 0 },
+      { id: 'lecithin', name: 'Soya Lecithin', unit: 'kg', kind: 'ingredient', cost: 700, pack: 200, packName: 'drum', par: 20, inHand: 14.5, pipeline: 200 },
       { id: 'citrate', name: 'Sodium Citrate', unit: 'kg', kind: 'ingredient', cost: 900, pack: 25, packName: 'bag', par: 25, inHand: 30, pipeline: 0 },
       { id: 'citric', name: 'Citric Acid', unit: 'kg', kind: 'ingredient', cost: 650, pack: 25, packName: 'bag', par: 10, inHand: 12, pipeline: 0 },
       { id: 'dsp', name: 'Di Sodium Phosphate', unit: 'kg', kind: 'ingredient', cost: 750, pack: 25, packName: 'bag', par: 15, inHand: 9, pipeline: 0 },
@@ -62,7 +62,7 @@ export function seed(): Data {
       { id: 'f1', productId: 'fudge', batches: 4, date: '2026-10-23', by: 'Priya Nair' },
       { id: 'f2', productId: 'coating', batches: 3, date: '2026-10-24', by: 'Priya Nair' },
     ],
-    // Pipeline above is stock on the way that isn't on a request; PO-2040's items are counted on their own.
+    // Pipeline above includes PO-2040's items (raising a request adds to pipeline).
     pos: [
       { id: 'PO-2040', date: '2026-10-17', status: 'Open', by: 'Marco Silva', lines: [{ ing: 'sugar', packs: 8, qty: 200 }, { ing: 'cocoaN', packs: 4, qty: 100 }, { ing: 'lecithin', packs: 1, qty: 200 }] },
       { id: 'PO-2039', date: '2026-10-12', status: 'Received', received: '2026-10-15', by: 'Ana Reyes', lines: [{ ing: 'coconut', packs: 5, qty: 1000 }, { ing: 'smp', packs: 8, qty: 200 }] },

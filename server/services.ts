@@ -838,8 +838,8 @@ export async function deleteBatch(db: Db, actor: Actor, id: string) {
 }
 
 // ── Purchase requests (everyone raises them; Admin/Warehouse receive) ────────
-// Stored as purchase orders. A request no longer touches pipeline: what's still to arrive on it
-// is counted on its own. Each item is received separately with what actually arrived.
+// Stored as purchase orders. Raising one adds its quantities to pipeline; each item is received
+// separately with what actually arrived, which moves it from pipeline into in-hand.
 
 export interface PoLineInput {
   ingredientId: string;
@@ -874,6 +874,7 @@ export async function createPO(db: Db, actor: Actor, input: PoLineInput[]) {
         }
         await tx.insert(t.purchaseOrders).values({ id, organizationId: actor.organizationId, code, status: 'Open', placedOn: plantToday(), createdBy: actor.userId });
         await tx.insert(t.poLines).values(rows.map((r, position) => ({ poId: id, ingredientId: r.ing.id, packs: r.packs, qty: r.qty, position })));
+        for (const r of rows) await writeStock(tx, actor, r.ing, 'pipeline', r.ing.pipeline + r.qty, 'po_created', code);
         // Remember the number so it's never handed out again, even if this request is deleted.
         const no = parseInt(code.replace(/\D/g, ''), 10) || 0;
         await tx
@@ -915,10 +916,14 @@ async function lockOpenRequest(tx: Tx, actor: Actor, code: string) {
   return po;
 }
 
-/** Add what arrived to in-hand and record it on the line. */
+/**
+ * Add what arrived to in-hand and take the item's requested quantity off pipeline (the item is done,
+ * so a shortfall doesn't linger in pipeline), then record it on the line.
+ */
 async function receiveLine(tx: Tx, actor: Actor, code: string, line: typeof t.poLines.$inferSelect, qty: number, note: string | null) {
   const ing = await lockIngredient(tx, actor, line.ingredientId);
   await writeStock(tx, actor, ing, 'inHand', ing.inHand + qty, 'po_received', code);
+  await writeStock(tx, actor, ing, 'pipeline', ing.pipeline - line.qty, 'po_received', code);
   await tx
     .update(t.poLines)
     .set({ receivedQty: round(qty), receivedOn: plantToday(), receivedBy: actor.userId, receiveNote: note?.trim() || null })
@@ -966,9 +971,9 @@ export async function receivePO(db: Db, actor: Actor, code: string) {
 }
 
 /**
- * Delete a purchase request. An open one is cancelled (needs "Receive deliveries"); a closed one
- * only leaves the history (needs "Setup"). Items already received stay in in-hand stock, because
- * they did arrive. Its number is never handed out again.
+ * Delete a purchase request. An open one is cancelled (needs "Receive deliveries"): items still to
+ * arrive come off pipeline. A closed one only leaves the history (needs "Setup"). Items already
+ * received stay in in-hand stock, because they did arrive. Its number is never handed out again.
  */
 export async function deletePO(db: Db, actor: Actor, code: string) {
   await db.transaction(async (tx) => {
@@ -979,7 +984,15 @@ export async function deletePO(db: Db, actor: Actor, code: string) {
       .for('update');
     if (!po) throw new AppError('That purchase request no longer exists.', 'not_found');
     requirePerm(actor, po.status === 'Open' ? 'receive' : 'setup');
-    // Requests don't add to pipeline, so there's nothing to take back out; anything already received stays in stock.
+    if (po.status === 'Open') {
+      // Cancelled: items still to arrive come back off pipeline. Items already received stay in stock.
+      const lines = await tx.select().from(t.poLines).where(eq(t.poLines.poId, po.id));
+      for (const l of lines) {
+        if (l.receivedQty != null) continue;
+        const ing = await lockIngredient(tx, actor, l.ingredientId);
+        await writeStock(tx, actor, ing, 'pipeline', ing.pipeline - l.qty, 'adjust', code);
+      }
+    }
     await tx.delete(t.purchaseOrders).where(eq(t.purchaseOrders.id, po.id));
   });
 }

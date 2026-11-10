@@ -19,7 +19,7 @@ export function useSearchResults() {
       .map((i) => ({
         id: i.id,
         name: i.name,
-        meta: `${qu(m.total(i), i.unit)} available · Par ${qu(num(i.par), i.unit)}`,
+        meta: `${qu(num(i.inHand), i.unit)} in stock · Par ${qu(num(i.par), i.unit)}`,
         low: m.isLow(i),
         shortLabel: '−' + qu(m.shortOf(i), i.unit),
       }));
@@ -30,7 +30,7 @@ export function useSearchResults() {
         .map((r) => m.byId[r.ing])
         .find((i) => i && i.name.toLowerCase().includes(q));
       if (!nameHit && !ingHit) return [];
-      const c = m.capacity(p, m.total);
+      const c = m.capacity(p, m.inHand);
       return [{ id: p.id, name: p.name, meta: (!nameHit && ingHit ? `Uses ${ingHit.name} · ` : '') + `${fmt(c.cases)} cases possible` }];
     });
     return { q, materials, products };

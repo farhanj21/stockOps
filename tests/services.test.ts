@@ -340,18 +340,16 @@ describe('stock, orders and production', () => {
     expect(Date.now() - new Date(last!.at).getTime()).toBeLessThan(60_000);
   });
 
-  it('requests whole packs for every suggestion; they count as requested, not as pipeline', async () => {
+  it('requests whole packs for every suggestion and adds them to pipeline', async () => {
     const po = await svc.generatePO(db, admin, []);
     expect(po).toEqual({ id: 'PR-2041', lines: 3 });
-    const dsp = await material(db, orgId, 'Di Sodium Phosphate');
-    expect(dsp.pipeline).toBe(0);
+    expect((await material(db, orgId, 'Di Sodium Phosphate')).pipeline).toBe(25);
     const m = buildModel(await loadData(db, orgId));
-    expect(m.requestedOf(m.byId[dsp.id])).toBe(25);
-    expect(m.suggestions).toHaveLength(0); // planning still counts what's been requested
+    expect(m.suggestions).toHaveLength(0); // what's in pipeline isn't suggested again
     await expect(svc.generatePO(db, admin, [])).rejects.toMatchObject({ code: 'conflict' });
   });
 
-  it('receiving everything adds it to in-hand, leaves pipeline alone, and closes the request once', async () => {
+  it('receiving everything moves it from pipeline into in-hand and closes the request once', async () => {
     await svc.receivePO(db, warehouse, 'PO-2040');
     expect(await material(db, orgId, SUGAR)).toMatchObject({ inHand: 2443, pipeline: 256 });
     const po = (await loadData(db, orgId)).pos.find((p) => p.id === 'PO-2040')!;
@@ -365,34 +363,33 @@ describe('stock, orders and production', () => {
     const cocoa = await material(db, orgId, 'Cocoa Powder (N)');
     const lecithin = await material(db, orgId, 'Soya Lecithin');
     await forbidden(svc.receivePOLine(db, production, 'PO-2040', sugar.id, 200, null));
-    // 150 of 200 kg sugar arrived.
+    // 150 of 200 kg sugar arrived: +150 in-hand, and the item's full 200 kg comes off pipeline.
     expect(await svc.receivePOLine(db, warehouse, 'PO-2040', sugar.id, 150, ' 2 bags torn ')).toEqual({ closed: false });
-    expect((await material(db, orgId, SUGAR)).inHand).toBe(2243 + 150);
+    expect(await material(db, orgId, SUGAR)).toMatchObject({ inHand: 2243 + 150, pipeline: 456 - 200 });
     await expect(svc.receivePOLine(db, warehouse, 'PO-2040', sugar.id, 50, null)).rejects.toMatchObject({ code: 'conflict' });
     let data = await loadData(db, orgId);
     let po = data.pos.find((p) => p.id === 'PO-2040')!;
     expect(po.status).toBe('Open');
     expect(po.lines.find((l) => l.ing === sugar.id)?.received).toMatchObject({ qty: 150, note: '2 bags torn', by: warehouse.name });
-    // Only what's still to arrive counts as requested.
-    let m = buildModel(data);
-    expect(m.requestedOf(m.byId[sugar.id])).toBe(0);
-    expect(m.requestedOf(m.byId[cocoa.id])).toBe(100);
+    expect((await material(db, orgId, 'Cocoa Powder (N)')).pipeline).toBe(124); // not received yet
     await svc.receivePOLine(db, warehouse, 'PO-2040', cocoa.id, 100, null);
+    expect((await material(db, orgId, 'Cocoa Powder (N)')).pipeline).toBe(24);
     expect(await svc.receivePOLine(db, warehouse, 'PO-2040', lecithin.id, 0, 'not delivered')).toEqual({ closed: true });
     data = await loadData(db, orgId);
     po = data.pos.find((p) => p.id === 'PO-2040')!;
     expect(po).toMatchObject({ status: 'Received', receivedBy: warehouse.name });
-    m = buildModel(data);
-    expect(m.requestedOf(m.byId[lecithin.id])).toBe(0);
+    expect(await material(db, orgId, 'Soya Lecithin')).toMatchObject({ inHand: lecithin.inHand, pipeline: 0 }); // nothing came; it comes off pipeline
     await expect(svc.receivePOLine(db, warehouse, 'PO-2040', cocoa.id, 1, null)).rejects.toMatchObject({ code: 'conflict' });
     await expect(svc.receivePOLine(db, warehouse, 'PO-2040', sugar.id, -1, null)).rejects.toBeInstanceOf(AppError);
   });
 
-  it('deleting an open request leaves stock alone; its number is never reused', async () => {
+  it('deleting an open request takes what is still to arrive off pipeline; its number is never reused', async () => {
     const before = await material(db, orgId, SUGAR);
     await forbidden(svc.deletePO(db, production, 'PO-2040'));
+    await svc.receivePOLine(db, warehouse, 'PO-2040', (await material(db, orgId, 'Cocoa Powder (N)')).id, 100, null);
     await svc.deletePO(db, warehouse, 'PO-2040');
     expect(await material(db, orgId, SUGAR)).toMatchObject({ inHand: before.inHand, pipeline: 256 });
+    expect((await material(db, orgId, 'Cocoa Powder (N)')).pipeline).toBe(24); // received item isn't taken off twice
     const data = await loadData(db, orgId);
     expect(data.pos.find((p) => p.id === 'PO-2040')).toBeUndefined();
     const po = await svc.generatePO(db, admin, []);
@@ -516,9 +513,7 @@ describe('custom purchase requests', () => {
     const [row] = await db.select().from(t.purchaseOrders).where(and(eq(t.purchaseOrders.organizationId, orgId), eq(t.purchaseOrders.code, 'PR-2041')));
     const lines = await db.select().from(t.poLines).where(eq(t.poLines.poId, row.id));
     expect(Object.fromEntries(lines.map((l) => [l.ingredientId, [l.packs, l.qty]]))).toEqual({ [sugar.id]: [3, 75], [cartons.id]: [2, 100] });
-    expect((await material(db, orgId, SUGAR)).pipeline).toBe(256); // requests don't touch pipeline
-    const m = buildModel(await loadData(db, orgId));
-    expect(m.requestedOf(m.byId[sugar.id])).toBe(200 + 75); // PO-2040 + this one
+    expect((await material(db, orgId, SUGAR)).pipeline).toBe(456 + 75);
   });
 
   it('merges repeated materials into one line', async () => {

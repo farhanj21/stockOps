@@ -61,7 +61,7 @@ export function Orders() {
     setBusy(null);
     if (!po) return;
     setUI({ poExcluded: {}, poPacks: {}, poExtra: [] });
-    toast(`${po.id} created · ${plural(po.lines, 'item')} requested.`);
+    toast(`${po.id} created · ${plural(po.lines, 'item')} added to pipeline.`);
   }
 
   return (

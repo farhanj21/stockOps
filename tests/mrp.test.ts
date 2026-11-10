@@ -68,14 +68,37 @@ describe('MRP math (blueprint §1)', () => {
     expect(m.nextPoId).toBe('PR-2041');
   });
 
-  it('counts open purchase requests as their own figure, separate from pipeline', () => {
-    // PO-2040 requests 200 kg sugar; pipeline (256) is stock on the way that isn't on a request.
-    expect(m.requestedOf(m.byId.sugar)).toBe(200);
-    expect(m.total(m.byId.sugar)).toBe(2243 + 200 + 256);
+  it('material impact counts in-hand only, and only asks to request what is not already on its way', () => {
     const d = seed();
-    d.pos[0].lines[0].received = { qty: 150, date: '2026-10-20', by: 'X', note: '' };
+    d.forecasts = [];
+    const sugar = d.ingredients.find((i) => i.id === 'sugar')!;
+    sugar.inHand = 0; // 456 kg in pipeline (PO-2040's 200 kg included) is on the way
     const m2 = buildModel(d);
-    expect(m2.requestedOf(m2.byId.sugar)).toBe(0); // a received item no longer counts as requested
+    const pid = Object.keys(d.recipes).find((k) => d.recipes[k].some((r) => r.ing === 'sugar' && Number(r.qty) > 0))!;
+    const perBatch = Number(d.recipes[pid].find((r) => r.ing === 'sugar')!.qty);
+    const batches = Math.ceil(500 / perBatch); // needs a bit more than is on the way
+    const line = m2.planImpact(m2.prodById[pid], batches).lines.find((l) => l.i.id === 'sugar')!;
+    expect(line.free).toBe(0);
+    expect(line.short).toBeCloseTo(line.need);
+    expect(line.coming).toBeCloseTo(456);
+    expect(line.order).toBeGreaterThanOrEqual(line.need - 456 - 1e-9); // only the uncovered part, in whole packs
+    expect(line.order).toBeLessThan(line.need - 456 + 25 + 1e-9);
+  });
+
+  it('"can produce" counts in-hand stock only, not requests or pipeline', () => {
+    const d = seed();
+    const sugar = d.ingredients.find((i) => i.id === 'sugar')!;
+    sugar.inHand = 0; // pipeline stays at 456 kg
+    const m2 = buildModel(d);
+    const uses = Object.keys(d.recipes).filter((pid) => d.recipes[pid].some((r) => r.ing === 'sugar' && Number(r.qty) > 0));
+    expect(uses.length).toBeGreaterThan(0);
+    for (const pid of uses) expect(m2.capacity(m2.prodById[pid], m2.inHand).batches).toBe(0);
+    expect(m2.capacity(m2.prodById[uses[0]], m2.total).batches).toBeGreaterThan(0); // planning still sees what's coming
+  });
+
+  it('buying decisions count in-hand + pipeline; using stock counts in-hand only', () => {
+    expect(m.total(m.byId.sugar)).toBe(2243 + 456);
+    expect(m.inHand(m.byId.sugar)).toBe(2243);
   });
 });
 
