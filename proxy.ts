@@ -16,6 +16,8 @@ export function proxy(req: NextRequest) {
 }
 
 export const config = {
-  // Pages only: skip API routes, build assets, icons, the manifest and the service worker.
-  matcher: ['/((?!api|_next/static|_next/image|icon|apple-icon|manifest.webmanifest|sw.js|favicon.ico).*)'],
+  // Pages only: skip API routes, build assets, icons, the share image, the manifest, robots.txt and the service worker.
+  matcher: [
+    '/((?!api|_next/static|_next/image|icon|apple-icon|opengraph-image|manifest.webmanifest|robots.txt|sw.js|favicon.ico).*)',
+  ],
 };

@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { Hanken_Grotesk, Marcellus } from 'next/font/google';
 import { Providers } from '@/components/Providers';
 import { BOOT_SCRIPT } from '@/lib/boot';
+import { siteUrl } from '@/lib/site-url';
 import './globals.css';
 import '@/styles/shell.css';
 import '@/styles/auth.css';
@@ -22,12 +23,26 @@ const serif = Marcellus({
   weight: '400',
 });
 
+const SHARE_TITLE = 'StockOps — Production MRP & inventory control';
+const DESCRIPTION = 'Production MRP & inventory control — stock counts, recipes, forecasts and purchase requests.';
+
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl()),
   title: { default: 'StockOps', template: '%s · StockOps' },
-  description: 'Production MRP & inventory control — stock counts, recipes, forecasts and purchase requests.',
+  description: DESCRIPTION,
   applicationName: 'StockOps',
   appleWebApp: { capable: true, title: 'StockOps', statusBarStyle: 'black-translucent' },
   formatDetection: { telephone: false },
+  // Link previews. The image comes from app/opengraph-image.tsx.
+  openGraph: {
+    type: 'website',
+    siteName: 'StockOps',
+    title: SHARE_TITLE,
+    description: DESCRIPTION,
+    url: '/',
+    locale: 'en_US',
+  },
+  twitter: { card: 'summary_large_image', title: SHARE_TITLE, description: DESCRIPTION },
 };
 
 export const viewport: Viewport = {

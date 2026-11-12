@@ -1,10 +1,14 @@
 import { ImageResponse } from 'next/og';
 
-/** Marcellus glyphs for "SO", fetched once at build time. Falls back to the default font offline. */
-async function loadMarcellus(): Promise<ArrayBuffer | null> {
+/**
+ * The glyphs of `text` in a Google font (e.g. "Marcellus", "Hanken Grotesk:wght@500"), fetched once at build time.
+ * Returns null offline, and the image falls back to the default font.
+ */
+export async function loadGoogleFont(family: string, text: string): Promise<ArrayBuffer | null> {
   'use cache';
   try {
-    const css = await (await fetch('https://fonts.googleapis.com/css2?family=Marcellus&text=SO')).text();
+    const query = `family=${family.replace(/ /g, '+')}&text=${encodeURIComponent(text)}`;
+    const css = await (await fetch(`https://fonts.googleapis.com/css2?${query}`)).text();
     const url = css.match(/src: url\((.+?)\) format\('(?:opentype|truetype)'\)/)?.[1];
     if (!url) return null;
     const res = await fetch(url);
@@ -19,7 +23,7 @@ async function loadMarcellus(): Promise<ArrayBuffer | null> {
  * `inset` shrinks the glyph for maskable icons, whose outer 10% may be cropped.
  */
 export async function brandImage(size: number, { rounded = false, inset = 1 } = {}) {
-  const font = await loadMarcellus();
+  const font = await loadGoogleFont('Marcellus', 'SO');
   return new ImageResponse(
     (
       <div
