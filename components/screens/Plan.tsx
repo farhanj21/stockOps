@@ -87,29 +87,45 @@ function Planner() {
 
   const products = m.data.products;
   const pp = m.prodById[ui.planProduct] ?? products[0];
-  const pb = Math.max(0, Math.floor(num(ui.planBatches)));
+  const upb = num(pp.upb);
+  const upc = Math.max(1, num(pp.upc));
+  // A custom quantity is scaled from the recipe by units, so it needs units per batch set in Setup.
+  const canCustom = upb > 0;
+  const custom = ui.planMode === 'custom' && canCustom;
+  const customUnits = Math.floor(num(ui.planCases)) * upc + Math.floor(num(ui.planLoose));
+  // Custom = one batch of `customUnits`; regular = whole recipe batches.
+  const pb = custom ? (customUnits > 0 ? 1 : 0) : Math.max(0, Math.floor(num(ui.planBatches)));
   const planDate = ui.planDate ?? daysFromToday(6);
-  // How many more batches in-hand stock can make, after what committed plans already need.
-  const coverBatches = m.capacity(pp, m.freeInHand).batches;
-  const impact = m.planImpact(pp, pb);
+  // How much more in-hand stock can make, after what committed plans already need.
+  const cover = m.capacity(pp, m.freeInHand);
+  const coverBatches = cover.batches;
+  const impact = m.planImpact(pp, pb, custom ? customUnits : null);
   const toRequest = impact.lines.filter((l) => l.packs > 0).length;
+  const qtyTxt = (units: number) => {
+    const c = Math.floor(units / upc);
+    const loose = units - c * upc;
+    return `${plural(c, 'case')}${loose > 0 ? ` + ${plural(loose, 'unit')}` : ''}`;
+  };
+  const sizeTxt = custom ? qtyTxt(customUnits) : plural(pb, 'batch', 'batches');
 
   const summary =
     impact.shortCount > 0
       ? `${plural(impact.shortCount, 'material')} short in hand` + (SHOW_COST && impact.orderCost > 0 ? ` · request est. ${money(impact.orderCost)}` : '')
       : pb > 0
         ? 'All materials covered'
-        : 'Set batches to preview';
-  const commitLabel = pb > 0 ? `Commit plan · ${plural(pb, 'batch', 'batches')}` : 'Commit plan';
+        : custom
+          ? 'Enter a quantity to preview'
+          : 'Set batches to preview';
+  const commitLabel = pb > 0 ? `Commit plan · ${sizeTxt}` : 'Commit plan';
 
   async function commit() {
     if (pb < 1 || busy) return;
     setBusy(true);
-    const saved = await addForecast({ productId: pp.id, batches: pb, date: planDate });
+    const saved = await addForecast({ productId: pp.id, batches: pb, date: planDate, customUnits: custom ? customUnits : null });
     setBusy(false);
     if (!saved) return;
-    ui.set({ planBatches: 0 });
-    const what = `${pp.name} · ${plural(pb, 'batch', 'batches')} committed.`;
+    ui.set(custom ? { planCases: '', planLoose: '' } : { planBatches: 0 });
+    const what = `${pp.name} · ${sizeTxt} committed.`;
     if (toRequest > 0) toast(`${what} ${plural(toRequest, 'material')} need requesting.`, { label: 'Review', fn: () => go('orders') });
     else if (impact.shortCount > 0) toast(`${what} ${plural(impact.shortCount, 'material')} short in hand, but already on the way.`);
     else toast(`${what} All materials in hand.`);
@@ -139,13 +155,24 @@ function Planner() {
       <div className="plans-grid">
         {m.forecastsSorted.map((f) => {
           const p = m.prodById[f.productId];
-          const cases = fmt(Math.floor(num(f.batches) * (p ? m.perCase(p) : 0)));
+          const cases = fmt(Math.floor(num(f.batches) * m.planCases(f)));
+          const fUpc = Math.max(1, num(p?.upc));
+          const fLoose = f.customUnits ? f.customUnits % fUpc : 0;
           return (
             <div key={f.id} className="plan-card">
               <div className="min0" style={{ flex: 1 }}>
                 <div style={{ fontSize: 14, fontWeight: 700 }}>{p?.name ?? '—'}</div>
                 <div className="muted tnum" style={{ marginTop: 2, fontSize: 12 }}>
-                  {plural(num(f.batches), 'batch', 'batches')} · {cases} cases · due {fmtDate(f.date)}
+                  {f.customUnits ? (
+                    <>
+                      Custom{num(f.batches) > 1 ? ` × ${fmt(num(f.batches))}` : ''} · {cases} cases{fLoose > 0 ? ` + ${plural(fLoose, 'unit')}` : ''}
+                    </>
+                  ) : (
+                    <>
+                      {plural(num(f.batches), 'batch', 'batches')} · {cases} cases
+                    </>
+                  )}{' '}
+                  · due {fmtDate(f.date)}
                 </div>
               </div>
               <button
@@ -204,7 +231,81 @@ function Planner() {
           </section>
 
           <section className="card pad">
-            <div className="sec-head" style={{ marginBottom: 12 }}>
+            <div className="seg plan-mode" role="radiogroup" aria-label="Production quantity">
+              {(
+                [
+                  ['batch', 'Regular batches'],
+                  ['custom', 'Custom quantity'],
+                ] as const
+              ).map(([k, label]) => (
+                <button
+                  key={k}
+                  type="button"
+                  role="radio"
+                  aria-checked={(custom ? 'custom' : 'batch') === k}
+                  disabled={k === 'custom' && !canCustom}
+                  title={k === 'custom' && !canCustom ? 'Set units per batch for this product in Setup first' : undefined}
+                  onClick={() => ui.set({ planMode: k })}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {custom ? (
+              <>
+                <div className="sec-head" style={{ margin: '14px 0 8px' }}>
+                  <span className="eyebrow">Quantity to make</span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--gold-ink)' }}>In-hand covers {qtyTxt(cover.units)}</span>
+                </div>
+                <div className="grid2" style={{ gap: 10 }}>
+                  <div>
+                    <label htmlFor="plan-cases" className="field-label sm">
+                      Cases ({fmt(upc)} units each)
+                    </label>
+                    <input
+                      id="plan-cases"
+                      className="input tnum"
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      placeholder="0"
+                      value={ui.planCases}
+                      onChange={(e) => ui.set({ planCases: inputVal(e.target.value, true) })}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="plan-loose" className="field-label sm">
+                      Loose units
+                    </label>
+                    <input
+                      id="plan-loose"
+                      className="input tnum"
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      placeholder="0"
+                      value={ui.planLoose}
+                      onChange={(e) => ui.set({ planLoose: inputVal(e.target.value, true) })}
+                    />
+                  </div>
+                </div>
+                <div className="subtle tnum" style={{ marginTop: 8, fontSize: 12 }}>
+                  = {fmt(customUnits)} units · ×{fmt(Math.round((customUnits / upb) * 1000) / 1000)} of the recipe ({fmt(upb)} units / batch). Ingredients scale with the recipe; packaging is rounded up to whole pieces.
+                </div>
+                <div className="grid2" style={{ marginTop: 12 }}>
+                  <div className="cell">
+                    <div className="cell-k">Batch weight</div>
+                    <div className="cell-v big">{qu((num(pp.batchKg) * customUnits) / upb, 'kg')}</div>
+                  </div>
+                  <div className="cell">
+                    <div className="cell-k">Units</div>
+                    <div className="cell-v big">{fmt(customUnits)}</div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+            <div className="sec-head" style={{ margin: '14px 0 12px' }}>
               <label htmlFor="plan-batches" className="eyebrow">
                 Batches
               </label>
@@ -238,6 +339,8 @@ function Planner() {
                 <div className="cell-v big">{fmt(Math.floor(pb * m.perCase(pp)))}</div>
               </div>
             </div>
+              </>
+            )}
             <div style={{ marginTop: 12 }}>
               <label htmlFor="plan-date" className="field-label sm">
                 Target date

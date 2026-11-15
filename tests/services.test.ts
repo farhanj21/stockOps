@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Db } from '@/db';
 import * as t from '@/db/schema';
 import { buildModel } from '@/lib/mrp';
+import { num } from '@/lib/format';
 import type { Actor } from '@/server/actor';
 import { AppError } from '@/server/errors';
 import * as svc from '@/server/services';
@@ -413,6 +414,31 @@ describe('stock, orders and production', () => {
     const m = buildModel(await loadData(db, orgId));
     expect(b).toMatchObject({ producedOn: '2026-10-21', plannedKg: 500, plannedUnits: 500, unitsPerCase: 10, actualKg: 488, units: 488, cases: 48, createdBy: production.userId });
     expect(b.materialCost).toBeCloseTo(m.batchCost(m.prodById[f.productId]), 0);
+  });
+
+  it('a custom-quantity batch deducts the recipe scaled to its units, packaging rounded up', async () => {
+    const fudge = await product(db, orgId, FUDGE); // recipe: 500 kg → 500 units, 10 per case
+    const d0 = await loadData(db, orgId);
+    const pack = d0.recipes[fudge.id].map((r) => d0.ingredients.find((i) => i.id === r.ing)!).find((i) => i.kind === 'packaging');
+    const packBefore = pack ? num(pack.inHand) : 0;
+    const packPerBatch = pack ? num(d0.recipes[fudge.id].find((r) => r.ing === pack.id)!.qty) : 0;
+
+    // 15 cases + 3 units = 153 units = 0.306 of the recipe.
+    await svc.addForecast(db, production, { productId: fudge.id, batches: 1, date: '2026-11-01', customUnits: 153 });
+    const f = (await loadData(db, orgId)).forecasts.find((x) => x.customUnits === 153)!;
+    expect(f).toBeTruthy();
+    // Committed custom plans allocate the scaled recipe.
+    const m = buildModel(await loadData(db, orgId));
+    expect(m.planCases(f)).toBeCloseTo(15.3);
+
+    await svc.logBatch(db, production, { productId: fudge.id, forecastId: f.id, customUnits: 153, batchNo: 'CU-1', date: '2026-10-21', cases: 15, looseUnits: 0 });
+    expect((await material(db, orgId, SUGAR)).inHand).toBeCloseTo(2243 - 140 * 0.306, 3);
+    if (pack) expect((await material(db, orgId, pack.name)).inHand).toBe(packBefore - Math.ceil(packPerBatch * 0.306 - 1e-9));
+    const [b] = await db.select().from(t.productionBatches).where(eq(t.productionBatches.batchNo, 'CU-1'));
+    // Measured against the custom size: 153 planned, 150 made → 3 units / 3 kg wastage.
+    expect(b).toMatchObject({ plannedKg: 153, plannedUnits: 153, units: 150, actualKg: 150 });
+    const [after] = await db.select().from(t.forecasts).where(eq(t.forecasts.id, f.id));
+    expect(after.batches).toBe(0);
   });
 
   it('batches can be logged without a plan', async () => {

@@ -59,8 +59,8 @@ export function seed(): Data {
       ),
     },
     forecasts: [
-      { id: 'f1', productId: 'fudge', batches: 4, date: '2026-10-23', by: 'Priya Nair' },
-      { id: 'f2', productId: 'coating', batches: 3, date: '2026-10-24', by: 'Priya Nair' },
+      { id: 'f1', productId: 'fudge', batches: 4, customUnits: null, date: '2026-10-23', by: 'Priya Nair' },
+      { id: 'f2', productId: 'coating', batches: 3, customUnits: null, date: '2026-10-24', by: 'Priya Nair' },
     ],
     // Pipeline above includes PO-2040's items (raising a request adds to pipeline).
     pos: [

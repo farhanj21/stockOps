@@ -48,6 +48,8 @@ export interface Forecast {
   id: string;
   productId: string;
   batches: number;
+  /** Units per batch for a custom-size plan; null = regular recipe batches. */
+  customUnits: number | null;
   date: string;
   by: string;
 }

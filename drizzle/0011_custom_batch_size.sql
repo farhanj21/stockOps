@@ -1,0 +1,1 @@
+ALTER TABLE "production_forecasts" ADD COLUMN "custom_units" integer;

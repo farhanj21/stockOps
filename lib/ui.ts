@@ -33,6 +33,10 @@ export interface UIState {
   stockFilter: StockFilter;
   planProduct: string;
   planBatches: Num;
+  /** Regular recipe batches, or one custom quantity entered as cases + loose units. */
+  planMode: 'batch' | 'custom';
+  planCases: Num;
+  planLoose: Num;
   /** null until the planner picks its default (a week out). */
   planDate: string | null;
   setupTab: SetupTab;
@@ -70,6 +74,9 @@ export const useUI = create<UIState>()((set) => ({
   stockFilter: 'all',
   planProduct: 'fudge',
   planBatches: 4,
+  planMode: 'batch',
+  planCases: '',
+  planLoose: '',
   planDate: null,
   setupTab: 'recipes',
   setupProduct: 'fudge',

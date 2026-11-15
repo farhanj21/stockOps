@@ -1503,6 +1503,19 @@ button.back-link {
   background: var(--navy);
   color: var(--on-navy);
 }
+.seg button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+/* Production plan: Regular batches / Custom quantity, full width of the card. */
+.plan-mode {
+  display: flex;
+  width: 100%;
+}
+.plan-mode button {
+  flex: 1;
+  padding: 0 10px;
+}
 /* Stock: filter control on the left, Export / Import on the right (desktop). */
 .stock-bar {
   display: flex;

@@ -13,7 +13,7 @@ import type { ImportUndo } from '@/lib/api';
 import { num, qu, round } from '@/lib/format';
 import { planImport, type ImportRow } from '@/lib/import-plan';
 import { buildModel } from '@/lib/mrp';
-import { normBatchNo, producedKg, totalUnits, unitWeightG } from '@/lib/production';
+import { batchFactor, normBatchNo, producedKg, scaledQty, totalUnits, unitWeightG } from '@/lib/production';
 import { isBuiltInRole, ROLES, type Perms } from '@/lib/roles';
 import type { MaterialKind, Role } from '@/lib/types';
 import { can, plantToday, requireAdmin, requirePerm, type Actor } from './actor';
@@ -664,15 +664,17 @@ async function ownForecast(tx: Db | Tx, actor: Actor, id: string, lock = false) 
   return f;
 }
 
-export async function addForecast(db: Db, actor: Actor, input: { productId: string; batches: number; date: string }) {
+export async function addForecast(db: Db, actor: Actor, input: { productId: string; batches: number; date: string; customUnits?: number | null }) {
   requirePerm(actor, 'plan');
-  await ownProduct(db, actor, input.productId);
+  const p = await ownProduct(db, actor, input.productId);
+  if (input.customUnits && !(p.unitsPerBatch > 0)) throw new AppError(`Set units per batch for ${p.name} in Setup before planning a custom quantity.`, 'conflict');
   const id = newId('fc');
   await db.insert(t.forecasts).values({
     id,
     organizationId: actor.organizationId,
     productId: input.productId,
     batches: input.batches,
+    customUnits: input.customUnits || null,
     targetDate: input.date,
     createdBy: actor.userId,
   });
@@ -736,18 +738,25 @@ async function assertBatchNoFree(tx: Db | Tx, actor: Actor, batchNo: string, exc
 
 /**
  * Record one batch made (Production / Admin): its own batch number and date, what came out
- * (kg, units, cases), deduct one batch of the recipe from in-hand stock, fix its material cost,
+ * (kg, units, cases), deduct the recipe from in-hand stock, fix its material cost,
  * and count the linked plan down by one.
+ *
+ * A regular batch uses the recipe as set up. A custom batch (`customUnits`) scales it to that many
+ * units: ingredients pro rata, packaging rounded up to whole pieces; the planned kg / units the
+ * batch is measured against for wastage scale the same way.
  */
-export async function logBatch(db: Db, actor: Actor, input: BatchInput & { productId: string; forecastId?: string | null }) {
+export async function logBatch(db: Db, actor: Actor, input: BatchInput & { productId: string; forecastId?: string | null; customUnits?: number | null }) {
   requirePerm(actor, 'plan');
   checkBatchDate(input);
   const batchNo = normBatchNo(input.batchNo);
   try {
     return await db.transaction(async (tx) => {
       const p = await ownProduct(tx, actor, input.productId);
+      if (input.customUnits && !(p.unitsPerBatch > 0)) throw new AppError(`Set units per batch for ${p.name} in Setup before making a custom quantity.`, 'conflict');
+      const factor = batchFactor(input.customUnits, p.unitsPerBatch);
+      const plannedUnits = factor === 1 ? p.unitsPerBatch : input.customUnits!;
       const unitG = unitWeightG(p.batchKg, p.unitsPerBatch, p.unitWeightG ?? 0);
-      const out = batchOutput(input, { plannedUnits: p.unitsPerBatch, upc: p.unitsPerCase, unitG });
+      const out = batchOutput(input, { plannedUnits, upc: p.unitsPerCase, unitG });
       await assertBatchNoFree(tx, actor, batchNo);
       if (input.forecastId) {
         const f = await ownForecast(tx, actor, input.forecastId, true);
@@ -760,11 +769,12 @@ export async function logBatch(db: Db, actor: Actor, input: BatchInput & { produ
       let materialCost = 0;
       for (const l of lines) {
         const ing = await lockIngredient(tx, actor, l.ingredientId);
-        materialCost += l.qtyPerBatch * ing.cost;
+        const use = scaledQty(l.qtyPerBatch, ing.kind, factor);
+        materialCost += use * ing.cost;
         if (ing.kind === 'utility') continue;
-        if (ing.inHand + EPS < l.qtyPerBatch)
+        if (ing.inHand + EPS < use)
           throw new AppError(`Only ${qu(ing.inHand, ing.unit)} of ${ing.name} in hand — receive stock first.`, 'conflict');
-        await writeStock(tx, actor, ing, 'inHand', ing.inHand - l.qtyPerBatch, 'production_run', batchNo);
+        await writeStock(tx, actor, ing, 'inHand', ing.inHand - use, 'production_run', batchNo);
       }
       await tx.insert(t.productionBatches).values({
         id: newId('bat'),
@@ -773,8 +783,8 @@ export async function logBatch(db: Db, actor: Actor, input: BatchInput & { produ
         producedOn: input.date,
         productId: p.id,
         forecastId: input.forecastId ?? null,
-        plannedKg: p.batchKg,
-        plannedUnits: p.unitsPerBatch,
+        plannedKg: Math.round(p.batchKg * factor * 1000) / 1000,
+        plannedUnits,
         unitsPerCase: p.unitsPerCase,
         unitWeightG: round(unitG),
         ...out,

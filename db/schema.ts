@@ -177,6 +177,8 @@ export const forecasts = pgTable(
       .references(() => products.id, { onDelete: 'cascade' }),
     /** Batches still to run; logging a run counts it down. */
     batches: integer('batches').notNull(),
+    /** Custom batch size in units; null = a regular batch as the recipe in Setup says. */
+    customUnits: integer('custom_units'),
     targetDate: date('target_date', { mode: 'string' }).notNull(),
     createdBy: text('created_by').references(() => users.id),
     createdAt: createdAt(),

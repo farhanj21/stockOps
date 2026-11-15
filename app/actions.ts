@@ -320,9 +320,16 @@ export async function removeMember(userId: string) {
 
 // ── Production ──────────────────────────────────────────────────────────────
 
-export async function addForecast(input: { productId: string; batches: number; date: string }) {
+/** Custom batch size in units (null = a regular recipe batch). */
+const CustomUnits = z.number().int('Whole units only.').min(1, 'Enter how many units to make.').max(1e8).nullable().optional();
+
+export async function addForecast(input: { productId: string; batches: number; date: string; customUnits?: number | null }) {
   return act((db, actor) =>
-    svc.addForecast(db, actor, z.object({ productId: Id, batches: z.number().int().min(1, 'Set at least one batch.').max(100000), date: IsoDate }).parse(input)),
+    svc.addForecast(
+      db,
+      actor,
+      z.object({ productId: Id, batches: z.number().int().min(1, 'Set at least one batch.').max(100000), date: IsoDate, customUnits: CustomUnits }).parse(input),
+    ),
   );
 }
 
@@ -342,9 +349,18 @@ const BatchFields = z.object({
   notes: z.string().max(500).optional(),
 });
 
-/** Production records one batch made; deducts one batch of the recipe from in-hand stock. */
-export async function logBatch(form: { productId: string; forecastId?: string | null; batchNo: string; date: string; cases: number; looseUnits: number; notes?: string }) {
-  const parsed = BatchFields.extend({ productId: Id, forecastId: Id.nullable().optional() }).safeParse(form);
+/** Production records one batch made; deducts the recipe (regular or custom-sized) from in-hand stock. */
+export async function logBatch(form: {
+  productId: string;
+  forecastId?: string | null;
+  customUnits?: number | null;
+  batchNo: string;
+  date: string;
+  cases: number;
+  looseUnits: number;
+  notes?: string;
+}) {
+  const parsed = BatchFields.extend({ productId: Id, forecastId: Id.nullable().optional(), customUnits: CustomUnits }).safeParse(form);
   if (!parsed.success) return fieldFail(parsed.error);
   return act((db, actor) => svc.logBatch(db, actor, parsed.data));
 }

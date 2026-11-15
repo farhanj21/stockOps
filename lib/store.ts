@@ -52,7 +52,7 @@ interface StoreState {
 
   setMemberRole: (userId: string, roleId: string) => void;
 
-  addForecast: (f: { productId: string; batches: number; date: string }) => Promise<boolean>;
+  addForecast: (f: { productId: string; batches: number; date: string; customUnits?: number | null }) => Promise<boolean>;
   removeForecast: (id: string) => Promise<Undo | null>;
 
   createPO: (lines: { ingredientId: string; packs: number }[]) => Promise<{ id: string; lines: number } | null>;

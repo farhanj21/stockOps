@@ -96,7 +96,7 @@ export async function loadData(db: Db, organizationId: string, people: { all: bo
     })),
     products: products.map((p) => ({ id: p.id, name: p.name, batchKg: p.batchKg, upb: p.unitsPerBatch, upc: p.unitsPerCase, unitG: p.unitWeightG ?? '' })),
     recipes,
-    forecasts: forecasts.map(({ f, by }) => ({ id: f.id, productId: f.productId, batches: f.batches, date: f.targetDate, by: by ?? '—' })),
+    forecasts: forecasts.map(({ f, by }) => ({ id: f.id, productId: f.productId, batches: f.batches, customUnits: f.customUnits ?? null, date: f.targetDate, by: by ?? '—' })),
     // People see the PO code (PO-2041); it is unique within the organization, so it doubles as the id.
     pos: pos.map(({ po, by, receivedBy }) => ({
       id: po.code,

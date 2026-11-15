@@ -21,6 +21,24 @@ export function producedKg(units: number, unitG: number) {
   return Math.round(units * unitG) / 1000;
 }
 
+/**
+ * How big a batch is compared with the recipe in Setup: 1 for a regular batch, otherwise
+ * custom units ÷ the recipe's units per batch (e.g. 600 units of a 1,000-unit recipe = 0.6).
+ */
+export function batchFactor(customUnits: number | null | undefined, upb: number) {
+  return customUnits && customUnits > 0 && upb > 0 ? customUnits / upb : 1;
+}
+
+/**
+ * One recipe line's quantity for a batch `factor` × the recipe. Ingredients keep their recipe
+ * percentages (scaled to 3 decimals); packaging follows the units made, rounded up to whole pieces.
+ */
+export function scaledQty(qty: number, kind: string | undefined, factor: number) {
+  if (factor === 1) return qty;
+  const x = qty * factor;
+  return kind === 'packaging' ? Math.ceil(x - 1e-9) : Math.round(x * 1000) / 1000;
+}
+
 /** Full cases × units per case + loose units. */
 export const totalUnits = (cases: number, looseUnits: number, upc: number) => cases * Math.max(1, upc) + looseUnits;
 

@@ -7,7 +7,7 @@ import { Icon } from '@/components/Icon';
 import { useShowCost } from '@/lib/hooks';
 import { fmt, fmtDate, money, num, plural, qu, today } from '@/lib/format';
 import { useModel } from '@/lib/model';
-import { batchMetrics, looseUnitsOf, producedKg, suggestBatchNo, totalUnits, unitWeightG } from '@/lib/production';
+import { batchFactor, batchMetrics, looseUnitsOf, producedKg, scaledQty, suggestBatchNo, totalUnits, unitWeightG } from '@/lib/production';
 import { useStore } from '@/lib/store';
 import { confirmDialog, toast, useUI } from '@/lib/ui';
 import { SheetHeader } from './Sheet';
@@ -38,16 +38,26 @@ function BatchForm({ editingId }: { editingId?: string }) {
   const [forecastId, setForecastId] = useState<string>(editing?.forecastId ?? startForecast?.id ?? '');
   const p = m.prodById[productId];
   const startDate = editing?.date ?? today();
-  // A full batch as the recipe says, split into full cases + loose units.
-  const fullBatch = (x: typeof p | undefined) => {
+  // Units split into full cases + loose units for the form fields.
+  const split = (units: number, x: typeof p | undefined) => {
     const upc = Math.max(1, num(x?.upc));
-    const cases = Math.floor(num(x?.upb) / upc);
-    return { cases: String(cases), loose: String(num(x?.upb) - cases * upc) };
+    const cases = Math.floor(units / upc);
+    return { cases: String(cases), loose: String(units - cases * upc) };
   };
+  // A full batch as the recipe says.
+  const fullBatch = (x: typeof p | undefined) => split(num(x?.upb), x);
+  // Regular recipe batch, or a custom quantity (cases + loose units) scaled from the recipe.
+  const startCustom = startForecast?.customUnits ?? null;
+  const [size, setSize] = useState<'batch' | 'custom'>(startCustom ? 'custom' : 'batch');
+  const [target, setTarget] = useState(() => (startCustom ? split(startCustom, p) : { cases: '', loose: '' }));
   const [f, setF] = useState({
     batchNo: editing?.batchNo ?? suggestBatchNo(m.data.batches, startDate),
     date: startDate,
-    ...(editing ? { cases: String(editing.cases), loose: String(looseUnitsOf({ ...editing, upc: editing.upc || num(p?.upc) })) } : fullBatch(p)),
+    ...(editing
+      ? { cases: String(editing.cases), loose: String(looseUnitsOf({ ...editing, upc: editing.upc || num(p?.upc) })) }
+      : startCustom
+        ? split(startCustom, p)
+        : fullBatch(p)),
     notes: editing?.notes ?? '',
   });
   const [numberTouched, setNumberTouched] = useState(!!editing);
@@ -75,20 +85,58 @@ function BatchForm({ editingId }: { editingId?: string }) {
     const np = m.prodById[id];
     setProductId(id);
     setForecastId('');
+    setSize('batch');
+    setTarget({ cases: '', loose: '' });
     ui.set({ batchProduct: id });
     // Fresh defaults for the new product (the person can still change them).
     setF((x) => ({ ...x, ...fullBatch(np) }));
   };
 
+  // Picking a plan brings its size along (regular or custom).
+  const pickPlan = (id: string) => {
+    setForecastId(id);
+    const cu = m.forecastsSorted.find((x) => x.id === id)?.customUnits;
+    if (cu) {
+      setSize('custom');
+      setTarget(split(cu, p));
+      setF((x) => ({ ...x, ...split(cu, p) }));
+    } else if (id) {
+      setSize('batch');
+      setF((x) => ({ ...x, ...fullBatch(p) }));
+    }
+  };
+
+  const pickSize = (k: 'batch' | 'custom') => {
+    setSize(k);
+    setErr((e) => ({ ...e, target: '' }));
+    setF((x) => ({ ...x, ...(k === 'batch' ? fullBatch(p) : split(targetUnitsOf(target), p)) }));
+  };
+
+  // What's made is pre-filled from the custom quantity until changed below.
+  const setTargetField = (k: 'cases' | 'loose', v: string) => {
+    const next = { ...target, [k]: v };
+    setTarget(next);
+    setErr((e) => ({ ...e, target: '' }));
+    setF((x) => ({ ...x, ...split(targetUnitsOf(next), p) }));
+  };
+
   const plans = m.forecastsSorted.filter((x) => x.productId === productId);
-  // The recipe figures this batch is measured against: as logged, or the product's current ones for a new batch.
-  const plannedKg = editing?.plannedKg ?? num(p?.batchKg);
-  const plannedUnits = editing?.plannedUnits || num(p?.upb);
+  const recipeUpb = num(p?.upb);
   const upc = Math.max(1, editing?.upc || num(p?.upc));
+  function targetUnitsOf(t: { cases: string; loose: string }) {
+    return totalUnits(Math.floor(num(t.cases)), Math.floor(num(t.loose)), Math.max(1, num(p?.upc)));
+  }
+  const custom = !editing && size === 'custom' && recipeUpb > 0;
+  const customUnits = custom ? targetUnitsOf(target) : 0;
+  const factor = custom ? batchFactor(customUnits, recipeUpb) : 1;
+  // The recipe figures this batch is measured against: as logged, or the product's current ones (scaled for a custom size).
+  const plannedKg = editing?.plannedKg ?? num(p?.batchKg) * factor;
+  const plannedUnits = editing?.plannedUnits || (custom ? customUnits : recipeUpb);
   const units = totalUnits(Math.floor(num(f.cases)), Math.floor(num(f.loose)), upc);
   const unitG = editing?.unitG || unitWeightG(num(p?.batchKg), num(p?.upb), num(p?.unitG));
   const actualKg = producedKg(units, unitG);
-  const materialCost = editing?.materialCost ?? (p ? m.batchCost(p) : 0);
+  const materialCost =
+    editing?.materialCost ?? m.recipeOf(productId).reduce((a, r) => a + scaledQty(num(r.qty), m.byId[r.ing]?.kind, factor) * num(m.byId[r.ing]?.cost), 0);
   const metrics = batchMetrics({ plannedKg, actualKg, materialCost, plannedUnits, units });
 
   const deductions = editing
@@ -96,7 +144,7 @@ function BatchForm({ editingId }: { editingId?: string }) {
     : m.recipeOf(productId).flatMap((r) => {
         const i = m.byId[r.ing];
         if (m.isUtil(i)) return [];
-        const use = num(r.qty);
+        const use = scaledQty(num(r.qty), i.kind, factor);
         return [{ i, use, after: num(i.inHand) - use }];
       });
   const short = deductions.filter((d) => d.after < -1e-9);
@@ -128,6 +176,7 @@ function BatchForm({ editingId }: { editingId?: string }) {
     if (!next.cases && !next.loose && !(units > 0)) next.cases = 'Enter what was produced.';
     if (!(unitG > 0)) next.cases = 'Set the unit weight for this product in Setup first.';
     if (!f.date) next.date = 'Pick the production date.';
+    if (custom && !(customUnits > 0)) next.target = 'Enter the quantity this batch was made for.';
     if (Object.keys(next).length) return setErr(next);
     const fields = {
       batchNo: f.batchNo,
@@ -137,7 +186,7 @@ function BatchForm({ editingId }: { editingId?: string }) {
       notes: f.notes,
     };
     setBusy(true);
-    const res = editing ? await submit(() => updateBatch(editing.id, fields)) : await submit(() => logBatch({ ...fields, productId, forecastId: forecastId || null }));
+    const res = editing ? await submit(() => updateBatch(editing.id, fields)) : await submit(() => logBatch({ ...fields, productId, forecastId: forecastId || null, customUnits: custom ? customUnits : null }));
     setBusy(false);
     if (!res.ok) return setErr(res.fieldErrors ?? { batchNo: res.error });
     ui.set({ sheetOpen: false });
@@ -168,15 +217,79 @@ function BatchForm({ editingId }: { editingId?: string }) {
 
         {!editing && (
           <FormField id="bt-plan" label="From plan">
-            <select id="bt-plan" className="input" value={forecastId} onChange={(e) => setForecastId(e.target.value)}>
+            <select id="bt-plan" className="input" value={forecastId} onChange={(e) => pickPlan(e.target.value)}>
               <option value="">Not from a plan</option>
               {plans.map((x) => (
                 <option key={x.id} value={x.id}>
+                  {x.customUnits ? `Custom ${fmt(x.customUnits)} units · ` : ''}
                   {plural(num(x.batches), 'batch', 'batches')} left · due {fmtDate(x.date)}
                 </option>
               ))}
             </select>
           </FormField>
+        )}
+
+        {!editing && (
+          <div>
+            <div className="seg plan-mode" role="radiogroup" aria-label="Batch size">
+              {(
+                [
+                  ['batch', 'Regular batch'],
+                  ['custom', 'Custom quantity'],
+                ] as const
+              ).map(([k, label]) => (
+                <button
+                  key={k}
+                  type="button"
+                  role="radio"
+                  aria-checked={(custom ? 'custom' : 'batch') === k}
+                  disabled={k === 'custom' && !(recipeUpb > 0)}
+                  title={k === 'custom' && !(recipeUpb > 0) ? 'Set units per batch for this product in Setup first' : undefined}
+                  onClick={() => pickSize(k)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {custom ? (
+              <>
+                <div className="grid2" style={{ gap: 10, marginTop: 12 }}>
+                  <FormField id="bt-tcases" label={`Make: cases (${fmt(Math.max(1, num(p?.upc)))} units each)`} error={err.target}>
+                    <input
+                      id="bt-tcases"
+                      className="input tnum"
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      placeholder="0"
+                      value={target.cases}
+                      aria-invalid={!!err.target}
+                      onChange={(e) => setTargetField('cases', e.target.value)}
+                    />
+                  </FormField>
+                  <FormField id="bt-tloose" label="Make: loose units">
+                    <input
+                      id="bt-tloose"
+                      className="input tnum"
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      placeholder="0"
+                      value={target.loose}
+                      onChange={(e) => setTargetField('loose', e.target.value)}
+                    />
+                  </FormField>
+                </div>
+                <div className="subtle tnum" style={{ marginTop: -4, fontSize: 12 }}>
+                  = {fmt(customUnits)} units · ×{fmt(Math.round(factor * 1000) / 1000)} of the recipe · {qu(plannedKg, 'kg')}. Packaging rounded up to whole pieces.
+                </div>
+              </>
+            ) : (
+              <div className="subtle tnum" style={{ marginTop: 8, fontSize: 12 }}>
+                One batch as the recipe in Setup: {fmt(recipeUpb)} units · {qu(num(p?.batchKg), 'kg')}.
+              </div>
+            )}
+          </div>
         )}
 
         <div className="grid2" style={{ gap: 10 }}>
@@ -257,7 +370,7 @@ function BatchForm({ editingId }: { editingId?: string }) {
         {!editing && deductions.length > 0 && (
           <div>
             <div className="eyebrow" style={{ marginBottom: 8 }}>
-              Deducted from in-hand (one batch)
+              Deducted from in-hand ({custom ? `custom · ${fmt(customUnits)} units` : 'one batch'})
             </div>
             <div className="sheet-list list">
               {deductions.map(({ i, use, after }) => (

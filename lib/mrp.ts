@@ -1,9 +1,12 @@
 import { fmt, num, round } from './format';
+import { batchFactor, scaledQty } from './production';
 import type { Data, Ingredient, Product } from './types';
 
 export interface Capacity {
   batches: number;
   cases: number;
+  /** Units the stock covers, counting part batches (for custom quantities). */
+  units: number;
   /** The ingredient that runs out first. */
   lim: Ingredient | null;
 }
@@ -55,11 +58,12 @@ export function buildModel(d: Data) {
   const total = (i: Ingredient) => num(i.inHand) + num(i.pipeline);
   const alloc: Record<string, number> = {};
   ings.forEach((i) => (alloc[i.id] = 0));
-  d.forecasts.forEach((f) =>
+  d.forecasts.forEach((f) => {
+    const factor = batchFactor(f.customUnits, num(prodById[f.productId]?.upb));
     recipeOf(f.productId).forEach((r) => {
-      if (alloc[r.ing] != null) alloc[r.ing] += num(f.batches) * num(r.qty);
-    }),
-  );
+      if (alloc[r.ing] != null) alloc[r.ing] += num(f.batches) * scaledQty(num(r.qty), byId[r.ing]?.kind, factor);
+    });
+  });
   const allocOf = (i: Ingredient) => alloc[i.id] ?? 0;
   const free = (i: Ingredient) => total(i) - allocOf(i);
   /** What's physically here. Anything that uses stock counts this only: pipeline hasn't arrived yet. */
@@ -84,7 +88,8 @@ export function buildModel(d: Data) {
       }
     });
     const batches = Number.isFinite(best) ? Math.floor(best + EPS) : 0;
-    return { batches, cases: Math.floor((batches * num(p.upb)) / Math.max(1, num(p.upc))), lim };
+    const units = Number.isFinite(best) ? Math.floor(best * num(p.upb) + EPS) : 0;
+    return { batches, cases: Math.floor((batches * num(p.upb)) / Math.max(1, num(p.upc))), units, lim };
   }
 
   const alerts = ings
@@ -106,16 +111,20 @@ export function buildModel(d: Data) {
     })
     .filter((x): x is Suggestion => x !== null);
 
-  /** Material impact of planning `batches` more of a product, against free stock. */
-  function planImpact(p: Product, batches: number) {
+  /**
+   * Material impact of planning `batches` more of a product, against free stock.
+   * `customUnits` sizes each batch by units instead of the recipe's regular batch.
+   */
+  function planImpact(p: Product, batches: number, customUnits?: number | null) {
     const lines: PlanLine[] = [];
     let shortCount = 0;
     let orderCost = 0;
     let materialCost = 0;
+    const factor = batchFactor(customUnits, num(p.upb));
     recipeOf(p.id).forEach((r) => {
       const i = byId[r.ing];
       if (isUtil(i)) return;
-      const need = batches * num(r.qty);
+      const need = batches * scaledQty(num(r.qty), i.kind, factor);
       // Only in-hand stock can be used: pipeline counts once it's been received.
       const fr = Math.max(0, freeInHand(i));
       const short = Math.max(0, need - fr);
@@ -135,10 +144,17 @@ export function buildModel(d: Data) {
   const batchCost = (p: Product) =>
     recipeOf(p.id).reduce((a, r) => a + (byId[r.ing] ? num(r.qty) * num(byId[r.ing].cost) : 0), 0);
 
-  const forecastsSorted = d.forecasts.slice().sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  /** Cases one batch of a plan makes: the recipe's, or its custom units ÷ units per case. */
+  const planCases = (f: Pick<Data['forecasts'][number], 'productId' | 'customUnits'>) => {
+    const p = prodById[f.productId];
+    if (!p) return 0;
+    return f.customUnits ? f.customUnits / Math.max(1, num(p.upc)) : perCase(p);
+  };
+
+  const forecastsSorted =d.forecasts.slice().sort((a, b) => String(a.date).localeCompare(String(b.date)));
   const committedBatches = d.forecasts.reduce((a, f) => a + num(f.batches), 0);
   const committedCases = d.forecasts.reduce(
-    (a, f) => a + Math.floor(num(f.batches) * perCase(prodById[f.productId] || { upb: 0, upc: 1 })),
+    (a, f) => a + Math.floor(num(f.batches) * planCases(f)),
     0,
   );
 
@@ -162,6 +178,7 @@ export function buildModel(d: Data) {
     isLow,
     shortOf,
     perCase,
+    planCases,
     capacity,
     alerts,
     suggestions,

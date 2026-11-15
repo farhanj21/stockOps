@@ -78,6 +78,13 @@
       "when": 1794328210193,
       "tag": "0010_requests_into_pipeline",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1794731468837,
+      "tag": "0011_custom_batch_size",
+      "breakpoints": true
     }
   ]
 }
