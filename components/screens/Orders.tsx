@@ -81,6 +81,12 @@ export function Orders() {
             </h2>
             <span className="sec-meta">{m.suggestions.length ? `${m.suggestions.length} suggested` : 'Nothing suggested'}</span>
           </div>
+          {!perms.request ? (
+            <div className="empty">
+              <div className="empty-t">View only</div>
+              <div className="empty-s">Only Admin and Warehouse can raise purchase requests. Ask them if a material is needed.</div>
+            </div>
+          ) : (
           <div className="col" style={{ gap: 12 }}>
             <div className="card clip">
               <div className="po-intro">
@@ -130,6 +136,7 @@ export function Orders() {
               {busy === 'create' ? 'Creating…' : `Create ${m.nextPoId}`}
             </button>
           </div>
+          )}
         </section>
 
         <div className="col min0" style={{ gap: 22 }}>

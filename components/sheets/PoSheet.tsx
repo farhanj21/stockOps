@@ -5,6 +5,7 @@ import { Icon } from '@/components/Icon';
 import { poValue } from '@/lib/export';
 import { fmt, fmtDate, money, num, plural, qu } from '@/lib/format';
 import { useCurrentUser, useShowCost } from '@/lib/hooks';
+import { isAdminRole } from '@/lib/roles';
 import { useModel } from '@/lib/model';
 import { useStore } from '@/lib/store';
 import type { Ingredient, PoLine, PurchaseOrder } from '@/lib/types';
@@ -31,7 +32,7 @@ export function receivedText(l: PoLine, unit: string) {
 export function PoSheet({ id }: { id: string }) {
   const SHOW_COST = useShowCost();
   const m = useModel();
-  const { perms } = useCurrentUser();
+  const { perms, roleId } = useCurrentUser();
   const deletePO = useStore((s) => s.deletePO);
   const receivePO = useStore((s) => s.receivePO);
   const close = useUI((s) => s.closeSheet);
@@ -43,7 +44,8 @@ export function PoSheet({ id }: { id: string }) {
   const status = requestStatus(po);
   const pending = po.lines.filter((l) => !l.received);
   // Cancelling an open request needs "Receive deliveries"; removing closed history needs "Setup".
-  const canDelete = closed ? perms.setup : perms.receive;
+  // Only an Admin cancels or deletes a purchase request.
+  const canDelete = isAdminRole(roleId);
   const canReceive = !closed && perms.receive;
 
   async function remove() {

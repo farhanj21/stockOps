@@ -14,7 +14,7 @@ import { num, qu, round } from '@/lib/format';
 import { planImport, type ImportRow } from '@/lib/import-plan';
 import { buildModel } from '@/lib/mrp';
 import { batchFactor, normBatchNo, producedKg, scaledQty, totalUnits, unitWeightG } from '@/lib/production';
-import { isBuiltInRole, ROLES, type Perms } from '@/lib/roles';
+import { isAdminRole, isBuiltInRole, ROLES, type Perms } from '@/lib/roles';
 import type { MaterialKind, Role } from '@/lib/types';
 import { can, plantToday, requireAdmin, requirePerm, type Actor } from './actor';
 import { AppError, isUniqueViolation } from './errors';
@@ -230,7 +230,7 @@ export async function setMemberRole(db: Db, actor: Actor, userId: string, roleId
 
 // ── Custom roles ────────────────────────────────────────────────────────────
 
-const permColumns = (p: Perms) => ({ canStock: p.stock, canReceive: p.receive, canPlan: p.plan, canSetup: p.setup, canTeam: p.team, canCosts: p.costs, canCalc: p.calc });
+const permColumns = (p: Perms) => ({ canStock: p.stock, canReceive: p.receive, canRequest: p.request, canPlan: p.plan, canSetup: p.setup, canTeam: p.team, canCosts: p.costs, canCalc: p.calc });
 
 /** Role names are unique per organization (ignoring case) and can't reuse a built-in name. */
 async function assertRoleNameFree(tx: Db | Tx, actor: Actor, name: string, exceptId?: string) {
@@ -836,9 +836,9 @@ export async function updateBatch(db: Db, actor: Actor, id: string, input: Batch
   }
 }
 
-/** Remove a batch record. Only the record goes: in-hand stock and plans are left as they are. */
+/** Remove a batch record (Admin only). Only the record goes: in-hand stock and plans are left as they are. */
 export async function deleteBatch(db: Db, actor: Actor, id: string) {
-  requirePerm(actor, 'plan');
+  if (!isAdminRole(actor.roleId)) throw new AppError('Only an Admin can delete a batch record.', 'forbidden');
   const [b] = await db
     .delete(t.productionBatches)
     .where(and(eq(t.productionBatches.id, id), eq(t.productionBatches.organizationId, actor.organizationId)))
@@ -847,7 +847,7 @@ export async function deleteBatch(db: Db, actor: Actor, id: string) {
   return b;
 }
 
-// ── Purchase requests (everyone raises them; Admin/Warehouse receive) ────────
+// ── Purchase requests (Admin/Warehouse raise and receive; only Admin deletes) ─
 // Stored as purchase orders. Raising one adds its quantities to pipeline; each item is received
 // separately with what actually arrived, which moves it from pipeline into in-hand.
 
@@ -862,6 +862,7 @@ export interface PoLineInput {
  * Quantities and costs come from each material's saved pack size, never from the client.
  */
 export async function createPO(db: Db, actor: Actor, input: PoLineInput[]) {
+  requirePerm(actor, 'request');
   const packsById = new Map<string, number>();
   for (const l of input) {
     if (!Number.isInteger(l.packs) || l.packs < 1) throw new AppError('Request at least one whole pack per item.');
@@ -905,6 +906,7 @@ export async function createPO(db: Db, actor: Actor, input: PoLineInput[]) {
  * whole packs), leaving out the given materials.
  */
 export async function generatePO(db: Db, actor: Actor, excluded: string[]) {
+  requirePerm(actor, 'request');
   const m = buildModel(await loadData(db, actor.organizationId, { all: false }));
   const lines = m.suggestions.filter((s) => !excluded.includes(s.i.id));
   if (!lines.length) throw new AppError('Nothing to request — stock covers every plan and par level.', 'conflict');
@@ -981,11 +983,12 @@ export async function receivePO(db: Db, actor: Actor, code: string) {
 }
 
 /**
- * Delete a purchase request. An open one is cancelled (needs "Receive deliveries"): items still to
- * arrive come off pipeline. A closed one only leaves the history (needs "Setup"). Items already
- * received stay in in-hand stock, because they did arrive. Its number is never handed out again.
+ * Delete a purchase request (Admin only). An open one is cancelled: items still to arrive come off
+ * pipeline. A closed one only leaves the history. Items already received stay in in-hand stock,
+ * because they did arrive. Its number is never handed out again.
  */
 export async function deletePO(db: Db, actor: Actor, code: string) {
+  if (!isAdminRole(actor.roleId)) throw new AppError('Only an Admin can delete a purchase request.', 'forbidden');
   await db.transaction(async (tx) => {
     const [po] = await tx
       .select()
@@ -993,7 +996,6 @@ export async function deletePO(db: Db, actor: Actor, code: string) {
       .where(and(eq(t.purchaseOrders.code, code), eq(t.purchaseOrders.organizationId, actor.organizationId)))
       .for('update');
     if (!po) throw new AppError('That purchase request no longer exists.', 'not_found');
-    requirePerm(actor, po.status === 'Open' ? 'receive' : 'setup');
     if (po.status === 'Open') {
       // Cancelled: items still to arrive come back off pipeline. Items already received stay in stock.
       const lines = await tx.select().from(t.poLines).where(eq(t.poLines.poId, po.id));

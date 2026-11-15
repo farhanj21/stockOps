@@ -172,7 +172,7 @@ describe('team accounts', () => {
 });
 
 describe('custom roles', () => {
-  const NONE = { stock: false, receive: false, plan: false, setup: false, team: false, costs: false, calc: false };
+  const NONE = { stock: false, receive: false, request: false, plan: false, setup: false, team: false, costs: false, calc: false };
 
   it('admins create a role, give it to someone, and its permissions apply', async () => {
     const { id } = await svc.createRole(db, admin, { name: 'Store keeper', perms: { ...NONE, stock: true, receive: true } });
@@ -317,11 +317,14 @@ describe('role permissions (blueprint §3)', () => {
     await svc.addForecast(db, production, { productId: fudge.id, batches: 1, date: '2026-11-01' });
   });
 
-  it('every role can raise a purchase request; Production cannot receive one', async () => {
-    const po = await svc.generatePO(db, production, []);
+  it('only Admin and Warehouse raise purchase requests; Production can neither raise nor receive one', async () => {
+    await forbidden(svc.generatePO(db, production, []));
+    await forbidden(svc.createPO(db, production, [{ ingredientId: (await material(db, orgId, SUGAR)).id, packs: 1 }]));
+    const po = await svc.generatePO(db, warehouse, []);
     expect(po.id).toBe('PR-2041');
     await forbidden(svc.receivePO(db, production, po.id));
     await svc.receivePO(db, warehouse, po.id);
+    await svc.createPO(db, admin, [{ ingredientId: (await material(db, orgId, SUGAR)).id, packs: 1 }]);
   });
 });
 
@@ -387,8 +390,9 @@ describe('stock, orders and production', () => {
   it('deleting an open request takes what is still to arrive off pipeline; its number is never reused', async () => {
     const before = await material(db, orgId, SUGAR);
     await forbidden(svc.deletePO(db, production, 'PO-2040'));
+    await forbidden(svc.deletePO(db, warehouse, 'PO-2040')); // only an Admin deletes requests
     await svc.receivePOLine(db, warehouse, 'PO-2040', (await material(db, orgId, 'Cocoa Powder (N)')).id, 100, null);
-    await svc.deletePO(db, warehouse, 'PO-2040');
+    await svc.deletePO(db, admin, 'PO-2040');
     expect(await material(db, orgId, SUGAR)).toMatchObject({ inHand: before.inHand, pipeline: 256 });
     expect((await material(db, orgId, 'Cocoa Powder (N)')).pipeline).toBe(24); // received item isn't taken off twice
     const data = await loadData(db, orgId);
@@ -490,16 +494,17 @@ describe('stock, orders and production', () => {
     expect(b).toMatchObject({ units: 100, actualKg: 95, unitWeightG: 950 });
   });
 
-  it('Production can delete a batch record; stock stays as it is', async () => {
+  it('only an Admin can delete a batch record; stock stays as it is', async () => {
     const fudge = await product(db, orgId, FUDGE);
     await svc.logBatch(db, production, { productId: fudge.id, batchNo: 'D-1', date: '2026-10-20', cases: 50, looseUnits: 0 });
     const stock = (await material(db, orgId, SUGAR)).inHand;
     const [b] = await db.select().from(t.productionBatches).where(eq(t.productionBatches.batchNo, 'D-1'));
     await forbidden(svc.deleteBatch(db, warehouse, b.id));
-    expect(await svc.deleteBatch(db, production, b.id)).toEqual({ batchNo: 'D-1' });
+    await forbidden(svc.deleteBatch(db, production, b.id)); // Production edits records but can't delete them
+    expect(await svc.deleteBatch(db, admin, b.id)).toEqual({ batchNo: 'D-1' });
     expect(await db.select().from(t.productionBatches).where(eq(t.productionBatches.id, b.id))).toEqual([]);
     expect((await material(db, orgId, SUGAR)).inHand).toBe(stock);
-    await expect(svc.deleteBatch(db, production, b.id)).rejects.toMatchObject({ code: 'not_found' });
+    await expect(svc.deleteBatch(db, admin, b.id)).rejects.toMatchObject({ code: 'not_found' });
   });
 
   it('batch records can be corrected without touching stock', async () => {

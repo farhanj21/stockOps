@@ -60,6 +60,7 @@ export const customRoles = pgTable(
     name: text('name').notNull(),
     canStock: boolean('can_stock').notNull().default(false),
     canReceive: boolean('can_receive').notNull().default(false),
+    canRequest: boolean('can_request').notNull().default(false),
     canPlan: boolean('can_plan').notNull().default(false),
     canSetup: boolean('can_setup').notNull().default(false),
     canTeam: boolean('can_team').notNull().default(false),

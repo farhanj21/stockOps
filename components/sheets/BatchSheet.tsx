@@ -4,7 +4,8 @@ import { useState, type FormEvent } from 'react';
 import { deleteBatch, logBatch, updateBatch } from '@/app/actions';
 import { FormField } from '@/components/FormField';
 import { Icon } from '@/components/Icon';
-import { useShowCost } from '@/lib/hooks';
+import { useCurrentUser, useShowCost } from '@/lib/hooks';
+import { isAdminRole } from '@/lib/roles';
 import { fmt, fmtDate, money, num, plural, qu, today } from '@/lib/format';
 import { useModel } from '@/lib/model';
 import { batchFactor, batchMetrics, looseUnitsOf, producedKg, scaledQty, suggestBatchNo, totalUnits, unitWeightG } from '@/lib/production';
@@ -29,6 +30,7 @@ function BatchForm({ editingId }: { editingId?: string }) {
   const submit = useStore((s) => s.submit);
   const send = useStore((s) => s.send);
   const ui = useUI();
+  const { roleId } = useCurrentUser();
   const editing = editingId ? m.data.batches.find((b) => b.id === editingId) : undefined;
   const products = m.data.products;
 
@@ -397,7 +399,7 @@ function BatchForm({ editingId }: { editingId?: string }) {
         <button type="submit" className="btn btn-primary btn-lg" disabled={busy || short.length > 0 || noRecipe}>
           {busy ? 'Saving…' : editing ? 'Save changes' : `Log batch ${f.batchNo.trim().toUpperCase()}`}
         </button>
-        {editing && (
+        {editing && isAdminRole(roleId) && (
           <button type="button" className="btn btn-outline danger-btn" style={{ width: '100%' }} disabled={busy} onClick={remove}>
             <Icon name="trash" size={14} /> Delete batch
           </button>

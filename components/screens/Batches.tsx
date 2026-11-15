@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { deleteBatch } from '@/app/actions';
 import { Icon } from '@/components/Icon';
 import { useCurrentUser, useShowCost } from '@/lib/hooks';
+import { isAdminRole } from '@/lib/roles';
 import { batchRows, downloadWorkbook, totalsRows } from '@/lib/export';
 import { fmt, fmtDate, money, plural, qu } from '@/lib/format';
 import { useModel } from '@/lib/model';
@@ -43,7 +44,8 @@ function NoBatches({ filtered }: { filtered?: boolean }) {
 /** Every batch made, newest first, filterable by product and month. */
 export function BatchRecords() {
   const SHOW_COST = useShowCost();
-  const canDelete = useCurrentUser().perms.plan;
+  // Production can edit batch records; only an Admin deletes them.
+  const canDelete = isAdminRole(useCurrentUser().roleId);
   const send = useStore((s) => s.send);
 
   // Same rule as the batch sheet: only the record goes; stock and plans stay as they are.

@@ -41,7 +41,7 @@ const QUICK_ACTIONS: Record<Role, QuickAction[]> = {
     { title: 'Plan batches', sub: 'Forecast & preview', icon: 'calendar', to: 'plan' },
     { title: 'Log a batch', sub: 'Batch no. · kg · cases', icon: 'check', iconStroke: 2.2, to: 'batch' },
     { title: 'Check stock', sub: 'View only', icon: 'box', to: 'stock' },
-    { title: 'New request', sub: 'Rounded to packs', icon: 'receipt', to: 'orders' },
+    { title: 'Purchase Requests', sub: 'View only', icon: 'receipt', to: 'orders' },
   ],
 };
 
@@ -55,7 +55,7 @@ function quickActionsFor(roleId: string, perms: Perms): QuickAction[] {
   if (perms.plan) list.push({ title: 'Log a batch', sub: 'Batch no. · kg · cases', icon: 'check', iconStroke: 2.2, to: 'batch' });
   if (perms.setup) list.push({ title: 'Recipes & par', sub: 'Setup', icon: 'sliders', to: 'setup' });
   if (!perms.stock) list.push({ title: 'Check stock', sub: 'View only', icon: 'box', to: 'stock' });
-  list.push({ title: 'Purchase Requests', sub: 'Review & generate', icon: 'receipt', to: 'orders' });
+  list.push({ title: 'Purchase Requests', sub: perms.request ? 'Review & generate' : 'View only', icon: 'receipt', to: 'orders' });
   list.push({ title: 'Below-par items', sub: 'Filtered stock list', icon: 'alert', to: 'stockLow' });
   return list.slice(0, 4);
 }

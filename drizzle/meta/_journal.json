@@ -85,6 +85,13 @@
       "when": 1794731468837,
       "tag": "0011_custom_batch_size",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1794731912524,
+      "tag": "0012_role_request",
+      "breakpoints": true
     }
   ]
 }
