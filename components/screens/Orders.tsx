@@ -9,9 +9,50 @@ import { useCurrentUser, useShowCost } from '@/lib/hooks';
 import { useModel } from '@/lib/model';
 import { useStore } from '@/lib/store';
 import type { Ingredient, Num, PoLine } from '@/lib/types';
-import { toast, useUI } from '@/lib/ui';
+import { toast, useUI, type OrdersTab } from '@/lib/ui';
+import { RequestSummary } from './RequestSummary';
 
+const ORDER_TABS: [OrdersTab, string][] = [
+  ['requests', 'Requests'],
+  ['summary', 'Summary'],
+];
+
+/** Purchase Requests: raise and receive requests, or see them summarised by day, month and year. */
 export function Orders() {
+  const tab = useUI((s) => s.ordersTab);
+  const setUI = useUI((s) => s.set);
+  return (
+    <div className="col" style={{ gap: 18 }}>
+      <div className="n-only">
+        <h1 className="page-title" style={{ margin: 0, fontWeight: 400 }}>
+          Purchase Requests
+        </h1>
+        <div className="page-sub">Quantities round up to full supplier packs.</div>
+      </div>
+      <div className="tabs" role="tablist" aria-label="Purchase request sections">
+        {ORDER_TABS.map(([k, label]) => (
+          <button
+            key={k}
+            type="button"
+            role="tab"
+            id={`tab-${k}`}
+            aria-selected={tab === k}
+            aria-controls={`panel-${k}`}
+            className="tab"
+            onClick={() => setUI({ ordersTab: k })}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`}>
+        {tab === 'summary' ? <RequestSummary /> : <Requests />}
+      </div>
+    </div>
+  );
+}
+
+function Requests() {
   const SHOW_COST = useShowCost();
   const m = useModel();
   const { perms } = useCurrentUser();
@@ -66,13 +107,6 @@ export function Orders() {
 
   return (
     <div className="col" style={{ gap: 22 }}>
-      <div className="n-only">
-        <h1 className="page-title" style={{ margin: 0, fontWeight: 400 }}>
-          Purchase Requests
-        </h1>
-        <div className="page-sub">Quantities round up to full supplier packs.</div>
-      </div>
-
       <div className="orders-grid">
         <section className="min0">
           <div className="sec-head">

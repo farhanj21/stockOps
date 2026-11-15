@@ -8,6 +8,7 @@ export type { ImportRow } from './import-plan';
 
 export type SheetType = 'material' | 'product' | 'batch' | 'import' | 'po';
 export type PlanTab = 'plan' | 'batches' | 'calc' | 'reports';
+export type OrdersTab = 'requests' | 'summary';
 export type StockFilter = 'all' | 'low' | 'ingredient' | 'packaging';
 export type SetupTab = 'recipes' | 'materials';
 
@@ -48,6 +49,8 @@ export interface UIState {
   poExtra: string[];
   /** Production screen section. */
   planTab: PlanTab;
+  /** Purchase Requests screen section. */
+  ordersTab: OrdersTab;
   /** Plan (forecast) to log the next batch against, or null for none. */
   runId: string | null;
   /** Product to log the next batch for when it isn't from a plan. */
@@ -84,6 +87,7 @@ export const useUI = create<UIState>()((set) => ({
   poPacks: {},
   poExtra: [],
   planTab: 'plan',
+  ordersTab: 'requests',
   runId: null,
   batchProduct: null,
   runBatches: 1,
